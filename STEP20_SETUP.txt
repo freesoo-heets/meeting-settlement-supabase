@@ -1,0 +1,47 @@
+STEP 20 - PWA / 모바일 / 정산공유 템플릿 / 배포 준비
+
+추가 기능
+- 앱 설치(PWA)
+  · Android Chrome / Edge 등에서 설치 가능
+  · 헤더 '앱 설치' 버튼
+  · 설치 버튼이 지원되지 않는 브라우저에서는 홈 화면 추가 안내
+- 오프라인 앱 쉘 캐시
+  · 네트워크가 끊긴 경우 최근 캐시된 화면을 열 수 있음
+  · Supabase 데이터 변경/조회 자체는 인터넷 연결 필요
+- 정산 공유 문구 3종
+  · 기본형
+  · 카톡 꾸밈형
+  · 간단형
+- 모바일 터치 UX 강화
+  · 입력창 모바일 확대 문제 완화
+  · 공유 컨트롤 반응형
+- 기존 Step 18/19 기능 모두 유지
+
+적용
+1. ZIP 전체를 프로젝트에 덮어쓰기
+   핵심 추가 파일:
+   app/manifest.ts
+   public/sw.js
+   public/icon-192.png
+   public/icon-512.png
+
+2. 추가 SQL 없음
+3. 추가 환경변수 없음
+
+로컬 재시작
+Ctrl + C
+Remove-Item -Recurse -Force .\.next -ErrorAction SilentlyContinue
+npm run dev
+
+Vercel 배포 환경변수 최종 확인
+NEXT_PUBLIC_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+SUPABASE_SERVICE_ROLE_KEY
+CREATOR_SETUP_KEY
+
+주의
+- SUPABASE_SERVICE_ROLE_KEY는 절대 NEXT_PUBLIC_ 접두사를 붙이지 않습니다.
+- .env.local은 GitHub에 올리지 않습니다.
+- PWA 설치 기능은 localhost 또는 HTTPS(Vercel)에서 테스트하는 것이 좋습니다.
+- 카카오톡 '직접 채팅방 지정 전송'이 아니라 모바일 시스템 공유창을 사용합니다.
+  사용자가 공유 대상에서 카카오톡 및 채팅방을 선택하는 방식입니다.

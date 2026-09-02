@@ -66,7 +66,12 @@ export async function POST(request: Request) {
     }
 
     if (!member) {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Seoul",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(new Date());
       const { data: createdMember, error: createMemberError } = await admin
         .from("members")
         .insert({

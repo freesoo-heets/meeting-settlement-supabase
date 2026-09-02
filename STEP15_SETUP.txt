@@ -1,0 +1,49 @@
+STEP 15 적용 순서
+
+변경사항
+- 관리자가 회원을 추가하는 방식 제거
+- 개인이 '최초 가입'에서 닉네임 + 비밀번호를 직접 생성
+- 기존 회원 명단에 같은 닉네임이 있으면 기존 회원 데이터에 로그인 계정만 연결
+- 기존 회원 명단에 없으면 가입 시 members + auth + profiles 자동 생성
+- 가입일은 신규 가입한 날짜로 자동 기록
+- 탈퇴된 기존 닉네임은 재가입 불가
+- 제작자는 일반 가입 후 CREATOR_SETUP_KEY로 최초 1명만 owner 승격
+- 제작자만 다른 회원을 admin으로 지정/해제
+- 관리자만 회원 탈퇴/복귀 및 입장일 수정
+- 일반회원/관리자/제작자의 메인 UI/탭/대시보드는 동일
+- 모든 역할에 '내 현황' 스트립 추가: 월 참석/선입금/남은 부담금
+- 참석 해제 시 해당 모임의 특정값 + 선입금도 함께 정리
+
+적용
+1) Step 14가 이미 적용되어 있다면 SQL Editor에서
+   supabase/step15_self_signup.sql 실행
+
+2) 다음 파일/폴더 덮어쓰기
+   app/page.tsx
+   app/globals.css
+   app/api/auth/signup/route.ts
+   app/api/auth/nickname/route.ts
+   app/api/setup/creator/route.ts
+   lib/server-admin.ts
+
+3) app/api/admin/member-account 폴더는 더 이상 사용하지 않습니다.
+   기존 프로젝트에 있다면 삭제해도 됩니다.
+
+4) .env.local 유지
+   NEXT_PUBLIC_SUPABASE_URL=...
+   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...
+   SUPABASE_SERVICE_ROLE_KEY=sb_secret_...
+   CREATOR_SETUP_KEY=본인만아는설정키
+
+5) 재시작
+   Ctrl + C
+   Remove-Item -Recurse -Force .\.next -ErrorAction SilentlyContinue
+   npm run dev
+
+제작자 최초 지정
+1. 로그인 화면 > 최초 가입
+2. 제작자 본인이 닉네임/비밀번호로 가입
+3. 로그아웃
+4. 로그인 화면 > 제작자 권한 설정
+5. CREATOR_SETUP_KEY + 가입한 닉네임 입력
+6. 다시 로그인

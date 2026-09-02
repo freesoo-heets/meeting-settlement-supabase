@@ -117,6 +117,7 @@ export default function Home() {
   const [showCreatorSetup, setShowCreatorSetup] = useState(false);
   const [creatorSetupKey, setCreatorSetupKey] = useState("");
   const [creatorNickname, setCreatorNickname] = useState("");
+  const [ownerExists, setOwnerExists] = useState<boolean | null>(null);
 
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
   const [selectedMeetingId, setSelectedMeetingId] = useState("");
@@ -275,6 +276,24 @@ export default function Home() {
     window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
     return () => {
       window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+    };
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+
+    void (async () => {
+      try {
+        const response = await fetch("/api/setup/status", { cache: "no-store" });
+        const body = await response.json();
+        if (alive) setOwnerExists(Boolean(body.ownerExists));
+      } catch {
+        if (alive) setOwnerExists(null);
+      }
+    })();
+
+    return () => {
+      alive = false;
     };
   }, []);
 
@@ -872,13 +891,18 @@ export default function Home() {
   }
 
   function exportBackupJson() {
+    if (!isAdmin) {
+      setNotice("전체 백업은 관리자 이상만 사용할 수 있습니다.");
+      return;
+    }
+
     const data = {
+      version: 1,
       exportedAt: new Date().toISOString(),
       members,
       meetings,
       adjustments,
       prepayments,
-      profiles,
     };
 
     downloadTextFile(
@@ -1122,6 +1146,8 @@ export default function Home() {
       }
 
       setShowCreatorSetup(false);
+      setOwnerExists(true);
+      setCreatorSetupKey("");
       setAuthMode("login");
       setLoginNickname(creatorNickname.trim());
       setLoginNotice("제작자 권한이 지정되었습니다. 기존 비밀번호로 로그인해주세요.");
@@ -1910,34 +1936,40 @@ export default function Home() {
 
           {loginNotice && <div className="authNotice">{loginNotice}</div>}
 
-          <button
-            className="creatorSetupToggle"
-            onClick={() => setShowCreatorSetup((value) => !value)}
-          >
-            {showCreatorSetup ? "제작자 권한 설정 닫기" : "제작자 권한 설정"}
-          </button>
-
-          {showCreatorSetup && (
-            <div className="creatorSetupBox">
-              <strong>제작자(owner) 최초 지정</strong>
-              <p>
-                먼저 일반 가입을 완료한 뒤, 설정키로 해당 닉네임을 제작자로 지정합니다.
-              </p>
-              <input
-                type="password"
-                placeholder="CREATOR_SETUP_KEY"
-                value={creatorSetupKey}
-                onChange={(event) => setCreatorSetupKey(event.target.value)}
-              />
-              <input
-                placeholder="이미 가입한 제작자 닉네임"
-                value={creatorNickname}
-                onChange={(event) => setCreatorNickname(event.target.value)}
-              />
-              <button className="smallButton" onClick={() => void setupCreator()}>
-                제작자로 지정
+          {ownerExists === false && (
+            <>
+              <button
+                className="creatorSetupToggle"
+                onClick={() => setShowCreatorSetup((value) => !value)}
+              >
+                {showCreatorSetup ? "초기 운영자 설정 닫기" : "초기 운영자 설정"}
               </button>
-            </div>
+
+              {showCreatorSetup && (
+                <div className="creatorSetupBox">
+                  <strong>최초 제작자(owner) 지정</strong>
+                  <p>
+                    제작자로 사용할 계정을 먼저 '최초 가입'한 뒤 설정키와 닉네임을 입력합니다.
+                    제작자 지정이 완료되면 이 메뉴는 로그인 화면에서 자동으로 사라집니다.
+                  </p>
+                  <input
+                    type="password"
+                    placeholder="CREATOR_SETUP_KEY"
+                    value={creatorSetupKey}
+                    onChange={(event) => setCreatorSetupKey(event.target.value)}
+                    autoComplete="off"
+                  />
+                  <input
+                    placeholder="이미 가입한 제작자 닉네임"
+                    value={creatorNickname}
+                    onChange={(event) => setCreatorNickname(event.target.value)}
+                  />
+                  <button className="smallButton" onClick={() => void setupCreator()}>
+                    제작자로 지정
+                  </button>
+                </div>
+              )}
+            </>
           )}
 
           <small className="authFooter">Made by. 퐁당</small>
@@ -2937,9 +2969,11 @@ export default function Home() {
                 <button className="tinyButton ghost" onClick={exportMonthlyCsv}>
                   CSV 내보내기
                 </button>
-                <button className="tinyButton ghost" onClick={exportBackupJson}>
-                  전체 백업 JSON
-                </button>
+                {isAdmin && (
+                  <button className="tinyButton ghost" onClick={exportBackupJson}>
+                    운영자 백업 JSON
+                  </button>
+                )}
               </div>
             </div>
 
