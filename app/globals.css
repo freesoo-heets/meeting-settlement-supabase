@@ -1930,3 +1930,47 @@ select {
     font-size: 12px;
   }
 }
+
+
+/* STEP 22: 관리자 회원 추가 */
+.adminMemberAddPanel {
+  margin-bottom: 14px;
+}
+
+.adminMemberAddForm {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(150px, 190px) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.adminMemberAddForm label {
+  display: grid;
+  gap: 6px;
+}
+
+.adminMemberAddForm label span {
+  font-size: 12px;
+  font-weight: 700;
+  color: #6b7280;
+}
+
+.adminMemberAddForm input {
+  width: 100%;
+  min-height: 42px;
+}
+
+.adminAddMemberButton {
+  min-height: 42px;
+  white-space: nowrap;
+}
+
+@media (max-width: 700px) {
+  .adminMemberAddForm {
+    grid-template-columns: 1fr;
+  }
+
+  .adminAddMemberButton {
+    width: 100%;
+  }
+}

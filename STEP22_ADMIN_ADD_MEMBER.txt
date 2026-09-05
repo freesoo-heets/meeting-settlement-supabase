@@ -1,0 +1,21 @@
+STEP 22 - 관리자 회원 추가
+
+변경사항
+- 회원 현황 상단에 관리자/제작자 전용 "회원 추가" 영역 추가
+- 닉네임 + 입장일로 회원 명단 선등록 가능
+- 일반회원에게는 회원 추가 UI가 보이지 않음
+- 관리자가 추가한 회원은 로그인 계정이 아직 없는 상태
+- 해당 회원이 로그인 화면에서 같은 닉네임으로 "최초 가입"하면 기존 members 행에 Auth/Profile이 자동 연결됨
+- 중복 닉네임 방지
+- 회원 추가 activity_log 기록
+- 모바일 1열 입력 UI 지원
+- PWA 캐시 v4
+
+SQL
+Supabase SQL Editor에서 아래 파일을 1회 실행:
+supabase/step22_admin_add_member.sql
+
+배포
+git add .
+git commit -m "Step 22 admin add member"
+git push

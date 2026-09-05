@@ -141,6 +141,8 @@ export default function Home() {
   const [shareTemplate, setShareTemplate] = useState<"compact" | "detail" | "simple">("compact");
   const [installPrompt, setInstallPrompt] = useState<any>(null);
 
+  const [newMemberName, setNewMemberName] = useState("");
+  const [newMemberJoinDate, setNewMemberJoinDate] = useState(today);
   const [editingJoinId, setEditingJoinId] = useState("");
   const [editingJoinDate, setEditingJoinDate] = useState("");
   const [editingCostId, setEditingCostId] = useState("");
@@ -1190,6 +1192,68 @@ export default function Home() {
       );
       await loadAll();
     }
+  }
+
+  async function addMemberByAdmin() {
+    if (!isAdmin) {
+      setNotice("회원 추가는 관리자 이상만 가능합니다.");
+      return;
+    }
+
+    const name = newMemberName.trim();
+    if (name.length < 2 || name.length > 20) {
+      setNotice("회원 닉네임은 2~20자로 입력해주세요.");
+      return;
+    }
+
+    if (!newMemberJoinDate) {
+      setNotice("입장일을 선택해주세요.");
+      return;
+    }
+
+    const duplicate = members.some(
+      (member) => member.name.trim().toLowerCase() === name.toLowerCase()
+    );
+    if (duplicate) {
+      setNotice("이미 등록된 닉네임입니다.");
+      return;
+    }
+
+    if (saving) return;
+    setSaving(true);
+    setNotice("");
+
+    const { data, error } = await supabase
+      .from("members")
+      .insert({
+        name,
+        active: true,
+        join_date: newMemberJoinDate,
+        withdrawn_at: null,
+      })
+      .select("id")
+      .single();
+
+    if (error || !data) {
+      setNotice(`회원 추가 실패: ${error?.message ?? "등록 결과를 확인할 수 없습니다."}`);
+      setSaving(false);
+      return;
+    }
+
+    await logActivity(
+      "회원 추가",
+      "member",
+      data.id,
+      `${name} 님을 회원 명단에 추가 · 입장일 ${newMemberJoinDate}`
+    );
+
+    setNewMemberName("");
+    setNewMemberJoinDate(today);
+    setNotice(
+      `${name} 님을 추가했습니다. 로그인 계정은 해당 회원이 '최초 가입'을 하면 자동 연결됩니다.`
+    );
+    await loadAll();
+    setSaving(false);
   }
 
   async function toggleMemberStatus(member: Member) {
@@ -2760,6 +2824,49 @@ export default function Home() {
 
       {mainTab === "members" && (
         <>
+          {isAdmin && (
+            <section className="panel standalonePanel adminMemberAddPanel">
+              <div className="panelHead compactHead">
+                <div>
+                  <h2>회원 추가</h2>
+                  <p>
+                    관리자가 회원 명단을 먼저 등록할 수 있습니다. 회원이 같은 닉네임으로
+                    '최초 가입'하면 기존 회원 기록에 로그인 계정이 자동 연결됩니다.
+                  </p>
+                </div>
+              </div>
+              <div className="adminMemberAddForm">
+                <label>
+                  <span>닉네임</span>
+                  <input
+                    value={newMemberName}
+                    onChange={(event) => setNewMemberName(event.target.value)}
+                    placeholder="회원 닉네임"
+                    maxLength={20}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") void addMemberByAdmin();
+                    }}
+                  />
+                </label>
+                <label>
+                  <span>입장일</span>
+                  <input
+                    type="date"
+                    value={newMemberJoinDate}
+                    onChange={(event) => setNewMemberJoinDate(event.target.value)}
+                  />
+                </label>
+                <button
+                  className="primaryButton adminAddMemberButton"
+                  onClick={() => void addMemberByAdmin()}
+                  disabled={saving}
+                >
+                  {saving ? "추가 중..." : "회원 추가"}
+                </button>
+              </div>
+            </section>
+          )}
+
           <section className="memberToolbar panel standalonePanel">
             <div className="filterBar">
               <input
