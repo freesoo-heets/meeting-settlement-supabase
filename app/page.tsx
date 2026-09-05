@@ -138,7 +138,6 @@ export default function Home() {
   const [showAccountPanel, setShowAccountPanel] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [newPasswordConfirm, setNewPasswordConfirm] = useState("");
-  const [shareTemplate, setShareTemplate] = useState<"compact" | "detail" | "simple">("compact");
   const [installPrompt, setInstallPrompt] = useState<any>(null);
 
   const [newMemberName, setNewMemberName] = useState("");
@@ -947,50 +946,25 @@ export default function Home() {
 
     const allRows = [...rows, ...guestRows];
 
-    if (shareTemplate === "simple") {
-      return [
-        `📌 ${meeting.title} 벙비`,
-        `${meeting.date}`,
-        `총 ${won(Number(meeting.cost))}`,
-        "",
-        ...allRows.map((row) => `${row.name}${row.guest ? "(게스트)" : ""} ${won(row.remaining)}`),
-      ].join("\\n");
-    }
-
-    if (shareTemplate === "detail") {
-      return [
-        `📌 강서구 찐친만들기 벙비 정산`,
-        `━━━━━━━━━━━━━━`,
-        `📅 ${meeting.date}`,
-        `🍻 ${meeting.title}`,
-        `💰 총 비용 ${won(Number(meeting.cost))}`,
-        `👥 ${allRows.length}명`,
-        "",
-        ...allRows.map((row) => {
-          if (row.guest) return `• ${row.name}(게스트) : ${won(row.remaining)}`;
-          if (row.paid > 0) {
-            return `• ${row.name} : ${won(row.share)} / 선입금 ${won(row.paid)} → ${won(row.remaining)}`;
-          }
-          return `• ${row.name} : ${won(row.remaining)}`;
-        }),
-        "",
-        `━━━━━━━━━━━━━━`,
-        `벙비 확인 부탁드립니다 🙌`,
-      ].join("\\n");
-    }
-
     return [
-      `[강서구 찐친만들기 벙비 정산]`,
-      `${meeting.date} · ${meeting.title}`,
-      `총 비용: ${won(Number(meeting.cost))}`,
+      `📌 강서구 찐친만들기 벙비 정산`,
+      `━━━━━━━━━━━━━━`,
+      `📅 ${meeting.date}`,
+      `🍻 ${meeting.title}`,
+      `💰 총 비용 ${won(Number(meeting.cost))}`,
+      `👥 ${allRows.length}명`,
       "",
       ...allRows.map((row) => {
-        if (row.guest) return `${row.name}(게스트) · ${won(row.remaining)}`;
-        return `${row.name} · ${won(row.remaining)}${row.paid > 0 ? ` (선입금 ${won(row.paid)})` : ""}`;
+        if (row.guest) return `• ${row.name}(게스트) : ${won(row.remaining)}`;
+        if (row.paid > 0) {
+          return `• ${row.name} : ${won(row.share)} / 선입금 ${won(row.paid)} → ${won(row.remaining)}`;
+        }
+        return `• ${row.name} : ${won(row.remaining)}`;
       }),
       "",
-      `총 ${allRows.length}명`,
-    ].join("\\n");
+      `━━━━━━━━━━━━━━`,
+      `벙비 확인 부탁드립니다 🙌`,
+    ].join("\n");
   }
 
   async function shareSettlement(meeting: Meeting) {
@@ -2528,19 +2502,6 @@ export default function Home() {
                 </div>
                 {selectedMeeting && selectedMeeting.cost != null && (
                   <div className="shareControl">
-                    <select
-                      value={shareTemplate}
-                      onChange={(event) =>
-                        setShareTemplate(
-                          event.target.value as "compact" | "detail" | "simple"
-                        )
-                      }
-                      aria-label="정산 공유 문구 형식"
-                    >
-                      <option value="compact">기본형</option>
-                      <option value="detail">카톡 꾸밈형</option>
-                      <option value="simple">간단형</option>
-                    </select>
                     <button
                       className="kakaoShareButton"
                       onClick={() => void shareSettlement(selectedMeeting)}
