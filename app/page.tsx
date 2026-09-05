@@ -52,7 +52,7 @@ type Meeting = MeetingRow & {
   guests: MeetingGuest[];
 };
 
-type MainTab = "dashboard" | "meetings" | "members" | "monthly";
+type MainTab = "dashboard" | "meetings" | "members" | "monthly" | "help";
 type MemberFilter = "all" | "active" | "warning" | "withdrawn";
 type AppRole = "owner" | "admin" | "user";
 
@@ -2070,6 +2070,7 @@ export default function Home() {
           ["meetings", "모임 관리"],
           ["members", "회원 현황"],
           ["monthly", "월별 참석 현황"],
+          ["help", "사용방법"],
         ].map(([value, label]) => (
           <button
             key={value}
@@ -3087,6 +3088,227 @@ export default function Home() {
             </div>
           </section>
         </>
+      )}
+
+
+      {mainTab === "help" && (
+        <section className="helpPage">
+          <div className="helpHero panel standalonePanel">
+            <div>
+              <div className="kicker">USER GUIDE</div>
+              <h2>사용방법</h2>
+              <p>
+                현재 로그인한 권한에 맞는 기능만 안내합니다.
+              </p>
+            </div>
+            <span className={`roleBadge ${currentRole ?? "user"} helpRoleBadge`}>
+              {currentRole === "owner"
+                ? "제작자"
+                : currentRole === "admin"
+                  ? "관리자"
+                  : "일반회원"}
+            </span>
+          </div>
+
+          <div className="helpGrid">
+            <article className="panel helpCard">
+              <div className="helpStepNumber">01</div>
+              <h3>로그인 · 내 계정</h3>
+              <p>
+                가입한 닉네임과 비밀번호로 로그인합니다. 처음 사용하는 회원은
+                <strong> 최초 가입</strong>에서 본인의 닉네임과 비밀번호를 직접 설정합니다.
+              </p>
+              <p>
+                관리자가 회원을 미리 등록했다면 반드시 <strong>등록된 닉네임과 동일하게</strong>
+                최초 가입해야 기존 입장일과 참석 기록에 계정이 연결됩니다.
+              </p>
+              <p>상단의 <strong>내 계정</strong>에서 비밀번호를 변경할 수 있습니다.</p>
+            </article>
+
+            <article className="panel helpCard">
+              <div className="helpStepNumber">02</div>
+              <h3>대시보드 · 내 현황</h3>
+              <p>
+                대시보드에서 활동 회원, 이번 달 모임, 총비용, 참석 순위를 확인합니다.
+              </p>
+              <p>
+                상단의 <strong>내 현황 · 상세보기</strong>에서는 본인의 월 참석 횟수,
+                벙비 합계, 입장일, 최근 참석일과 참석 모임별 부담금을 확인할 수 있습니다.
+              </p>
+            </article>
+
+            <article className="panel helpCard">
+              <div className="helpStepNumber">03</div>
+              <h3>모임 관리 · 비용 배분</h3>
+              <p>
+                모임을 선택하면 참석자, 게스트, 비용을 관리할 수 있습니다. 비용은 기본적으로
+                참석 인원 기준 1/N으로 계산되며 필요한 경우 회원별 <strong>특정값</strong>을
+                입력할 수 있습니다.
+              </p>
+              <p>
+                <strong>선입금</strong>은 해당 모임의 비용 배분 영역에서만 관리하며,
+                정산 금액에서 자동 차감됩니다.
+              </p>
+            </article>
+
+            <article className="panel helpCard">
+              <div className="helpStepNumber">04</div>
+              <h3>카카오톡 정산 공유</h3>
+              <p>
+                모임 비용과 참석자 입력이 끝나면 <strong>카카오톡 정산 공유</strong>를 누릅니다.
+                공유 문구는 카톡 꾸밈형으로 고정되어 실제 줄바꿈 형태로 전달됩니다.
+              </p>
+              <div className="helpSharePreview">
+                <span>📌 강서구 찐친만들기 벙비 정산</span>
+                <span>━━━━━━━━━━━━━━</span>
+                <span>📅 모임 날짜</span>
+                <span>🍻 모임명</span>
+                <span>💰 총 비용</span>
+                <span>👥 참석 인원</span>
+                <span>&nbsp;</span>
+                <span>• 회원명 : 정산금액</span>
+              </div>
+            </article>
+          </div>
+
+          {currentRole === "user" && (
+            <section className="panel helpPermissionPanel">
+              <div className="helpPermissionHead">
+                <div>
+                  <span className="helpPermissionLabel">일반회원 가이드</span>
+                  <h2>내 모임과 정산을 확인하고 관리합니다</h2>
+                </div>
+              </div>
+              <div className="helpPermissionGrid">
+                <div>
+                  <strong>사용 가능</strong>
+                  <p>대시보드 및 내 현황 조회</p>
+                  <p>모임 생성 · 수정 · 삭제 · 복사</p>
+                  <p>참석자 · 게스트 관리</p>
+                  <p>비용 배분 · 특정값 · 선입금 입력</p>
+                  <p>카카오톡 정산 공유</p>
+                  <p>회원 및 월별 참석 현황 조회</p>
+                  <p>월별 CSV 내보내기</p>
+                </div>
+                <div>
+                  <strong>관리자 전용</strong>
+                  <p>회원 추가</p>
+                  <p>회원 탈퇴 · 복귀</p>
+                  <p>회원 입장일 수정</p>
+                  <p>운영자 백업 JSON</p>
+                  <p>관리자 지정 · 해제</p>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {currentRole === "admin" && (
+            <>
+              <section className="panel helpPermissionPanel">
+                <div className="helpPermissionHead">
+                  <div>
+                    <span className="helpPermissionLabel">관리자 가이드</span>
+                    <h2>회원 명단과 운영 상태를 관리합니다</h2>
+                  </div>
+                </div>
+                <div className="helpAdminSteps">
+                  <div>
+                    <strong>회원 추가</strong>
+                    <p>
+                      회원 현황 상단에서 닉네임과 입장일을 입력합니다. 해당 회원은 이후
+                      같은 닉네임으로 최초 가입하면 로그인 계정이 자동 연결됩니다.
+                    </p>
+                  </div>
+                  <div>
+                    <strong>탈퇴 · 복귀</strong>
+                    <p>
+                      회원 카드에서 탈퇴 또는 복귀를 선택합니다. 탈퇴 회원은 로그인할 수 없습니다.
+                    </p>
+                  </div>
+                  <div>
+                    <strong>입장일 수정</strong>
+                    <p>회원 카드의 입장일 버튼을 눌러 날짜를 변경하고 저장합니다.</p>
+                  </div>
+                  <div>
+                    <strong>운영자 백업</strong>
+                    <p>
+                      월별 참석 현황의 운영자 백업 JSON으로 회원·모임·비용조정·선입금 정보를
+                      내려받을 수 있습니다.
+                    </p>
+                  </div>
+                </div>
+              </section>
+              <div className="helpNote">
+                관리자 지정 및 해제는 제작자(owner)만 가능합니다.
+              </div>
+            </>
+          )}
+
+          {currentRole === "owner" && (
+            <>
+              <section className="panel helpPermissionPanel ownerHelpPanel">
+                <div className="helpPermissionHead">
+                  <div>
+                    <span className="helpPermissionLabel">제작자(owner) 가이드</span>
+                    <h2>전체 운영과 관리자 권한을 관리합니다</h2>
+                  </div>
+                </div>
+                <div className="helpAdminSteps">
+                  <div>
+                    <strong>회원 관리</strong>
+                    <p>관리자와 동일하게 회원 추가, 탈퇴·복귀, 입장일 수정을 사용할 수 있습니다.</p>
+                  </div>
+                  <div>
+                    <strong>관리자 지정</strong>
+                    <p>
+                      회원 현황에서 로그인 계정이 연결된 회원의 <strong>관리자 지정</strong>을 누릅니다.
+                    </p>
+                  </div>
+                  <div>
+                    <strong>관리자 해제</strong>
+                    <p>관리자 회원의 관리자 해제를 누르면 일반회원 권한으로 돌아갑니다.</p>
+                  </div>
+                  <div>
+                    <strong>운영자 백업</strong>
+                    <p>월별 참석 현황에서 운영자 백업 JSON을 내려받을 수 있습니다.</p>
+                  </div>
+                </div>
+              </section>
+
+              <section className="panel helpSecurityPanel">
+                <h3>제작자 보안 안내</h3>
+                <p>
+                  <strong>CREATOR_SETUP_KEY</strong>와 <strong>SUPABASE_SERVICE_ROLE_KEY</strong>는
+                  일반 회원에게 공유하지 마세요. 제작자 권한은 앱 화면에서 다른 역할로 변경되지
+                  않도록 보호되어 있습니다.
+                </p>
+              </section>
+            </>
+          )}
+
+          <section className="panel helpTips">
+            <h3>비용 배분 예시</h3>
+            <div className="helpExampleGrid">
+              <div>
+                <span>기본 1/N</span>
+                <strong>100,000원 ÷ 4명</strong>
+                <p>각 25,000원</p>
+              </div>
+              <div>
+                <span>특정값 적용</span>
+                <strong>A 회원 10,000원 고정</strong>
+                <p>남은 90,000원을 나머지 인원이 1/N</p>
+              </div>
+              <div>
+                <span>선입금 적용</span>
+                <strong>부담금 30,000원</strong>
+                <p>선입금 10,000원 → 정산 20,000원</p>
+              </div>
+            </div>
+          </section>
+
+          <div className="helpVersion">사용방법 · Step 23 기준</div>
+        </section>
       )}
 
       <footer className="siteFooter">Made by. 퐁당</footer>

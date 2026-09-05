@@ -62,7 +62,7 @@ input:focus, select:focus { border-color: #8b5cf6; }
   top: 8px;
   z-index: 10;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 5px;
   padding: 5px;
   margin-bottom: 14px;
@@ -600,7 +600,7 @@ th { color: #6b7280; font-size: 11px; }
 @media (max-width: 520px) {
   .pageShell { width: min(100% - 16px, 1240px); padding-top: 14px; }
   .topHeader h1 { font-size: 24px; }
-  .mainTabs { overflow-x: auto; grid-template-columns: repeat(4, minmax(105px, 1fr)); }
+  .mainTabs { overflow-x: auto; grid-template-columns: repeat(5, minmax(100px, 1fr)); }
   .summaryGrid { grid-template-columns: 1fr 1fr; }
   .allocationSummaryGrid, .miniSummaryGrid { grid-template-columns: 1fr; }
 }
@@ -1410,7 +1410,7 @@ th { color: #6b7280; font-size: 11px; }
     bottom: max(10px, env(safe-area-inset-bottom));
     z-index: 700;
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     gap: 3px;
     padding: 5px;
     border: 1px solid #e6ded6;
@@ -1972,5 +1972,218 @@ select {
 
   .adminAddMemberButton {
     width: 100%;
+  }
+}
+
+
+/* STEP 23: 권한별 사용방법 */
+.helpPage {
+  display: grid;
+  gap: 12px;
+}
+
+.helpHero {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  padding: 20px;
+}
+
+.helpHero h2 {
+  margin: 3px 0 4px;
+  font-size: 24px;
+}
+
+.helpHero p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.helpRoleBadge {
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  font-size: 12px;
+}
+
+.helpGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.helpCard {
+  position: relative;
+  margin-top: 0;
+  min-height: 190px;
+  overflow: hidden;
+}
+
+.helpCard h3,
+.helpTips h3,
+.helpSecurityPanel h3 {
+  margin: 0 0 10px;
+  font-size: 16px;
+}
+
+.helpCard p,
+.helpAdminSteps p,
+.helpPermissionGrid p,
+.helpSecurityPanel p {
+  margin: 6px 0 0;
+  color: #626975;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.helpStepNumber {
+  position: absolute;
+  top: 9px;
+  right: 14px;
+  color: #ece8f4;
+  font-size: 38px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.helpSharePreview {
+  display: grid;
+  gap: 2px;
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  background: #f7f5f2;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.helpPermissionPanel {
+  margin-top: 0;
+}
+
+.helpPermissionHead {
+  margin-bottom: 14px;
+}
+
+.helpPermissionHead h2 {
+  margin: 4px 0 0;
+  font-size: 18px;
+}
+
+.helpPermissionLabel {
+  display: inline-block;
+  color: #6d28d9;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.helpPermissionGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.helpPermissionGrid > div,
+.helpAdminSteps > div {
+  padding: 14px;
+  border: 1px solid #ece8e3;
+  border-radius: 12px;
+  background: #fffdfa;
+}
+
+.helpPermissionGrid strong,
+.helpAdminSteps strong {
+  font-size: 13px;
+}
+
+.helpAdminSteps {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.ownerHelpPanel {
+  border: 1px solid #ddd6fe;
+}
+
+.helpSecurityPanel {
+  margin-top: 0;
+  border: 1px solid #fee2e2;
+  background: #fffafa;
+}
+
+.helpNote {
+  padding: 11px 13px;
+  border-radius: 11px;
+  background: #f5f3ff;
+  color: #5b21b6;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.helpTips {
+  margin-top: 0;
+}
+
+.helpExampleGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 9px;
+}
+
+.helpExampleGrid > div {
+  display: grid;
+  gap: 4px;
+  padding: 13px;
+  border: 1px solid #ece8e3;
+  border-radius: 12px;
+  background: #faf9f7;
+}
+
+.helpExampleGrid span {
+  color: #6b7280;
+  font-size: 11px;
+}
+
+.helpExampleGrid strong {
+  font-size: 13px;
+}
+
+.helpExampleGrid p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.helpVersion {
+  padding: 3px 0 6px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 11px;
+}
+
+@media (max-width: 700px) {
+  .helpHero {
+    padding: 16px;
+  }
+
+  .helpHero h2 {
+    font-size: 21px;
+  }
+
+  .helpGrid,
+  .helpPermissionGrid,
+  .helpAdminSteps,
+  .helpExampleGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .helpCard {
+    min-height: auto;
+  }
+
+  .mainTabs .tabButton[data-tab="monthly"] {
+    font-size: 9px;
   }
 }
