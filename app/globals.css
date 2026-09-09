@@ -2187,3 +2187,68 @@ select {
     font-size: 9px;
   }
 }
+
+
+/* STEP 24: 회원 관리자 도구 */
+.memberSortControl {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.memberSortControl span {
+  color: #6b7280;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.memberSortControl select {
+  min-height: 38px;
+  min-width: 165px;
+  padding: 6px 28px 6px 9px;
+}
+
+.memberNicknameEditRow input {
+  min-width: 180px;
+}
+
+.dangerButton {
+  border-color: #fecaca !important;
+  color: #b91c1c !important;
+  background: #fffafa !important;
+}
+
+.dangerButton:hover:not(:disabled) {
+  background: #fef2f2 !important;
+}
+
+.dangerButton:disabled {
+  opacity: .42;
+  cursor: not-allowed;
+}
+
+@media (max-width: 760px) {
+  .memberToolbar .filterBar {
+    align-items: stretch;
+  }
+
+  .memberSortControl {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .memberSortControl select {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .memberNicknameEditRow {
+    grid-template-columns: 1fr auto auto;
+  }
+
+  .memberNicknameEditRow input {
+    min-width: 0;
+  }
+}

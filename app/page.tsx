@@ -54,6 +54,7 @@ type Meeting = MeetingRow & {
 
 type MainTab = "dashboard" | "meetings" | "members" | "monthly" | "help";
 type MemberFilter = "all" | "active" | "warning" | "withdrawn";
+type MemberSort = "nickname_asc" | "nickname_desc" | "join_desc" | "join_asc" | "last_desc" | "last_asc";
 type AppRole = "owner" | "admin" | "user";
 
 type Profile = {
@@ -124,6 +125,7 @@ export default function Home() {
 
   const [memberSearch, setMemberSearch] = useState("");
   const [memberFilter, setMemberFilter] = useState<MemberFilter>("all");
+  const [memberSort, setMemberSort] = useState<MemberSort>("nickname_asc");
 
   const [newMeetingDate, setNewMeetingDate] = useState(today);
   const [newMeetingTitle, setNewMeetingTitle] = useState("");
@@ -142,6 +144,8 @@ export default function Home() {
 
   const [newMemberName, setNewMemberName] = useState("");
   const [newMemberJoinDate, setNewMemberJoinDate] = useState(today);
+  const [editingNicknameId, setEditingNicknameId] = useState("");
+  const [editingNickname, setEditingNickname] = useState("");
   const [editingJoinId, setEditingJoinId] = useState("");
   const [editingJoinDate, setEditingJoinDate] = useState("");
   const [editingCostId, setEditingCostId] = useState("");
@@ -449,7 +453,7 @@ export default function Home() {
   const filteredMembers = useMemo(() => {
     const q = memberSearch.trim().toLowerCase();
 
-    return members.filter((member) => {
+    const rows = members.filter((member) => {
       if (q && !member.name.toLowerCase().includes(q)) return false;
       if (memberFilter === "active") return member.active;
       if (memberFilter === "withdrawn") return !member.active;
@@ -458,7 +462,42 @@ export default function Home() {
       }
       return true;
     });
-  }, [members, memberSearch, memberFilter, warningByMember]);
+
+    return [...rows].sort((a, b) => {
+      if (memberSort === "nickname_asc") {
+        return a.name.localeCompare(b.name, "ko");
+      }
+      if (memberSort === "nickname_desc") {
+        return b.name.localeCompare(a.name, "ko");
+      }
+      if (memberSort === "join_desc") {
+        return b.join_date.localeCompare(a.join_date) || a.name.localeCompare(b.name, "ko");
+      }
+      if (memberSort === "join_asc") {
+        return a.join_date.localeCompare(b.join_date) || a.name.localeCompare(b.name, "ko");
+      }
+
+      const aLast = lastAttendanceByMember[a.id];
+      const bLast = lastAttendanceByMember[b.id];
+
+      // 참석 기록이 없는 회원은 항상 목록 뒤로 보냅니다.
+      if (!aLast && !bLast) return a.name.localeCompare(b.name, "ko");
+      if (!aLast) return 1;
+      if (!bLast) return -1;
+
+      if (memberSort === "last_desc") {
+        return bLast.localeCompare(aLast) || a.name.localeCompare(b.name, "ko");
+      }
+      return aLast.localeCompare(bLast) || a.name.localeCompare(b.name, "ko");
+    });
+  }, [
+    members,
+    memberSearch,
+    memberFilter,
+    memberSort,
+    warningByMember,
+    lastAttendanceByMember,
+  ]);
 
   const adjustmentByKey = useMemo(() => {
     const map: Record<string, SettlementAdjustment> = {};
@@ -1228,6 +1267,152 @@ export default function Home() {
     );
     await loadAll();
     setSaving(false);
+  }
+
+  async function getAccessTokenForAdminAction() {
+    const { data } = await supabase.auth.getSession();
+    return data.session?.access_token ?? "";
+  }
+
+  async function saveMemberNickname(member: Member) {
+    if (!isAdmin) {
+      setNotice("닉네임 수정은 관리자 이상만 가능합니다.");
+      return;
+    }
+
+    const nickname = editingNickname.trim();
+    if (nickname.length < 2 || nickname.length > 20) {
+      setNotice("닉네임은 2~20자로 입력해주세요.");
+      return;
+    }
+
+    if (nickname === member.name) {
+      setEditingNicknameId("");
+      setEditingNickname("");
+      return;
+    }
+
+    if (saving) return;
+    setSaving(true);
+    setNotice("");
+
+    try {
+      const accessToken = await getAccessTokenForAdminAction();
+      if (!accessToken) {
+        setNotice("로그인 세션을 확인할 수 없습니다. 다시 로그인해주세요.");
+        return;
+      }
+
+      const response = await fetch("/api/admin/member", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          memberId: member.id,
+          nickname,
+        }),
+      });
+      const body = await response.json();
+
+      if (!response.ok) {
+        setNotice(body.error ?? "닉네임 수정에 실패했습니다.");
+        return;
+      }
+
+      const oldName = member.name;
+      setEditingNicknameId("");
+      setEditingNickname("");
+
+      if (currentMember?.id === member.id) {
+        setCurrentNickname(nickname);
+      }
+
+      await logActivity(
+        "닉네임 수정",
+        "member",
+        member.id,
+        `${oldName} → ${nickname}`
+      );
+      await loadAll();
+      setNotice(`${oldName} 님의 닉네임을 ${nickname}(으)로 변경했습니다.`);
+    } catch {
+      setNotice("닉네임 수정 중 오류가 발생했습니다.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteMemberByAdmin(member: Member) {
+    if (!isAdmin) {
+      setNotice("회원 삭제는 관리자 이상만 가능합니다.");
+      return;
+    }
+
+    const profile = profiles.find((item) => item.member_id === member.id);
+
+    if (
+      !window.confirm(
+        `${member.name} 회원을 완전히 삭제할까요?\n\n참석 기록, 특정값, 선입금 등 이 회원과 연결된 데이터도 함께 삭제됩니다. 이 작업은 되돌릴 수 없습니다.`
+      )
+    ) {
+      return;
+    }
+
+    if (
+      !window.confirm(
+        `정말 삭제하시겠습니까?\n\n삭제 대상: ${member.name}${profile ? ` (${profile.role === "admin" ? "관리자" : profile.role === "owner" ? "제작자" : "회원"})` : ""}`
+      )
+    ) {
+      return;
+    }
+
+    if (saving) return;
+    setSaving(true);
+    setNotice("");
+
+    try {
+      const accessToken = await getAccessTokenForAdminAction();
+      if (!accessToken) {
+        setNotice("로그인 세션을 확인할 수 없습니다. 다시 로그인해주세요.");
+        return;
+      }
+
+      const response = await fetch("/api/admin/member", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ memberId: member.id }),
+      });
+      const body = await response.json();
+
+      if (!response.ok) {
+        setNotice(body.error ?? "회원 삭제에 실패했습니다.");
+        return;
+      }
+
+      await logActivity(
+        "회원 삭제",
+        "member",
+        null,
+        `${member.name} 회원 완전 삭제`
+      );
+
+      if (memberDetailId === member.id) setMemberDetailId("");
+      setEditingNicknameId("");
+      setEditingNickname("");
+      setEditingJoinId("");
+      setEditingJoinDate("");
+      await loadAll();
+      setNotice(`${member.name} 회원을 삭제했습니다.`);
+    } catch {
+      setNotice("회원 삭제 중 오류가 발생했습니다.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function toggleMemberStatus(member: Member) {
@@ -2853,6 +3038,21 @@ export default function Home() {
                   </button>
                 ))}
               </div>
+              <label className="memberSortControl">
+                <span>정렬</span>
+                <select
+                  value={memberSort}
+                  onChange={(event) => setMemberSort(event.target.value as MemberSort)}
+                  aria-label="회원 정렬"
+                >
+                  <option value="nickname_asc">닉네임 가나다순</option>
+                  <option value="nickname_desc">닉네임 역순</option>
+                  <option value="join_desc">입장일 최신순</option>
+                  <option value="join_asc">입장일 오래된순</option>
+                  <option value="last_desc">최근 참석일 최신순</option>
+                  <option value="last_asc">최근 참석일 오래된순</option>
+                </select>
+              </label>
             </div>
           </section>
 
@@ -2927,11 +3127,38 @@ export default function Home() {
                           <button
                             className="tinyButton ghost"
                             onClick={() => {
+                              setEditingNicknameId(member.id);
+                              setEditingNickname(member.name);
+                              setEditingJoinId("");
+                              setEditingJoinDate("");
+                            }}
+                          >
+                            닉네임
+                          </button>
+                          <button
+                            className="tinyButton ghost"
+                            onClick={() => {
                               setEditingJoinId(member.id);
                               setEditingJoinDate(member.join_date);
+                              setEditingNicknameId("");
+                              setEditingNickname("");
                             }}
                           >
                             입장일
+                          </button>
+                          <button
+                            className="tinyButton dangerButton"
+                            onClick={() => void deleteMemberByAdmin(member)}
+                            disabled={saving || profile?.role === "owner" || currentMember?.id === member.id}
+                            title={
+                              profile?.role === "owner"
+                                ? "제작자는 삭제할 수 없습니다."
+                                : currentMember?.id === member.id
+                                  ? "현재 로그인한 본인 계정은 삭제할 수 없습니다."
+                                  : "회원 완전 삭제"
+                            }
+                          >
+                            삭제
                           </button>
                         </>
                       )}
@@ -2951,6 +3178,41 @@ export default function Home() {
                       )}
                     </div>
                   </div>
+
+                  {isAdmin && editingNicknameId === member.id && (
+                    <div className="editRow memberNicknameEditRow">
+                      <input
+                        value={editingNickname}
+                        onChange={(event) => setEditingNickname(event.target.value)}
+                        placeholder="새 닉네임"
+                        maxLength={20}
+                        autoFocus
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") void saveMemberNickname(member);
+                          if (event.key === "Escape") {
+                            setEditingNicknameId("");
+                            setEditingNickname("");
+                          }
+                        }}
+                      />
+                      <button
+                        className="tinyButton"
+                        onClick={() => void saveMemberNickname(member)}
+                        disabled={saving}
+                      >
+                        저장
+                      </button>
+                      <button
+                        className="tinyButton ghost"
+                        onClick={() => {
+                          setEditingNicknameId("");
+                          setEditingNickname("");
+                        }}
+                      >
+                        취소
+                      </button>
+                    </div>
+                  )}
 
                   {isAdmin && editingJoinId === member.id && (
                     <div className="editRow">

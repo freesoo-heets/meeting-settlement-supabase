@@ -1,0 +1,42 @@
+STEP 24 - 회원 관리자 기능 강화
+
+신규 기능
+1. 관리자/제작자 회원 닉네임 수정
+   - 로그인 계정이 연결된 회원은 members + profiles 닉네임을 함께 변경
+   - 이후 변경된 닉네임으로 로그인
+   - 중복 닉네임 차단
+   - 일반 관리자는 제작자 닉네임 수정 불가
+   - 일반 관리자는 다른 관리자 닉네임 수정 불가
+   - 관리자는 본인 닉네임 수정 가능
+   - 제작자는 일반회원/관리자/본인 닉네임 수정 가능
+
+2. 회원 완전 삭제
+   - 관리자: 일반회원 삭제 가능
+   - 제작자: 일반회원/관리자 삭제 가능
+   - 제작자(owner)는 삭제 불가
+   - 현재 로그인한 본인 계정 삭제 불가
+   - 2단계 확인창 적용
+   - Auth 계정 + 회원 연결 데이터 삭제
+   - attendance / settlement_adjustments / meeting_prepayments 등 FK cascade 데이터 함께 삭제
+
+3. 회원 정렬
+   - 닉네임 가나다순 / 역순
+   - 입장일 최신순 / 오래된순
+   - 최근 참석일 최신순 / 오래된순
+   - 최근 참석 기록이 없는 회원은 참석일 정렬에서 뒤로 표시
+
+보안
+- 닉네임 변경/완전삭제는 브라우저에서 service role을 사용하지 않음
+- /api/admin/member 서버 API에서 Supabase access token 확인
+- profiles role을 서버에서 재검증 후 service role로 작업
+
+DB 변경 없음
+환경변수 변경 없음
+기존 SUPABASE_SERVICE_ROLE_KEY 사용
+
+PWA 캐시 v8
+
+배포
+git add .
+git commit -m "Step 24 member admin tools"
+git push
