@@ -2464,3 +2464,452 @@ select {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+
+/* STEP 27: 모임 중심 대시보드 */
+.meetingDashboardHero {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.meetingDashboardTitle {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 4px 2px;
+}
+
+.meetingDashboardTitle h2 {
+  margin: 3px 0 4px;
+  font-size: 24px;
+  letter-spacing: -.03em;
+}
+
+.meetingDashboardTitle p {
+  margin: 0;
+  color: #766e67;
+  font-size: 12px;
+}
+
+.dashboardEyebrow {
+  color: #8b5e3c;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .08em;
+}
+
+.dashboardManageButton {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid #ded5cc;
+  border-radius: 11px;
+  background: #fffdfb;
+  color: #3c352f;
+  font-size: 11px;
+  font-weight: 900;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.meetingMetricGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 9px;
+}
+
+.meetingMetricCard {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  min-height: 112px;
+  padding: 15px;
+  border: 1px solid #e8e0d8;
+  border-radius: 16px;
+  background: #fffdfa;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+}
+
+button.meetingMetricCard {
+  cursor: pointer;
+}
+
+.meetingMetricCard > span {
+  color: #847970;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.meetingMetricCard > strong {
+  overflow: hidden;
+  font-size: 25px;
+  letter-spacing: -.04em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meetingMetricCard > strong em {
+  margin-left: 3px;
+  color: #8b8179;
+  font-size: 11px;
+  font-style: normal;
+}
+
+.meetingMetricCard > small {
+  color: #9a9088;
+  font-size: 10px;
+}
+
+.meetingDashboardGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(250px, .75fr);
+  gap: 12px;
+}
+
+.meetingVisualPanel {
+  min-width: 0;
+}
+
+.dashboardPanelBadge {
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: #f3eee8;
+  color: #6d625a;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.meetingVisualList {
+  display: grid;
+  gap: 5px;
+}
+
+.meetingVisualRow {
+  display: grid;
+  grid-template-columns: minmax(135px, 1fr) minmax(160px, 1.35fr) minmax(92px, auto);
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  padding: 10px 11px;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  background: #faf8f5;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.meetingVisualRow:hover {
+  border-color: #e7ded5;
+  background: #fffdfa;
+}
+
+.meetingVisualMeta {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.meetingVisualMeta > span {
+  padding: 4px 6px;
+  border-radius: 7px;
+  background: #ece6df;
+  color: #665d56;
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.meetingVisualMeta > strong {
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meetingVisualBarArea {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 34px;
+  align-items: center;
+  gap: 7px;
+}
+
+.meetingVisualTrack,
+.costProgressTrack {
+  overflow: hidden;
+  height: 8px;
+  border-radius: 999px;
+  background: #ede8e2;
+}
+
+.meetingVisualTrack > span,
+.costProgressTrack > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #49413a;
+}
+
+.meetingVisualBarArea small {
+  color: #655d56;
+  font-size: 10px;
+  font-weight: 900;
+  text-align: right;
+}
+
+.meetingVisualCost {
+  text-align: right;
+  font-size: 10px;
+}
+
+.meetingVisualCost strong {
+  font-size: 11px;
+}
+
+.costMissingBadge {
+  display: inline-flex;
+  padding: 5px 7px;
+  border-radius: 8px;
+  background: #fff1e8;
+  color: #b45309;
+  font-size: 9px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.dashboardSideStack {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.managementNeedButton {
+  display: grid;
+  gap: 9px;
+  width: 100%;
+  min-height: 148px;
+  padding: 17px;
+  border: 1px solid #e5ddd5;
+  border-radius: 17px;
+  background: #fffdfa;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.managementNeedButton.hasWarning {
+  border-color: #f3c9aa;
+  background: #fff8f2;
+}
+
+.managementNeedButton > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.managementNeedButton > div span {
+  color: #786f68;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.managementNeedButton > div strong {
+  font-size: 25px;
+  letter-spacing: -.04em;
+}
+
+.managementNeedButton p {
+  margin: 0;
+  color: #766e67;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.managementNeedButton em {
+  color: #8b5e3c;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.costProgressPanel {
+  display: grid;
+  gap: 10px;
+}
+
+.costProgressNumber {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.costProgressNumber strong {
+  font-size: 25px;
+}
+
+.costProgressNumber span {
+  color: #8b8179;
+  font-size: 11px;
+}
+
+.costMissingAction {
+  width: 100%;
+  min-height: 35px;
+  border: 0;
+  border-radius: 9px;
+  background: #f5eee8;
+  color: #73543c;
+  font-size: 10px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.costCompleteText {
+  color: #6d7568;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.dashboardEmpty {
+  padding: 28px 12px;
+}
+
+.meetingOpsSummary {
+  display: grid;
+  grid-template-columns: minmax(150px, .7fr) minmax(0, 1.8fr);
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.meetingOpsSummaryTitle {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.meetingOpsSummaryTitle > div {
+  display: grid;
+  gap: 2px;
+}
+
+.meetingOpsSummaryTitle span,
+.meetingOpsSummaryTitle small {
+  color: #8b8179;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.meetingOpsSummaryTitle strong {
+  font-size: 14px;
+}
+
+.meetingOpsSummaryGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.meetingOpsSummaryGrid > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 7px;
+  min-width: 0;
+  padding: 9px 10px;
+  border-radius: 10px;
+  background: #f7f4f0;
+}
+
+.meetingOpsSummaryGrid span {
+  color: #81776f;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.meetingOpsSummaryGrid strong {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .meetingMetricGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .meetingDashboardGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboardSideStack {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .meetingOpsSummary {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .meetingDashboardTitle {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .dashboardManageButton {
+    width: 100%;
+  }
+
+  .meetingVisualRow {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+  }
+
+  .meetingVisualBarArea {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .meetingVisualCost {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .dashboardSideStack {
+    grid-template-columns: 1fr;
+  }
+
+  .meetingOpsSummaryTitle {
+    align-items: flex-start;
+  }
+
+  .meetingOpsSummaryGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 420px) {
+  .meetingMetricGrid {
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .meetingMetricCard {
+    min-height: 100px;
+    padding: 12px;
+  }
+
+  .meetingMetricCard > strong {
+    font-size: 21px;
+  }
+}

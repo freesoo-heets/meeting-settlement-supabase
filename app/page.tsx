@@ -777,43 +777,46 @@ export default function Home() {
     [monthStats]
   );
 
-  const newMembersThisMonth = useMemo(
-    () => members.filter((member) => member.join_date.startsWith(selectedMonth)),
-    [members, selectedMonth]
-  );
-
   const costMissingMeetings = useMemo(
     () => monthMeetings.filter((meeting) => meeting.cost == null),
     [monthMeetings]
   );
 
-  const managementAlerts = useMemo(() => {
-    const alerts: { key: string; title: string; detail: string; type: "member" | "meeting"; id: string }[] = [];
+  const completedCostMeetings = monthMeetings.length - costMissingMeetings.length;
 
-    for (const member of warningMembers) {
-      alerts.push({
-        key: `member-${member.id}`,
-        title: `${member.name} · 참석 확인 필요`,
-        detail: warningByMember[member.id]?.text ?? "장기 미참석",
-        type: "member",
-        id: member.id,
-      });
-    }
+  const averageMeetingAttendance = useMemo(
+    () =>
+      monthMeetings.length > 0
+        ? monthAttendanceTotal / monthMeetings.length
+        : 0,
+    [monthMeetings, monthAttendanceTotal]
+  );
 
-    for (const meeting of costMissingMeetings) {
-      alerts.push({
-        key: `meeting-${meeting.id}`,
-        title: `${meeting.date} · ${meeting.title}`,
-        detail: "모임 비용 미입력",
-        type: "meeting",
-        id: meeting.id,
-      });
-    }
+  const averageMeetingCost = useMemo(
+    () =>
+      completedCostMeetings > 0
+        ? monthTotalCost / completedCostMeetings
+        : 0,
+    [completedCostMeetings, monthTotalCost]
+  );
 
-    return alerts.slice(0, 8);
-  }, [warningMembers, warningByMember, costMissingMeetings]);
+  const monthMeetingRows = useMemo(
+    () =>
+      [...monthMeetings]
+        .sort((a, b) => b.date.localeCompare(a.date))
+        .map((meeting) => ({
+          meeting,
+          people: meeting.attendeeIds.length + meeting.guests.length,
+          cost: meeting.cost == null ? null : Number(meeting.cost),
+        })),
+    [monthMeetings]
+  );
 
-  const recentMeetings = meetings.slice(0, 5);
+  const maxMonthMeetingPeople = useMemo(
+    () => Math.max(1, ...monthMeetingRows.map((item) => item.people)),
+    [monthMeetingRows]
+  );
+
 
   async function logActivity(
     action: string,
@@ -2353,157 +2356,157 @@ export default function Home() {
 
       {mainTab === "dashboard" && (
         <>
-          <section className="summaryGrid">
-            <div className="summaryCard">
-              <span>활동중 회원</span>
-              <strong>{activeMembers.length}명</strong>
-              <small>탈퇴 {withdrawnMembers.length}명</small>
+          <section className="meetingDashboardHero">
+            <div className="meetingDashboardTitle">
+              <div>
+                <span className="dashboardEyebrow">{selectedMonth}</span>
+                <h2>이번 달 모임 한눈에 보기</h2>
+                <p>모임 횟수, 참석 규모, 비용 입력 현황을 한 화면에서 확인합니다.</p>
+              </div>
+              <button
+                className="dashboardManageButton"
+                onClick={() => setMainTab("meetings")}
+              >
+                모임 관리 열기
+              </button>
             </div>
-            <div className="summaryCard warningSummary">
-              <span>참석 경고</span>
-              <strong>{warningMembers.length}명</strong>
-              <small>확인 필요</small>
-            </div>
-            <div className="summaryCard">
-              <span>{selectedMonth} 모임</span>
-              <strong>{monthMeetings.length}회</strong>
-              <small>총 참석 {monthAttendanceTotal}명 · 게스트 {monthGuestTotal}명</small>
-            </div>
-            <div className="summaryCard">
-              <span>월 총비용</span>
-              <strong>{won(monthTotalCost)}</strong>
+
+            <div className="meetingMetricGrid">
+              <button className="meetingMetricCard" onClick={() => setMainTab("meetings")}>
+                <span>모임</span>
+                <strong>{monthMeetings.length}<em>회</em></strong>
+                <small>이번 달 등록 모임</small>
+              </button>
+
+              <div className="meetingMetricCard">
+                <span>총 참석</span>
+                <strong>{monthAttendanceTotal}<em>명</em></strong>
+                <small>평균 {averageMeetingAttendance.toFixed(1)}명 / 모임</small>
+              </div>
+
+              <div className="meetingMetricCard">
+                <span>참여 회원</span>
+                <strong>{uniqueMonthParticipants}<em>명</em></strong>
+                <small>중복 제외 회원 기준</small>
+              </div>
+
+              <div className="meetingMetricCard">
+                <span>총 벙비</span>
+                <strong>{won(monthTotalCost)}</strong>
+                <small>평균 {won(averageMeetingCost)} / 비용 입력 모임</small>
+              </div>
             </div>
           </section>
 
-          <section className="dashboardOpsGrid">
-            <div className="panel">
+          <section className="meetingDashboardGrid">
+            <div className="panel meetingVisualPanel">
               <div className="panelHead compactHead">
                 <div>
-                  <h2>관리 필요</h2>
-                  <p>자동 점검 {managementAlerts.length}건</p>
+                  <h2>모임별 참석 규모</h2>
+                  <p>막대 길이로 모임별 참석 인원을 비교합니다.</p>
                 </div>
+                <span className="dashboardPanelBadge">{monthMeetingRows.length}건</span>
               </div>
-              <div className="compactList">
-                {managementAlerts.map((alert) => (
+
+              <div className="meetingVisualList">
+                {monthMeetingRows.map(({ meeting, people, cost }) => (
                   <button
-                    className="compactRow compactRowButton"
-                    key={alert.key}
+                    className="meetingVisualRow"
+                    key={meeting.id}
                     onClick={() => {
-                      if (alert.type === "member") {
-                        setMemberDetailId(alert.id);
-                      } else {
-                        setSelectedMeetingId(alert.id);
-                        setMainTab("meetings");
-                      }
+                      setSelectedMeetingId(meeting.id);
+                      setMainTab("meetings");
                     }}
                   >
-                    <div>
-                      <strong>{alert.title}</strong>
-                      <div className="muted">{alert.detail}</div>
+                    <div className="meetingVisualMeta">
+                      <span>{meeting.date.slice(5).replace("-", ".")}</span>
+                      <strong>{meeting.title}</strong>
                     </div>
-                    <span>확인</span>
+                    <div className="meetingVisualBarArea">
+                      <div className="meetingVisualTrack">
+                        <span
+                          style={{
+                            width: `${Math.max(6, (people / maxMonthMeetingPeople) * 100)}%`,
+                          }}
+                        />
+                      </div>
+                      <small>{people}명</small>
+                    </div>
+                    <div className="meetingVisualCost">
+                      {cost == null ? (
+                        <span className="costMissingBadge">비용 미입력</span>
+                      ) : (
+                        <strong>{won(cost)}</strong>
+                      )}
+                    </div>
                   </button>
                 ))}
-                {managementAlerts.length === 0 && (
-                  <div className="empty">현재 관리가 필요한 항목이 없습니다.</div>
+
+                {monthMeetingRows.length === 0 && (
+                  <div className="empty dashboardEmpty">
+                    이번 달 등록된 모임이 없습니다.
+                  </div>
                 )}
               </div>
             </div>
 
-            <div className="panel">
-              <div className="panelHead compactHead">
+            <div className="dashboardSideStack">
+              <button
+                className={`managementNeedButton ${warningMembers.length > 0 ? "hasWarning" : ""}`}
+                onClick={() => {
+                  setMemberFilter("warning");
+                  setMainTab("members");
+                }}
+              >
                 <div>
-                  <h2>이번 달 운영 통계</h2>
-                  <p>{selectedMonth}</p>
+                  <span>관리 필요</span>
+                  <strong>{warningMembers.length}명</strong>
                 </div>
-              </div>
-              <div className="opsStatsGrid">
-                <div><span>참여 회원</span><strong>{uniqueMonthParticipants}명</strong></div>
-                <div><span>신규 회원</span><strong>{newMembersThisMonth.length}명</strong></div>
-                <div><span>모임</span><strong>{monthMeetings.length}회</strong></div>
-                <div><span>총 벙비</span><strong>{won(monthTotalCost)}</strong></div>
-              </div>
-            </div>
-          </section>
+                <p>
+                  {warningMembers.length > 0
+                    ? "참석 경고 회원을 회원 현황에서 바로 확인"
+                    : "현재 경고 상태 회원이 없습니다."}
+                </p>
+                <em>회원 현황 · 경고 보기 →</em>
+              </button>
 
-          <section className="dashboardGrid compactTop">
-            <div className="panel">
-              <div className="panelHead">
-                <div>
-                  <h2>최근 모임</h2>
-                  <p>최근 5개</p>
-                </div>
-                <button className="linkButton" onClick={() => setMainTab("meetings")}>
-                  관리
-                </button>
-              </div>
-              <div className="compactList">
-                {recentMeetings.map((meeting) => (
-                  <button
-                    className="compactRow compactRowButton"
-                    key={meeting.id}
-                    onClick={() => setDetailMeetingId(meeting.id)}
-                  >
-                    <div>
-                      <strong>{meeting.title}</strong>
-                      <div className="muted">{meeting.date}</div>
-                    </div>
-                    <span>{meeting.attendeeIds.length + meeting.guests.length}명 · 상세</span>
-                  </button>
-                ))}
-                {!recentMeetings.length && <div className="empty">모임이 없습니다.</div>}
-              </div>
-            </div>
-
-            <div className="panel">
-              <div className="panelHead">
-                <div>
-                  <h2>주의 회원</h2>
-                  <p>자동 경고 대상</p>
-                </div>
-                <button
-                  className="linkButton"
-                  onClick={() => {
-                    setMemberFilter("warning");
-                    setMainTab("members");
-                  }}
-                >
-                  전체
-                </button>
-              </div>
-              <div className="compactList">
-                {warningMembers.slice(0, 5).map((member) => (
-                  <div className="compactRow warningRow" key={member.id}>
-                    <div>
-                      <strong>{member.name}</strong>
-                      <div className="muted">{warningByMember[member.id]?.text}</div>
-                    </div>
-                    <span className="warningBadge">확인</span>
+              <div className="panel costProgressPanel">
+                <div className="panelHead compactHead">
+                  <div>
+                    <h2>비용 입력 현황</h2>
+                    <p>모임 정산 준비 상태</p>
                   </div>
-                ))}
-                {!warningMembers.length && <div className="empty">경고 회원 없음</div>}
-              </div>
-            </div>
+                </div>
 
-            <div className="panel">
-              <div className="panelHead">
-                <div>
-                  <h2>이번 달 비용 요약</h2>
-                  <p>모임관리 기준</p>
+                <div className="costProgressNumber">
+                  <strong>{completedCostMeetings}</strong>
+                  <span>/ {monthMeetings.length}개 모임</span>
                 </div>
-                <button className="linkButton" onClick={() => setMainTab("meetings")}>
-                  관리
-                </button>
-              </div>
-              <div className="miniSummaryGrid">
-                <div className="miniSummary">
-                  <span>회원 부담금</span>
-                  <strong>{won(monthStats.reduce((s, x) => s + x.expectedAmount, 0))}</strong>
+
+                <div className="costProgressTrack" aria-hidden="true">
+                  <span
+                    style={{
+                      width:
+                        monthMeetings.length > 0
+                          ? `${(completedCostMeetings / monthMeetings.length) * 100}%`
+                          : "0%",
+                    }}
+                  />
                 </div>
-                <div className="miniSummary">
-                  <span>모임 총비용</span>
-                  <strong>{won(monthTotalCost)}</strong>
-                </div>
+
+                {costMissingMeetings.length > 0 ? (
+                  <button
+                    className="costMissingAction"
+                    onClick={() => {
+                      setSelectedMeetingId(costMissingMeetings[0].id);
+                      setMainTab("meetings");
+                    }}
+                  >
+                    비용 미입력 {costMissingMeetings.length}건 확인
+                  </button>
+                ) : (
+                  <span className="costCompleteText">모든 모임의 비용이 입력되었습니다.</span>
+                )}
               </div>
             </div>
           </section>
@@ -2512,6 +2515,22 @@ export default function Home() {
 
       {mainTab === "meetings" && (
         <>
+          <section className="meetingOpsSummary panel standalonePanel">
+            <div className="meetingOpsSummaryTitle">
+              <div>
+                <span>{selectedMonth}</span>
+                <strong>이번 달 운영 요약</strong>
+              </div>
+              <small>모임 관리 기준</small>
+            </div>
+            <div className="meetingOpsSummaryGrid">
+              <div><span>모임</span><strong>{monthMeetings.length}회</strong></div>
+              <div><span>총 참석</span><strong>{monthAttendanceTotal}명</strong></div>
+              <div><span>참여 회원</span><strong>{uniqueMonthParticipants}명</strong></div>
+              <div><span>총 벙비</span><strong>{won(monthTotalCost)}</strong></div>
+            </div>
+          </section>
+
           <section className="controlGrid">
             <div className="panel standalonePanel">
               <div className="panelHead compactHead">
