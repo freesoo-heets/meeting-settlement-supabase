@@ -3202,12 +3202,6 @@ export default function Home() {
                     </div>
 
                     <div className="actions memberAdminActions">
-                      <button
-                        className="tinyButton ghost"
-                        onClick={() => setMemberDetailId(member.id)}
-                      >
-                        상세
-                      </button>
                       {profile && (
                         <span className={`accountBadge ${profile.role}`}>
                           {profile.role === "owner"
