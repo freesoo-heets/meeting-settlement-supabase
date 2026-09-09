@@ -227,12 +227,24 @@ export default function Home() {
     const attendanceRows = (attendanceResult.data ?? []) as AttendanceRow[];
     const guestRows = (guestResult.data ?? []) as MeetingGuest[];
 
+    const attendanceByMeeting = new Map<string, string[]>();
+    for (const row of attendanceRows) {
+      const current = attendanceByMeeting.get(row.meeting_id) ?? [];
+      current.push(row.member_id);
+      attendanceByMeeting.set(row.meeting_id, current);
+    }
+
+    const guestsByMeeting = new Map<string, MeetingGuest[]>();
+    for (const guest of guestRows) {
+      const current = guestsByMeeting.get(guest.meeting_id) ?? [];
+      current.push(guest);
+      guestsByMeeting.set(guest.meeting_id, current);
+    }
+
     const assembled: Meeting[] = meetingRows.map((meeting) => ({
       ...meeting,
-      attendeeIds: attendanceRows
-        .filter((row) => row.meeting_id === meeting.id)
-        .map((row) => row.member_id),
-      guests: guestRows.filter((guest) => guest.meeting_id === meeting.id),
+      attendeeIds: attendanceByMeeting.get(meeting.id) ?? [],
+      guests: guestsByMeeting.get(meeting.id) ?? [],
     }));
 
     setMembers(memberRows);
@@ -402,14 +414,19 @@ export default function Home() {
   );
 
   const lastAttendanceByMember = useMemo(() => {
-    const map: Record<string, string | null> = {};
-    for (const member of members) {
-      const dates = meetings
-        .filter((meeting) => meeting.attendeeIds.includes(member.id))
-        .map((meeting) => meeting.date)
-        .sort((a, b) => b.localeCompare(a));
-      map[member.id] = dates[0] ?? null;
+    const map: Record<string, string | null> = Object.fromEntries(
+      members.map((member) => [member.id, null])
+    );
+
+    for (const meeting of meetings) {
+      for (const memberId of meeting.attendeeIds) {
+        const current = map[memberId];
+        if (!current || meeting.date > current) {
+          map[memberId] = meeting.date;
+        }
+      }
     }
+
     return map;
   }, [members, meetings]);
 

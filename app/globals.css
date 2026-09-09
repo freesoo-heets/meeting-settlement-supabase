@@ -152,13 +152,6 @@ input:focus, select:focus { border-color: #8b5cf6; }
   font-size: 12px;
 }
 
-.dashboardGrid {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 12px;
-}
-
-.compactTop .panel { min-height: 220px; }
 
 .controlGrid {
   display: grid;
@@ -1651,36 +1644,6 @@ th { color: #6b7280; font-size: 11px; }
   transform: translateY(-1px);
 }
 
-.dashboardOpsGrid {
-  display: grid;
-  grid-template-columns: 1.3fr .8fr;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.opsStatsGrid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 7px;
-}
-
-.opsStatsGrid > div {
-  display: grid;
-  gap: 3px;
-  padding: 11px;
-  border-radius: 12px;
-  background: #f7f4f0;
-}
-
-.opsStatsGrid span {
-  color: #857b73;
-  font-size: 9px;
-  font-weight: 800;
-}
-
-.opsStatsGrid strong {
-  font-size: 15px;
-}
 
 .attendeeBulkBar {
   display: flex;
@@ -1835,9 +1798,6 @@ th { color: #6b7280; font-size: 11px; }
 }
 
 @media (max-width: 900px) {
-  .dashboardOpsGrid {
-    grid-template-columns: 1fr;
-  }
 
   .rankList {
     grid-template-columns: 1fr 1fr;
@@ -2563,15 +2523,6 @@ button.meetingMetricCard {
   font-size: 10px;
 }
 
-.meetingDashboardGrid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.65fr) minmax(250px, .75fr);
-  gap: 12px;
-}
-
-.meetingVisualPanel {
-  min-width: 0;
-}
 
 .dashboardPanelBadge {
   padding: 5px 8px;
@@ -2582,62 +2533,6 @@ button.meetingMetricCard {
   font-weight: 900;
 }
 
-.meetingVisualList {
-  display: grid;
-  gap: 5px;
-}
-
-.meetingVisualRow {
-  display: grid;
-  grid-template-columns: minmax(135px, 1fr) minmax(160px, 1.35fr) minmax(92px, auto);
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  min-width: 0;
-  padding: 10px 11px;
-  border: 1px solid transparent;
-  border-radius: 11px;
-  background: #faf8f5;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.meetingVisualRow:hover {
-  border-color: #e7ded5;
-  background: #fffdfa;
-}
-
-.meetingVisualMeta {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 7px;
-  min-width: 0;
-}
-
-.meetingVisualMeta > span {
-  padding: 4px 6px;
-  border-radius: 7px;
-  background: #ece6df;
-  color: #665d56;
-  font-size: 9px;
-  font-weight: 900;
-}
-
-.meetingVisualMeta > strong {
-  overflow: hidden;
-  font-size: 11px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.meetingVisualBarArea {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 34px;
-  align-items: center;
-  gap: 7px;
-}
 
 .meetingVisualTrack,
 .costProgressTrack {
@@ -2655,21 +2550,6 @@ button.meetingMetricCard {
   background: #49413a;
 }
 
-.meetingVisualBarArea small {
-  color: #655d56;
-  font-size: 10px;
-  font-weight: 900;
-  text-align: right;
-}
-
-.meetingVisualCost {
-  text-align: right;
-  font-size: 10px;
-}
-
-.meetingVisualCost strong {
-  font-size: 11px;
-}
 
 .costMissingBadge {
   display: inline-flex;
@@ -2682,11 +2562,6 @@ button.meetingMetricCard {
   white-space: nowrap;
 }
 
-.dashboardSideStack {
-  display: grid;
-  align-content: start;
-  gap: 12px;
-}
 
 .managementNeedButton {
   display: grid;
@@ -2744,20 +2619,6 @@ button.meetingMetricCard {
   gap: 10px;
 }
 
-.costProgressNumber {
-  display: flex;
-  align-items: baseline;
-  gap: 4px;
-}
-
-.costProgressNumber strong {
-  font-size: 25px;
-}
-
-.costProgressNumber span {
-  color: #8b8179;
-  font-size: 11px;
-}
 
 .costMissingAction {
   width: 100%;
@@ -2847,13 +2708,6 @@ button.meetingMetricCard {
     grid-template-columns: repeat(2, 1fr);
   }
 
-  .meetingDashboardGrid {
-    grid-template-columns: 1fr;
-  }
-
-  .dashboardSideStack {
-    grid-template-columns: 1fr 1fr;
-  }
 
   .meetingOpsSummary {
     grid-template-columns: 1fr;
@@ -2870,24 +2724,6 @@ button.meetingMetricCard {
     width: 100%;
   }
 
-  .meetingVisualRow {
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 8px;
-  }
-
-  .meetingVisualBarArea {
-    grid-column: 1 / -1;
-    grid-row: 2;
-  }
-
-  .meetingVisualCost {
-    grid-column: 2;
-    grid-row: 1;
-  }
-
-  .dashboardSideStack {
-    grid-template-columns: 1fr;
-  }
 
   .meetingOpsSummaryTitle {
     align-items: flex-start;
