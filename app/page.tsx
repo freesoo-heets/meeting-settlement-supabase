@@ -55,6 +55,8 @@ type Meeting = MeetingRow & {
 type MainTab = "dashboard" | "meetings" | "members" | "monthly" | "help";
 type MemberFilter = "all" | "active" | "warning" | "withdrawn";
 type MemberSort = "nickname_asc" | "nickname_desc" | "join_desc" | "join_asc" | "last_desc" | "last_asc";
+type AttendeeSort = "selected_first" | "nickname_asc" | "nickname_desc" | "join_desc" | "join_asc" | "last_desc" | "last_asc";
+type GuestSort = "nickname_asc" | "nickname_desc" | "added_desc" | "added_asc";
 type AppRole = "owner" | "admin" | "user";
 
 type Profile = {
@@ -131,6 +133,8 @@ export default function Home() {
   const [newMeetingTitle, setNewMeetingTitle] = useState("");
   const [newGuestName, setNewGuestName] = useState("");
   const [attendeeSearch, setAttendeeSearch] = useState("");
+  const [attendeeSort, setAttendeeSort] = useState<AttendeeSort>("selected_first");
+  const [guestSort, setGuestSort] = useState<GuestSort>("nickname_asc");
   const [detailMeetingId, setDetailMeetingId] = useState("");
   const [editingMeetingId, setEditingMeetingId] = useState("");
   const [editingMeetingTitle, setEditingMeetingTitle] = useState("");
@@ -397,14 +401,6 @@ export default function Home() {
     [members]
   );
 
-  const filteredAttendanceMembers = useMemo(() => {
-    const query = attendeeSearch.trim().toLowerCase();
-    if (!query) return activeMembers;
-    return activeMembers.filter((member) =>
-      member.name.toLowerCase().includes(query)
-    );
-  }, [activeMembers, attendeeSearch]);
-
   const lastAttendanceByMember = useMemo(() => {
     const map: Record<string, string | null> = {};
     for (const member of members) {
@@ -416,6 +412,71 @@ export default function Home() {
     }
     return map;
   }, [members, meetings]);
+
+  const filteredAttendanceMembers = useMemo(() => {
+    const query = attendeeSearch.trim().toLowerCase();
+    const rows = activeMembers.filter((member) =>
+      !query || member.name.toLowerCase().includes(query)
+    );
+
+    return [...rows].sort((a, b) => {
+      if (attendeeSort === "selected_first") {
+        const aSelected = selectedMeeting?.attendeeIds.includes(a.id) ? 1 : 0;
+        const bSelected = selectedMeeting?.attendeeIds.includes(b.id) ? 1 : 0;
+        if (aSelected !== bSelected) return bSelected - aSelected;
+        return a.name.localeCompare(b.name, "ko");
+      }
+
+      if (attendeeSort === "nickname_asc") {
+        return a.name.localeCompare(b.name, "ko");
+      }
+      if (attendeeSort === "nickname_desc") {
+        return b.name.localeCompare(a.name, "ko");
+      }
+      if (attendeeSort === "join_desc") {
+        return b.join_date.localeCompare(a.join_date) || a.name.localeCompare(b.name, "ko");
+      }
+      if (attendeeSort === "join_asc") {
+        return a.join_date.localeCompare(b.join_date) || a.name.localeCompare(b.name, "ko");
+      }
+
+      const aLast = lastAttendanceByMember[a.id];
+      const bLast = lastAttendanceByMember[b.id];
+
+      if (!aLast && !bLast) return a.name.localeCompare(b.name, "ko");
+      if (!aLast) return 1;
+      if (!bLast) return -1;
+
+      if (attendeeSort === "last_desc") {
+        return bLast.localeCompare(aLast) || a.name.localeCompare(b.name, "ko");
+      }
+
+      return aLast.localeCompare(bLast) || a.name.localeCompare(b.name, "ko");
+    });
+  }, [
+    activeMembers,
+    attendeeSearch,
+    attendeeSort,
+    selectedMeeting,
+    lastAttendanceByMember,
+  ]);
+
+  const sortedSelectedGuests = useMemo(() => {
+    if (!selectedMeeting) return [];
+
+    return [...selectedMeeting.guests].sort((a, b) => {
+      if (guestSort === "nickname_asc") {
+        return a.name.localeCompare(b.name, "ko");
+      }
+      if (guestSort === "nickname_desc") {
+        return b.name.localeCompare(a.name, "ko");
+      }
+      if (guestSort === "added_desc") {
+        return b.created_at.localeCompare(a.created_at) || a.name.localeCompare(b.name, "ko");
+      }
+      return a.created_at.localeCompare(b.created_at) || a.name.localeCompare(b.name, "ko");
+    });
+  }, [selectedMeeting, guestSort]);
 
   const warningByMember = useMemo(() => {
     const map: Record<string, { warning: boolean; text: string }> = {};
@@ -2619,14 +2680,30 @@ export default function Home() {
                     </button>
                   </div>
 
-                  <div className="attendeeSearchBar">
+                  <div className="attendeeSearchBar attendeeSearchSortBar">
                     <input
                       type="search"
                       placeholder="참석자 닉네임 빠른 검색"
                       value={attendeeSearch}
                       onChange={(event) => setAttendeeSearch(event.target.value)}
                     />
-                    <span>
+                    <label className="meetingSortControl">
+                      <span>참석자 정렬</span>
+                      <select
+                        value={attendeeSort}
+                        onChange={(event) => setAttendeeSort(event.target.value as AttendeeSort)}
+                        aria-label="참석자 정렬"
+                      >
+                        <option value="selected_first">선택된 회원 먼저</option>
+                        <option value="nickname_asc">닉네임 가나다순</option>
+                        <option value="nickname_desc">닉네임 역순</option>
+                        <option value="join_desc">입장일 최신순</option>
+                        <option value="join_asc">입장일 오래된순</option>
+                        <option value="last_desc">최근 참석일 최신순</option>
+                        <option value="last_asc">최근 참석일 오래된순</option>
+                      </select>
+                    </label>
+                    <span className="attendeeCount">
                       선택 {selectedMeeting.attendeeIds.length}명 / 전체 {activeMembers.length}명
                     </span>
                   </div>
@@ -2651,22 +2728,37 @@ export default function Home() {
                   </div>
 
                   <div className="guestBlock">
-                    <div className="inlineForm guestAdd">
-                      <input
-                        placeholder="게스트 이름"
-                        value={newGuestName}
-                        onChange={(event) => setNewGuestName(event.target.value)}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter") void addGuest();
-                        }}
-                      />
-                      <button className="smallButton" onClick={() => void addGuest()}>
-                        게스트 추가
-                      </button>
+                    <div className="guestToolbar">
+                      <div className="inlineForm guestAdd">
+                        <input
+                          placeholder="게스트 이름"
+                          value={newGuestName}
+                          onChange={(event) => setNewGuestName(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") void addGuest();
+                          }}
+                        />
+                        <button className="smallButton" onClick={() => void addGuest()}>
+                          게스트 추가
+                        </button>
+                      </div>
+                      <label className="meetingSortControl guestSortControl">
+                        <span>게스트 정렬</span>
+                        <select
+                          value={guestSort}
+                          onChange={(event) => setGuestSort(event.target.value as GuestSort)}
+                          aria-label="게스트 정렬"
+                        >
+                          <option value="nickname_asc">닉네임 가나다순</option>
+                          <option value="nickname_desc">닉네임 역순</option>
+                          <option value="added_desc">최근 추가순</option>
+                          <option value="added_asc">먼저 추가순</option>
+                        </select>
+                      </label>
                     </div>
 
                     <div className="guestTags">
-                      {selectedMeeting.guests.map((guest) => (
+                      {sortedSelectedGuests.map((guest) => (
                         <span className="guestTag" key={guest.id}>
                           {guest.name}
                           <button onClick={() => void deleteGuest(guest)}>×</button>

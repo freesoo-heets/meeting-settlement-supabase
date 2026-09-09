@@ -2252,3 +2252,74 @@ select {
     min-width: 0;
   }
 }
+
+
+/* STEP 25: 모임 참석자/게스트 정렬 */
+.attendeeSearchSortBar {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto auto;
+  align-items: end;
+  gap: 8px;
+}
+
+.meetingSortControl {
+  display: grid;
+  gap: 4px;
+  min-width: 170px;
+}
+
+.meetingSortControl > span {
+  padding: 0;
+  color: #6b7280;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.meetingSortControl select {
+  min-height: 38px;
+  width: 100%;
+  padding: 6px 28px 6px 9px;
+}
+
+.attendeeCount {
+  align-self: center;
+  white-space: nowrap;
+}
+
+.guestToolbar {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+  margin-bottom: 9px;
+}
+
+.guestToolbar .guestAdd {
+  margin-bottom: 0;
+}
+
+.guestSortControl {
+  min-width: 155px;
+}
+
+@media (max-width: 760px) {
+  .attendeeSearchSortBar {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .meetingSortControl,
+  .guestSortControl {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .attendeeCount {
+    align-self: auto;
+  }
+
+  .guestToolbar {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+}
