@@ -1,4 +1,4 @@
-const CACHE_NAME = "jjinc-manager-v12";
+const CACHE_NAME = "jjinc-manager-v13";
 const APP_SHELL = ["/", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png"];
 
 self.addEventListener("install", (event) => {

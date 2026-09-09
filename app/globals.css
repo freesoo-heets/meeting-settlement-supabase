@@ -2913,3 +2913,237 @@ button.meetingMetricCard {
     font-size: 21px;
   }
 }
+
+
+/* STEP 27.1: 인기벙 TOP3 + 참석 TOP5 대시보드 */
+.dashboardRankingGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(320px, .85fr);
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.dashboardRankingPanel {
+  min-width: 0;
+}
+
+.popularMeetingList,
+.dashboardAttendanceList {
+  display: grid;
+  gap: 7px;
+}
+
+.popularMeetingCard {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 72px;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid #ece5de;
+  border-radius: 13px;
+  background: #fffdfa;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.popularMeetingCard:hover,
+.dashboardAttendanceCard:hover {
+  border-color: #d9cfc5;
+  background: #fbf8f4;
+}
+
+.dashboardRankNumber {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 9px;
+  background: #332d28;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.rank1 .dashboardRankNumber {
+  background: #8b5e3c;
+}
+
+.rank2 .dashboardRankNumber {
+  background: #6f675f;
+}
+
+.rank3 .dashboardRankNumber {
+  background: #9a765b;
+}
+
+.popularMeetingMain {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.popularMeetingTitleLine {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.popularMeetingTitleLine strong {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.popularMeetingTitleLine span {
+  flex: 0 0 auto;
+  color: #8c827a;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.popularMeetingRateLine {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 38px;
+  align-items: center;
+  gap: 7px;
+}
+
+.popularMeetingRateTrack {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #ede8e2;
+}
+
+.popularMeetingRateTrack span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #5b5149;
+}
+
+.popularMeetingRateLine > strong {
+  color: #5e554e;
+  font-size: 10px;
+  text-align: right;
+}
+
+.popularMeetingPeople {
+  display: grid;
+  justify-items: end;
+  gap: 1px;
+}
+
+.popularMeetingPeople strong {
+  font-size: 19px;
+  letter-spacing: -.04em;
+}
+
+.popularMeetingPeople span {
+  color: #8b8179;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.dashboardAttendanceCard {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  padding: 9px 11px;
+  border: 1px solid #ece5de;
+  border-radius: 12px;
+  background: #fffdfa;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dashboardAttendanceCard > div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.dashboardAttendanceCard > div strong {
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboardAttendanceCard > div small {
+  color: #8d837b;
+  font-size: 9px;
+}
+
+.attendanceCountValue {
+  min-width: 38px;
+  text-align: right;
+  font-size: 13px;
+}
+
+.dashboardActionGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.dashboardActionCard {
+  min-height: 0;
+}
+
+.costProgressCompact {
+  font-size: 16px;
+  letter-spacing: -.04em;
+}
+
+@media (max-width: 950px) {
+  .dashboardRankingGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .dashboardActionGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .popularMeetingCard {
+    grid-template-columns: 30px minmax(0, 1fr) 60px;
+    padding: 10px;
+  }
+
+  .dashboardRankNumber {
+    width: 26px;
+    height: 26px;
+  }
+}
+
+@media (max-width: 390px) {
+  .popularMeetingCard {
+    grid-template-columns: 28px minmax(0, 1fr);
+  }
+
+  .popularMeetingPeople {
+    grid-column: 2;
+    grid-row: 2;
+    justify-items: start;
+    display: flex;
+    align-items: baseline;
+    gap: 3px;
+  }
+
+  .popularMeetingMain {
+    grid-column: 2;
+  }
+}

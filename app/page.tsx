@@ -800,21 +800,32 @@ export default function Home() {
     [completedCostMeetings, monthTotalCost]
   );
 
-  const monthMeetingRows = useMemo(
+  const popularMeetings = useMemo(
     () =>
       [...monthMeetings]
-        .sort((a, b) => b.date.localeCompare(a.date))
-        .map((meeting) => ({
-          meeting,
-          people: meeting.attendeeIds.length + meeting.guests.length,
-          cost: meeting.cost == null ? null : Number(meeting.cost),
-        })),
-    [monthMeetings]
-  );
+        .map((meeting) => {
+          const memberAttendees = meeting.attendeeIds.length;
+          const totalAttendees = memberAttendees + meeting.guests.length;
+          const attendanceRate =
+            activeMembers.length > 0
+              ? Math.min(100, Math.round((memberAttendees / activeMembers.length) * 100))
+              : 0;
 
-  const maxMonthMeetingPeople = useMemo(
-    () => Math.max(1, ...monthMeetingRows.map((item) => item.people)),
-    [monthMeetingRows]
+          return {
+            meeting,
+            memberAttendees,
+            totalAttendees,
+            attendanceRate,
+          };
+        })
+        .sort(
+          (a, b) =>
+            b.attendanceRate - a.attendanceRate ||
+            b.totalAttendees - a.totalAttendees ||
+            b.meeting.date.localeCompare(a.meeting.date)
+        )
+        .slice(0, 3),
+    [monthMeetings, activeMembers]
   );
 
 
@@ -2361,7 +2372,7 @@ export default function Home() {
               <div>
                 <span className="dashboardEyebrow">{selectedMonth}</span>
                 <h2>이번 달 모임 한눈에 보기</h2>
-                <p>모임 횟수, 참석 규모, 비용 입력 현황을 한 화면에서 확인합니다.</p>
+                <p>핵심 수치와 인기 모임·참석 랭킹을 한 화면에서 확인합니다.</p>
               </div>
               <button
                 className="dashboardManageButton"
@@ -2398,116 +2409,148 @@ export default function Home() {
             </div>
           </section>
 
-          <section className="meetingDashboardGrid">
-            <div className="panel meetingVisualPanel">
+          <section className="dashboardRankingGrid">
+            <div className="panel dashboardRankingPanel popularMeetingPanel">
               <div className="panelHead compactHead">
                 <div>
-                  <h2>모임별 참석 규모</h2>
-                  <p>막대 길이로 모임별 참석 인원을 비교합니다.</p>
+                  <h2>🔥 인기벙 TOP 3</h2>
+                  <p>활동중 회원 대비 참석률 기준 · 게스트는 참석인원에 포함</p>
                 </div>
-                <span className="dashboardPanelBadge">{monthMeetingRows.length}건</span>
+                <span className="dashboardPanelBadge">{popularMeetings.length}건</span>
               </div>
 
-              <div className="meetingVisualList">
-                {monthMeetingRows.map(({ meeting, people, cost }) => (
+              <div className="popularMeetingList">
+                {popularMeetings.map(({ meeting, totalAttendees, attendanceRate }, index) => (
                   <button
-                    className="meetingVisualRow"
+                    className={`popularMeetingCard rank${index + 1}`}
                     key={meeting.id}
                     onClick={() => {
                       setSelectedMeetingId(meeting.id);
                       setMainTab("meetings");
                     }}
                   >
-                    <div className="meetingVisualMeta">
-                      <span>{meeting.date.slice(5).replace("-", ".")}</span>
-                      <strong>{meeting.title}</strong>
-                    </div>
-                    <div className="meetingVisualBarArea">
-                      <div className="meetingVisualTrack">
-                        <span
-                          style={{
-                            width: `${Math.max(6, (people / maxMonthMeetingPeople) * 100)}%`,
-                          }}
-                        />
+                    <span className="dashboardRankNumber">{index + 1}</span>
+                    <div className="popularMeetingMain">
+                      <div className="popularMeetingTitleLine">
+                        <strong>{meeting.title}</strong>
+                        <span>{meeting.date.slice(5).replace("-", ".")}</span>
                       </div>
-                      <small>{people}명</small>
+                      <div className="popularMeetingRateLine">
+                        <div className="popularMeetingRateTrack" aria-hidden="true">
+                          <span style={{ width: `${attendanceRate}%` }} />
+                        </div>
+                        <strong>{attendanceRate}%</strong>
+                      </div>
                     </div>
-                    <div className="meetingVisualCost">
-                      {cost == null ? (
-                        <span className="costMissingBadge">비용 미입력</span>
-                      ) : (
-                        <strong>{won(cost)}</strong>
-                      )}
+                    <div className="popularMeetingPeople">
+                      <strong>{totalAttendees}</strong>
+                      <span>명 참석</span>
                     </div>
                   </button>
                 ))}
 
-                {monthMeetingRows.length === 0 && (
-                  <div className="empty dashboardEmpty">
-                    이번 달 등록된 모임이 없습니다.
-                  </div>
+                {popularMeetings.length === 0 && (
+                  <div className="empty dashboardEmpty">이번 달 모임이 없습니다.</div>
                 )}
               </div>
             </div>
 
-            <div className="dashboardSideStack">
-              <button
-                className={`managementNeedButton ${warningMembers.length > 0 ? "hasWarning" : ""}`}
-                onClick={() => {
-                  setMemberFilter("warning");
-                  setMainTab("members");
-                }}
-              >
+            <div className="panel dashboardRankingPanel attendanceTopPanel">
+              <div className="panelHead compactHead">
                 <div>
-                  <span>관리 필요</span>
-                  <strong>{warningMembers.length}명</strong>
+                  <h2>🏅 이번 달 참석 TOP 5</h2>
+                  <p>회원별 모임 참석 횟수 기준</p>
                 </div>
-                <p>
-                  {warningMembers.length > 0
-                    ? "참석 경고 회원을 회원 현황에서 바로 확인"
-                    : "현재 경고 상태 회원이 없습니다."}
-                </p>
-                <em>회원 현황 · 경고 보기 →</em>
-              </button>
+                <button
+                  className="linkButton"
+                  onClick={() => setMainTab("monthly")}
+                >
+                  전체 현황
+                </button>
+              </div>
 
-              <div className="panel costProgressPanel">
-                <div className="panelHead compactHead">
-                  <div>
-                    <h2>비용 입력 현황</h2>
-                    <p>모임 정산 준비 상태</p>
-                  </div>
-                </div>
-
-                <div className="costProgressNumber">
-                  <strong>{completedCostMeetings}</strong>
-                  <span>/ {monthMeetings.length}개 모임</span>
-                </div>
-
-                <div className="costProgressTrack" aria-hidden="true">
-                  <span
-                    style={{
-                      width:
-                        monthMeetings.length > 0
-                          ? `${(completedCostMeetings / monthMeetings.length) * 100}%`
-                          : "0%",
-                    }}
-                  />
-                </div>
-
-                {costMissingMeetings.length > 0 ? (
+              <div className="dashboardAttendanceList">
+                {topAttendance.map((item, index) => (
                   <button
-                    className="costMissingAction"
-                    onClick={() => {
-                      setSelectedMeetingId(costMissingMeetings[0].id);
-                      setMainTab("meetings");
-                    }}
+                    className={`dashboardAttendanceCard rank${index + 1}`}
+                    key={item.member.id}
+                    onClick={() => setMemberDetailId(item.member.id)}
                   >
-                    비용 미입력 {costMissingMeetings.length}건 확인
+                    <span className="dashboardRankNumber">{index + 1}</span>
+                    <div>
+                      <strong>{item.member.name}</strong>
+                      <small>
+                        {monthMeetings.length > 0
+                          ? `참석률 ${Math.round((item.attendanceCount / monthMeetings.length) * 100)}%`
+                          : "참석률 0%"}
+                      </small>
+                    </div>
+                    <strong className="attendanceCountValue">{item.attendanceCount}회</strong>
                   </button>
-                ) : (
-                  <span className="costCompleteText">모든 모임의 비용이 입력되었습니다.</span>
+                ))}
+
+                {topAttendance.length === 0 && (
+                  <div className="empty dashboardEmpty">이번 달 참석 기록이 없습니다.</div>
                 )}
               </div>
+            </div>
+          </section>
+
+          <section className="dashboardActionGrid">
+            <button
+              className={`managementNeedButton dashboardActionCard ${warningMembers.length > 0 ? "hasWarning" : ""}`}
+              onClick={() => {
+                setMemberFilter("warning");
+                setMainTab("members");
+              }}
+            >
+              <div>
+                <span>관리 필요</span>
+                <strong>{warningMembers.length}명</strong>
+              </div>
+              <p>
+                {warningMembers.length > 0
+                  ? "참석 경고 회원을 회원 현황에서 바로 확인합니다."
+                  : "현재 경고 상태 회원이 없습니다."}
+              </p>
+              <em>회원 현황 · 경고 보기 →</em>
+            </button>
+
+            <div className="panel costProgressPanel dashboardActionCard">
+              <div className="panelHead compactHead">
+                <div>
+                  <h2>비용 입력 현황</h2>
+                  <p>모임 정산 준비 상태</p>
+                </div>
+                <strong className="costProgressCompact">
+                  {completedCostMeetings}/{monthMeetings.length}
+                </strong>
+              </div>
+
+              <div className="costProgressTrack" aria-hidden="true">
+                <span
+                  style={{
+                    width:
+                      monthMeetings.length > 0
+                        ? `${(completedCostMeetings / monthMeetings.length) * 100}%`
+                        : "0%",
+                  }}
+                />
+              </div>
+
+              {costMissingMeetings.length > 0 ? (
+                <button
+                  className="costMissingAction"
+                  onClick={() => {
+                    setSelectedMeetingId(costMissingMeetings[0].id);
+                    setMainTab("meetings");
+                  }}
+                >
+                  비용 미입력 {costMissingMeetings.length}건 확인
+                </button>
+              ) : (
+                <span className="costCompleteText">모든 모임의 비용이 입력되었습니다.</span>
+              )}
             </div>
           </section>
         </>
