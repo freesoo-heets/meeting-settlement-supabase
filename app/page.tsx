@@ -52,7 +52,7 @@ type Meeting = MeetingRow & {
   guests: MeetingGuest[];
 };
 
-type MainTab = "dashboard" | "meetings" | "members" | "monthly" | "help";
+type MainTab = "dashboard" | "meetings" | "members" | "monthly" | "history" | "help";
 type MemberFilter = "all" | "active" | "warning" | "withdrawn";
 type MemberSort = "nickname_asc" | "nickname_desc" | "join_desc" | "join_asc" | "last_desc" | "last_asc";
 type AttendeeSort = "selected_first" | "nickname_asc" | "nickname_desc" | "join_desc" | "join_asc" | "last_desc" | "last_asc";
@@ -2316,6 +2316,7 @@ export default function Home() {
           ["meetings", "모임 관리"],
           ["members", "회원 현황"],
           ["monthly", "월별 참석 현황"],
+          ["history", "변경 이력"],
           ["help", "사용방법"],
         ].map(([value, label]) => (
           <button
@@ -3107,14 +3108,38 @@ export default function Home() {
           )}
 
           <section className="memberToolbar panel standalonePanel">
-            <div className="filterBar">
-              <input
-                className="searchInput"
-                placeholder="회원 검색"
-                value={memberSearch}
-                onChange={(event) => setMemberSearch(event.target.value)}
-              />
-              <div className="filterButtons">
+            <div className="memberToolbarTop">
+              <label className="memberSearchControl">
+                <span>회원 검색</span>
+                <input
+                  className="searchInput"
+                  type="search"
+                  placeholder="닉네임을 입력하세요"
+                  value={memberSearch}
+                  onChange={(event) => setMemberSearch(event.target.value)}
+                />
+              </label>
+
+              <label className="memberSortControl">
+                <span>정렬 기준</span>
+                <select
+                  value={memberSort}
+                  onChange={(event) => setMemberSort(event.target.value as MemberSort)}
+                  aria-label="회원 정렬"
+                >
+                  <option value="nickname_asc">닉네임 가나다순</option>
+                  <option value="nickname_desc">닉네임 역순</option>
+                  <option value="join_desc">입장일 최신순</option>
+                  <option value="join_asc">입장일 오래된순</option>
+                  <option value="last_desc">최근 참석일 최신순</option>
+                  <option value="last_asc">최근 참석일 오래된순</option>
+                </select>
+              </label>
+            </div>
+
+            <div className="memberFilterSection">
+              <span className="memberToolbarLabel">회원 상태</span>
+              <div className="filterButtons memberStatusFilters">
                 {[
                   ["all", "전체"],
                   ["active", "활동중"],
@@ -3130,21 +3155,6 @@ export default function Home() {
                   </button>
                 ))}
               </div>
-              <label className="memberSortControl">
-                <span>정렬</span>
-                <select
-                  value={memberSort}
-                  onChange={(event) => setMemberSort(event.target.value as MemberSort)}
-                  aria-label="회원 정렬"
-                >
-                  <option value="nickname_asc">닉네임 가나다순</option>
-                  <option value="nickname_desc">닉네임 역순</option>
-                  <option value="join_desc">입장일 최신순</option>
-                  <option value="join_asc">입장일 오래된순</option>
-                  <option value="last_desc">최근 참석일 최신순</option>
-                  <option value="last_asc">최근 참석일 오래된순</option>
-                </select>
-              </label>
             </div>
           </section>
 
@@ -3445,6 +3455,53 @@ export default function Home() {
       )}
 
 
+      {mainTab === "history" && (
+        <section className="historyPage">
+          <section className="panel standalonePanel historyHeaderPanel">
+            <div>
+              <span className="historyKicker">ACTIVITY LOG</span>
+              <h2>최근 변경 이력</h2>
+              <p>회원·모임·정산 관련 최근 변경 내용을 시간순으로 확인합니다.</p>
+            </div>
+            <strong>{activityLogs.length}건</strong>
+          </section>
+
+          <section className="panel activityPanel historyActivityPanel">
+            <div className="panelHead compactHead">
+              <div>
+                <h2>최근 활동</h2>
+                <p>최근 20건 · 모든 역할에서 동일하게 확인</p>
+              </div>
+            </div>
+            <div className="activityList">
+              {activityLogs.map((log) => (
+                <div className="activityRow" key={log.id}>
+                  <div>
+                    <strong>{log.action}</strong>
+                    <span>{log.description}</span>
+                  </div>
+                  <div className="activityMeta">
+                    <strong>{log.actor_nickname}</strong>
+                    <span>
+                      {new Date(log.created_at).toLocaleString("ko-KR", {
+                        year: "numeric",
+                        month: "2-digit",
+                        day: "2-digit",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  </div>
+                </div>
+              ))}
+              {activityLogs.length === 0 && (
+                <div className="empty">아직 기록된 변경 이력이 없습니다.</div>
+              )}
+            </div>
+          </section>
+        </section>
+      )}
+
       {mainTab === "help" && (
         <section className="helpPage">
           <div className="helpHero panel standalonePanel">
@@ -3661,7 +3718,7 @@ export default function Home() {
             </div>
           </section>
 
-          <div className="helpVersion">사용방법 · Step 23 기준</div>
+          <div className="helpVersion">사용방법 · Step 26 기준</div>
         </section>
       )}
 
@@ -3669,39 +3726,6 @@ export default function Home() {
 
       {loading && <div className="loading">불러오는 중...</div>}
     
-      <section className="panel activityPanel">
-        <div className="panelHead compactHead">
-          <div>
-            <h2>최근 변경 이력</h2>
-            <p>최근 20건 · 모든 역할에서 동일하게 확인</p>
-          </div>
-        </div>
-        <div className="activityList">
-          {activityLogs.map((log) => (
-            <div className="activityRow" key={log.id}>
-              <div>
-                <strong>{log.action}</strong>
-                <span>{log.description}</span>
-              </div>
-              <div className="activityMeta">
-                <strong>{log.actor_nickname}</strong>
-                <span>
-                  {new Date(log.created_at).toLocaleString("ko-KR", {
-                    month: "2-digit",
-                    day: "2-digit",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </span>
-              </div>
-            </div>
-          ))}
-          {activityLogs.length === 0 && (
-            <div className="empty">아직 기록된 변경 이력이 없습니다.</div>
-          )}
-        </div>
-      </section>
-
       {showMyActivity && currentMember && (
         <div className="meetingModalBackdrop" role="presentation">
           <section className="meetingModal" role="dialog" aria-modal="true">

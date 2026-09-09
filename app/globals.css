@@ -62,7 +62,7 @@ input:focus, select:focus { border-color: #8b5cf6; }
   top: 8px;
   z-index: 10;
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 5px;
   padding: 5px;
   margin-bottom: 14px;
@@ -600,7 +600,7 @@ th { color: #6b7280; font-size: 11px; }
 @media (max-width: 520px) {
   .pageShell { width: min(100% - 16px, 1240px); padding-top: 14px; }
   .topHeader h1 { font-size: 24px; }
-  .mainTabs { overflow-x: auto; grid-template-columns: repeat(5, minmax(100px, 1fr)); }
+  .mainTabs { overflow-x: auto; grid-template-columns: repeat(6, minmax(96px, 1fr)); }
   .summaryGrid { grid-template-columns: 1fr 1fr; }
   .allocationSummaryGrid, .miniSummaryGrid { grid-template-columns: 1fr; }
 }
@@ -1410,7 +1410,8 @@ th { color: #6b7280; font-size: 11px; }
     bottom: max(10px, env(safe-area-inset-bottom));
     z-index: 700;
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(2, 46px);
     gap: 3px;
     padding: 5px;
     border: 1px solid #e6ded6;
@@ -2321,5 +2322,145 @@ select {
   .guestToolbar {
     grid-template-columns: 1fr;
     align-items: stretch;
+  }
+}
+
+
+/* STEP 26: 회원 현황 툴바 재배치 + 변경 이력 메뉴 */
+.memberToolbar {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.memberToolbarTop {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(190px, 240px);
+  gap: 10px;
+  align-items: end;
+}
+
+.memberSearchControl,
+.memberSortControl {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  margin: 0;
+}
+
+.memberSearchControl > span,
+.memberSortControl > span,
+.memberToolbarLabel {
+  color: #6b7280;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.memberSearchControl .searchInput,
+.memberSortControl select {
+  width: 100%;
+  max-width: none;
+  min-height: 40px;
+}
+
+.memberFilterSection {
+  display: grid;
+  gap: 6px;
+}
+
+.memberStatusFilters {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(80px, 1fr));
+  gap: 6px;
+}
+
+.memberStatusFilters .filterButton {
+  width: 100%;
+  min-height: 38px;
+  margin: 0;
+}
+
+.historyPage {
+  display: grid;
+  gap: 12px;
+}
+
+.historyHeaderPanel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 18px 20px;
+}
+
+.historyHeaderPanel h2 {
+  margin: 3px 0 4px;
+  font-size: 22px;
+}
+
+.historyHeaderPanel p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.historyHeaderPanel > strong {
+  min-width: 58px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  background: #f5f1eb;
+  text-align: center;
+  font-size: 13px;
+}
+
+.historyKicker {
+  color: #7c3aed;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .08em;
+}
+
+.historyActivityPanel {
+  margin-top: 0;
+}
+
+@media (max-width: 760px) {
+  .pageShell {
+    padding-bottom: calc(132px + env(safe-area-inset-bottom));
+  }
+
+  .mainTabs {
+    grid-template-columns: repeat(3, 1fr) !important;
+    grid-template-rows: repeat(2, 46px);
+    max-height: 108px;
+  }
+
+  .mainTabs .tabButton {
+    min-height: 44px;
+    font-size: 10px;
+  }
+
+  .memberToolbarTop {
+    grid-template-columns: 1fr;
+  }
+
+  .memberStatusFilters {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .memberStatusFilters .filterButton {
+    padding-left: 4px;
+    padding-right: 4px;
+    font-size: 11px;
+  }
+
+  .historyHeaderPanel {
+    padding: 15px;
+  }
+}
+
+@media (max-width: 390px) {
+  .memberStatusFilters {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
