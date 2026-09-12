@@ -144,6 +144,8 @@ export default function Home() {
   const [showAccountPanel, setShowAccountPanel] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [newPasswordConfirm, setNewPasswordConfirm] = useState("");
+  const [adminResetPassword, setAdminResetPassword] = useState("");
+  const [adminResetPasswordConfirm, setAdminResetPasswordConfirm] = useState("");
   const [installPrompt, setInstallPrompt] = useState<any>(null);
 
   const [newMemberName, setNewMemberName] = useState("");
@@ -768,6 +770,14 @@ export default function Home() {
   const memberDetail = useMemo(
     () => members.find((member) => member.id === memberDetailId) ?? null,
     [members, memberDetailId]
+  );
+
+  const memberDetailProfile = useMemo(
+    () =>
+      memberDetail
+        ? profiles.find((profile) => profile.member_id === memberDetail.id) ?? null
+        : null,
+    [profiles, memberDetail]
   );
 
   const memberDetailMeetings = useMemo(() => {
@@ -1431,6 +1441,99 @@ export default function Home() {
       setNotice(`${oldName} 님의 닉네임을 ${nickname}(으)로 변경했습니다.`);
     } catch {
       setNotice("닉네임 수정 중 오류가 발생했습니다.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function resetMemberPasswordByAdmin(member: Member) {
+    if (!isAdmin) {
+      setNotice("비밀번호 재설정은 관리자 이상만 가능합니다.");
+      return;
+    }
+
+    const targetProfile = profiles.find((item) => item.member_id === member.id);
+    if (!targetProfile) {
+      setNotice("아직 최초 가입을 하지 않은 회원이라 로그인 계정이 없습니다.");
+      return;
+    }
+
+    if (currentMember?.id === member.id) {
+      setNotice("본인 비밀번호는 상단 '내 계정'에서 변경해주세요.");
+      return;
+    }
+
+    if (targetProfile.role === "owner") {
+      setNotice("제작자 계정의 비밀번호는 관리자 화면에서 재설정할 수 없습니다.");
+      return;
+    }
+
+    if (currentRole === "admin" && targetProfile.role === "admin") {
+      setNotice("관리자는 다른 관리자의 비밀번호를 재설정할 수 없습니다.");
+      return;
+    }
+
+    if (adminResetPassword.length < 6 || adminResetPassword.length > 72) {
+      setNotice("새 비밀번호는 6~72자로 입력해주세요.");
+      return;
+    }
+
+    if (adminResetPassword !== adminResetPasswordConfirm) {
+      setNotice("새 비밀번호 확인이 일치하지 않습니다.");
+      return;
+    }
+
+    if (
+      !window.confirm(
+        `${member.name} 님의 로그인 비밀번호를 새 비밀번호로 재설정할까요?\n\n기존 비밀번호는 확인하거나 복구할 수 없습니다.`
+      )
+    ) {
+      return;
+    }
+
+    if (saving) return;
+    setSaving(true);
+    setNotice("");
+
+    try {
+      const accessToken = await getAccessTokenForAdminAction();
+      if (!accessToken) {
+        setNotice("로그인 세션을 확인할 수 없습니다. 다시 로그인해주세요.");
+        return;
+      }
+
+      const response = await fetch("/api/admin/member", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          action: "reset-password",
+          memberId: member.id,
+          password: adminResetPassword,
+        }),
+      });
+      const body = await response.json();
+
+      if (!response.ok) {
+        setNotice(body.error ?? "비밀번호 재설정에 실패했습니다.");
+        return;
+      }
+
+      setAdminResetPassword("");
+      setAdminResetPasswordConfirm("");
+
+      await logActivity(
+        "비밀번호 재설정",
+        "member",
+        member.id,
+        `${member.name} 회원 로그인 비밀번호 재설정`
+      );
+
+      setNotice(`${member.name} 님의 로그인 비밀번호를 재설정했습니다.`);
+    } catch {
+      setNotice("비밀번호 재설정 중 오류가 발생했습니다.");
     } finally {
       setSaving(false);
     }
@@ -3898,7 +4001,16 @@ export default function Home() {
                 <span>회원 상세</span>
                 <h2>{memberDetail.name}</h2>
               </div>
-              <button className="modalCloseButton" onClick={() => setMemberDetailId("")}>×</button>
+              <button
+                className="modalCloseButton"
+                onClick={() => {
+                  setMemberDetailId("");
+                  setAdminResetPassword("");
+                  setAdminResetPasswordConfirm("");
+                }}
+              >
+                ×
+              </button>
             </div>
 
             <div className="modalSummaryGrid">
@@ -3907,6 +4019,90 @@ export default function Home() {
               <div><span>총 참석</span><strong>{memberDetailMeetings.length}회</strong></div>
               <div><span>최근 참석</span><strong>{lastAttendanceByMember[memberDetail.id] ?? "-"}</strong></div>
             </div>
+
+            {isAdmin && (
+              <div className="modalSection memberAccountAdminSection">
+                <div className="modalSectionHead">
+                  <strong>로그인 계정 관리</strong>
+                  <span>
+                    {memberDetailProfile
+                      ? memberDetailProfile.role === "owner"
+                        ? "제작자"
+                        : memberDetailProfile.role === "admin"
+                          ? "관리자"
+                          : "회원"
+                      : "계정 미연결"}
+                  </span>
+                </div>
+
+                {!memberDetailProfile ? (
+                  <div className="accountAdminHint">
+                    이 회원은 아직 최초 가입을 하지 않아 재설정할 로그인 계정이 없습니다.
+                  </div>
+                ) : currentMember?.id === memberDetail.id ? (
+                  <div className="accountAdminHint">
+                    본인 비밀번호는 상단 <strong>내 계정</strong>에서 변경해주세요.
+                  </div>
+                ) : memberDetailProfile.role === "owner" ? (
+                  <div className="accountAdminHint">
+                    제작자 계정의 비밀번호는 회원 관리 화면에서 재설정할 수 없습니다.
+                  </div>
+                ) : currentRole === "admin" && memberDetailProfile.role === "admin" ? (
+                  <div className="accountAdminHint">
+                    관리자는 다른 관리자의 비밀번호를 재설정할 수 없습니다.
+                  </div>
+                ) : (
+                  <div className="adminPasswordResetBox">
+                    <div className="adminPasswordResetDescription">
+                      <strong>비밀번호 재설정</strong>
+                      <span>
+                        기존 비밀번호는 표시하지 않고 새 비밀번호로만 변경합니다.
+                      </span>
+                    </div>
+                    <div className="adminPasswordResetFields">
+                      <label>
+                        <span>새 비밀번호</span>
+                        <input
+                          type="password"
+                          autoComplete="new-password"
+                          minLength={6}
+                          maxLength={72}
+                          placeholder="6자 이상"
+                          value={adminResetPassword}
+                          onChange={(event) => setAdminResetPassword(event.target.value)}
+                        />
+                      </label>
+                      <label>
+                        <span>비밀번호 확인</span>
+                        <input
+                          type="password"
+                          autoComplete="new-password"
+                          minLength={6}
+                          maxLength={72}
+                          placeholder="다시 입력"
+                          value={adminResetPasswordConfirm}
+                          onChange={(event) => setAdminResetPasswordConfirm(event.target.value)}
+                        />
+                      </label>
+                      <button
+                        className="tinyButton passwordResetButton"
+                        onClick={() => void resetMemberPasswordByAdmin(memberDetail)}
+                        disabled={
+                          saving ||
+                          adminResetPassword.length < 6 ||
+                          adminResetPassword !== adminResetPasswordConfirm
+                        }
+                      >
+                        {saving ? "처리 중..." : "비밀번호 재설정"}
+                      </button>
+                    </div>
+                    <small className="passwordResetNotice">
+                      비밀번호 값은 변경 이력에 저장하지 않습니다.
+                    </small>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="modalSection">
               <div className="modalSectionHead">

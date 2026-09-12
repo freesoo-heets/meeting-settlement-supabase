@@ -2983,3 +2983,84 @@ button.meetingMetricCard {
     grid-column: 2;
   }
 }
+
+
+/* STEP 29: 관리자 회원 비밀번호 재설정 */
+.memberAccountAdminSection {
+  padding-top: 14px;
+  border-top: 1px solid #eee7e1;
+}
+
+.accountAdminHint {
+  padding: 12px;
+  border-radius: 11px;
+  background: #f7f4f0;
+  color: #756c64;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.adminPasswordResetBox {
+  display: grid;
+  gap: 10px;
+  padding: 13px;
+  border: 1px solid #eadfd5;
+  border-radius: 13px;
+  background: #fffaf6;
+}
+
+.adminPasswordResetDescription {
+  display: grid;
+  gap: 2px;
+}
+
+.adminPasswordResetDescription strong {
+  font-size: 12px;
+}
+
+.adminPasswordResetDescription span,
+.passwordResetNotice {
+  color: #857b73;
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.adminPasswordResetFields {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  align-items: end;
+  gap: 8px;
+}
+
+.adminPasswordResetFields label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.adminPasswordResetFields label > span {
+  color: #716860;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.adminPasswordResetFields input {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+}
+
+.passwordResetButton {
+  min-height: 38px;
+  white-space: nowrap;
+}
+
+@media (max-width: 620px) {
+  .adminPasswordResetFields {
+    grid-template-columns: 1fr;
+  }
+
+  .passwordResetButton {
+    width: 100%;
+  }
+}

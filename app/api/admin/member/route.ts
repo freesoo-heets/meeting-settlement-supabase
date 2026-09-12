@@ -51,6 +51,113 @@ function cleanNickname(value: unknown) {
   return String(value ?? "").trim();
 }
 
+
+export async function POST(request: Request) {
+  try {
+    const auth = await requireAdmin(request);
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
+    const { action, memberId, password } = await request.json();
+
+    if (action !== "reset-password") {
+      return NextResponse.json({ error: "지원하지 않는 요청입니다." }, { status: 400 });
+    }
+
+    const cleanMemberId = String(memberId ?? "").trim();
+    const cleanPassword = String(password ?? "");
+
+    if (!cleanMemberId) {
+      return NextResponse.json({ error: "회원 정보가 없습니다." }, { status: 400 });
+    }
+
+    if (cleanPassword.length < 6 || cleanPassword.length > 72) {
+      return NextResponse.json(
+        { error: "새 비밀번호는 6~72자로 입력해주세요." },
+        { status: 400 }
+      );
+    }
+
+    const { admin, requester } = auth;
+
+    const { data: member, error: memberError } = await admin
+      .from("members")
+      .select("id,name")
+      .eq("id", cleanMemberId)
+      .maybeSingle();
+
+    if (memberError || !member) {
+      return NextResponse.json(
+        { error: "회원 정보를 찾을 수 없습니다." },
+        { status: 404 }
+      );
+    }
+
+    const { data: targetProfile, error: profileError } = await admin
+      .from("profiles")
+      .select("id,member_id,nickname,role")
+      .eq("member_id", cleanMemberId)
+      .maybeSingle();
+
+    if (profileError) {
+      return NextResponse.json({ error: profileError.message }, { status: 400 });
+    }
+
+    if (!targetProfile) {
+      return NextResponse.json(
+        { error: "아직 최초 가입을 하지 않아 로그인 계정이 없습니다." },
+        { status: 409 }
+      );
+    }
+
+    if (requester.member_id === cleanMemberId) {
+      return NextResponse.json(
+        { error: "본인 비밀번호는 내 계정에서 변경해주세요." },
+        { status: 403 }
+      );
+    }
+
+    if (targetProfile.role === "owner") {
+      return NextResponse.json(
+        { error: "제작자 계정의 비밀번호는 관리자 화면에서 재설정할 수 없습니다." },
+        { status: 403 }
+      );
+    }
+
+    if (requester.role === "admin" && targetProfile.role === "admin") {
+      return NextResponse.json(
+        { error: "관리자는 다른 관리자의 비밀번호를 재설정할 수 없습니다." },
+        { status: 403 }
+      );
+    }
+
+    const { error: updateError } = await admin.auth.admin.updateUserById(
+      targetProfile.id,
+      { password: cleanPassword }
+    );
+
+    if (updateError) {
+      return NextResponse.json(
+        { error: `비밀번호 재설정 실패: ${updateError.message}` },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "비밀번호 재설정 중 오류가 발생했습니다.",
+      },
+      { status: 500 }
+    );
+  }
+}
+
 export async function PATCH(request: Request) {
   try {
     const auth = await requireAdmin(request);
