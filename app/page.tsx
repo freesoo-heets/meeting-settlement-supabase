@@ -151,6 +151,8 @@ export default function Home() {
   const [adminResetPassword, setAdminResetPassword] = useState("");
   const [adminResetPasswordConfirm, setAdminResetPasswordConfirm] = useState("");
   const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const [showMobileMore, setShowMobileMore] = useState(false);
+  const [openMemberMenuId, setOpenMemberMenuId] = useState("");
 
   const [newMemberName, setNewMemberName] = useState("");
   const [newMemberJoinDate, setNewMemberJoinDate] = useState(today);
@@ -2535,7 +2537,7 @@ export default function Home() {
         </div>
       </header>
 
-      <nav className="mainTabs">
+      <nav className="mainTabs desktopMainTabs">
         {[
           ["dashboard", "대시보드"],
           ["meetings", "모임 관리"],
@@ -2555,7 +2557,78 @@ export default function Home() {
         ))}
       </nav>
 
-      {notice && <div className="notice">{notice}</div>}
+      <nav className="mobileBottomNav" aria-label="모바일 주요 메뉴">
+        {[
+          ["dashboard", "⌂", "홈"],
+          ["meetings", "●", "모임"],
+          ["members", "♟", "회원"],
+        ].map(([value, icon, label]) => (
+          <button
+            key={value}
+            className={mainTab === value ? "active" : ""}
+            onClick={() => {
+              setMainTab(value as MainTab);
+              setShowMobileMore(false);
+            }}
+          >
+            <span>{icon}</span>
+            <strong>{label}</strong>
+          </button>
+        ))}
+        <button
+          className={["monthly", "history", "help"].includes(mainTab) || showMobileMore ? "active" : ""}
+          onClick={() => setShowMobileMore((current) => !current)}
+        >
+          <span>•••</span>
+          <strong>더보기</strong>
+        </button>
+      </nav>
+
+      {showMobileMore && (
+        <div className="mobileMoreBackdrop" onClick={() => setShowMobileMore(false)}>
+          <section className="mobileMoreSheet" onClick={(event) => event.stopPropagation()}>
+            <div className="mobileMoreHandle" />
+            <div className="mobileMoreHead">
+              <strong>더보기</strong>
+              <button onClick={() => setShowMobileMore(false)}>×</button>
+            </div>
+            {[
+              ["monthly", "월별 참석 현황", "월별 참석·부담금 확인"],
+              ["history", "변경 이력", "최근 운영 변경 기록"],
+              ["help", "사용방법", "기능과 권한 안내"],
+            ].map(([value, label, description]) => (
+              <button
+                className="mobileMoreItem"
+                key={value}
+                onClick={() => {
+                  setMainTab(value as MainTab);
+                  setShowMobileMore(false);
+                }}
+              >
+                <div><strong>{label}</strong><span>{description}</span></div>
+                <em>›</em>
+              </button>
+            ))}
+            <button
+              className="mobileMoreItem"
+              onClick={() => {
+                setShowAccountPanel(true);
+                setShowMobileMore(false);
+              }}
+            >
+              <div><strong>내 계정</strong><span>비밀번호 및 계정 관리</span></div>
+              <em>›</em>
+            </button>
+          </section>
+        </div>
+      )}
+
+      {notice && (
+        <div className="notice appToast" role="status">
+          <span>{notice}</span>
+          <button onClick={() => setNotice("")} aria-label="알림 닫기">×</button>
+        </div>
+      )}
 
       <section className="myStatusStrip">
         <button
@@ -2875,6 +2948,25 @@ export default function Home() {
                 >
                   삭제
                 </button>
+              </div>
+            </section>
+          )}
+
+          {selectedMeeting && (
+            <section className="meetingFlowStepper" aria-label="모임 정산 진행 단계">
+              <div className="meetingFlowStep complete">
+                <span>1</span>
+                <div><strong>참석자</strong><small>{selectedMeeting.attendeeIds.length + selectedMeeting.guests.length}명</small></div>
+              </div>
+              <i />
+              <div className={`meetingFlowStep ${selectedMeeting.cost != null ? "complete" : "current"}`}>
+                <span>2</span>
+                <div><strong>비용 입력</strong><small>{selectedMeeting.cost == null ? "입력 필요" : won(Number(selectedMeeting.cost))}</small></div>
+              </div>
+              <i />
+              <div className={`meetingFlowStep ${selectedMeeting.cost != null && selectedMeeting.attendeeIds.length + selectedMeeting.guests.length > 0 ? "current" : ""}`}>
+                <span>3</span>
+                <div><strong>정산 공유</strong><small>카카오톡 공유</small></div>
               </div>
             </section>
           )}
@@ -3433,6 +3525,21 @@ export default function Home() {
           </section>
 
           <section className="memberCards">
+            {filteredMembers.length === 0 && (
+              <div className="emptyStateCard">
+                <strong>조건에 맞는 회원이 없습니다.</strong>
+                <span>검색어 또는 회원 상태 필터를 변경해보세요.</span>
+                <button
+                  className="tinyButton ghost"
+                  onClick={() => {
+                    setMemberSearch("");
+                    setMemberFilter("all");
+                  }}
+                >
+                  필터 초기화
+                </button>
+              </div>
+            )}
             {filteredMembers.map((member) => {
               const warning = warningByMember[member.id];
               const last = lastAttendanceByMember[member.id];
@@ -3486,65 +3593,90 @@ export default function Home() {
                         </span>
                       )}
 
-                      {isAdmin && (
-                        <>
+                      {(isAdmin || (isOwner && profile && profile.role !== "owner")) && (
+                        <div className="memberMoreMenuWrap">
                           <button
-                            className="tinyButton"
-                            onClick={() => void toggleMemberStatus(member)}
-                          >
-                            {member.active ? "탈퇴" : "복귀"}
-                          </button>
-                          <button
-                            className="tinyButton ghost"
-                            onClick={() => {
-                              setEditingNicknameId(member.id);
-                              setEditingNickname(member.name);
-                              setEditingJoinId("");
-                              setEditingJoinDate("");
-                            }}
-                          >
-                            닉네임
-                          </button>
-                          <button
-                            className="tinyButton ghost"
-                            onClick={() => {
-                              setEditingJoinId(member.id);
-                              setEditingJoinDate(member.join_date);
-                              setEditingNicknameId("");
-                              setEditingNickname("");
-                            }}
-                          >
-                            입장일
-                          </button>
-                          <button
-                            className="tinyButton dangerButton"
-                            onClick={() => void deleteMemberByAdmin(member)}
-                            disabled={saving || profile?.role === "owner" || currentMember?.id === member.id}
-                            title={
-                              profile?.role === "owner"
-                                ? "제작자는 삭제할 수 없습니다."
-                                : currentMember?.id === member.id
-                                  ? "현재 로그인한 본인 계정은 삭제할 수 없습니다."
-                                  : "회원 완전 삭제"
+                            className="memberMoreButton"
+                            aria-label={`${member.name} 회원 관리`}
+                            onClick={() =>
+                              setOpenMemberMenuId((current) => current === member.id ? "" : member.id)
                             }
                           >
-                            삭제
+                            ⋯
                           </button>
-                        </>
-                      )}
 
-                      {isOwner && profile && profile.role !== "owner" && (
-                        <button
-                          className={`tinyButton ${profile.role === "admin" ? "ghost" : "ownerAction"}`}
-                          onClick={() =>
-                            void changeMemberRole(
-                              member.id,
-                              profile.role === "admin" ? "user" : "admin"
-                            )
-                          }
-                        >
-                          {profile.role === "admin" ? "관리자 해제" : "관리자 지정"}
-                        </button>
+                          {openMemberMenuId === member.id && (
+                            <div className="memberMoreMenu">
+                              <button
+                                onClick={() => {
+                                  setMemberDetailId(member.id);
+                                  setOpenMemberMenuId("");
+                                }}
+                              >
+                                회원 상세
+                              </button>
+                              {isAdmin && (
+                                <>
+                                  <button
+                                    onClick={() => {
+                                      void toggleMemberStatus(member);
+                                      setOpenMemberMenuId("");
+                                    }}
+                                  >
+                                    {member.active ? "탈퇴 처리" : "회원 복귀"}
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setEditingNicknameId(member.id);
+                                      setEditingNickname(member.name);
+                                      setEditingJoinId("");
+                                      setEditingJoinDate("");
+                                      setOpenMemberMenuId("");
+                                    }}
+                                  >
+                                    닉네임 변경
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setEditingJoinId(member.id);
+                                      setEditingJoinDate(member.join_date);
+                                      setEditingNicknameId("");
+                                      setEditingNickname("");
+                                      setOpenMemberMenuId("");
+                                    }}
+                                  >
+                                    입장일 변경
+                                  </button>
+                                </>
+                              )}
+                              {isOwner && profile && profile.role !== "owner" && (
+                                <button
+                                  onClick={() => {
+                                    void changeMemberRole(
+                                      member.id,
+                                      profile.role === "admin" ? "user" : "admin"
+                                    );
+                                    setOpenMemberMenuId("");
+                                  }}
+                                >
+                                  {profile.role === "admin" ? "관리자 해제" : "관리자 지정"}
+                                </button>
+                              )}
+                              {isAdmin && (
+                                <button
+                                  className="danger"
+                                  onClick={() => {
+                                    void deleteMemberByAdmin(member);
+                                    setOpenMemberMenuId("");
+                                  }}
+                                  disabled={saving || profile?.role === "owner" || currentMember?.id === member.id}
+                                >
+                                  회원 삭제
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>
