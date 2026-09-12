@@ -55,6 +55,8 @@ type Meeting = MeetingRow & {
 type MainTab = "dashboard" | "meetings" | "members" | "monthly" | "history" | "help";
 type MemberFilter = "all" | "active" | "warning" | "withdrawn";
 type MemberSort = "nickname_asc" | "nickname_desc" | "join_desc" | "join_asc" | "last_desc" | "last_asc";
+type MonthlySortKey = "member" | "status" | "join" | "attendance" | "last" | "burden" | "warning";
+type SortDirection = "asc" | "desc";
 type AttendeeSort = "selected_first" | "nickname_asc" | "nickname_desc" | "join_desc" | "join_asc" | "last_desc" | "last_asc";
 type GuestSort = "nickname_asc" | "nickname_desc" | "added_desc" | "added_asc";
 type AppRole = "owner" | "admin" | "user";
@@ -128,6 +130,8 @@ export default function Home() {
   const [memberSearch, setMemberSearch] = useState("");
   const [memberFilter, setMemberFilter] = useState<MemberFilter>("all");
   const [memberSort, setMemberSort] = useState<MemberSort>("nickname_asc");
+  const [monthlySortKey, setMonthlySortKey] = useState<MonthlySortKey>("member");
+  const [monthlySortDirection, setMonthlySortDirection] = useState<SortDirection>("asc");
 
   const [newMeetingDate, setNewMeetingDate] = useState(today);
   const [newMeetingTitle, setNewMeetingTitle] = useState("");
@@ -530,6 +534,17 @@ export default function Home() {
     [activeMembers, warningByMember]
   );
 
+  const memberStatusCounts = useMemo(
+    () => ({
+      all: members.length,
+      active: members.filter((member) => member.active).length,
+      warning: warningMembers.length,
+      withdrawn: members.filter((member) => !member.active).length,
+    }),
+    [members, warningMembers]
+  );
+
+
   const filteredMembers = useMemo(() => {
     const q = memberSearch.trim().toLowerCase();
 
@@ -691,6 +706,82 @@ export default function Home() {
       };
     });
   }, [members, monthMeetings, meetingAllocation]);
+
+
+  const sortedMonthStats = useMemo(() => {
+    const direction = monthlySortDirection === "asc" ? 1 : -1;
+
+    return [...monthStats].sort((a, b) => {
+      let result = 0;
+
+      switch (monthlySortKey) {
+        case "member":
+          result = a.member.name.localeCompare(b.member.name, "ko");
+          break;
+        case "status":
+          result = Number(b.member.active) - Number(a.member.active);
+          break;
+        case "join":
+          result = a.member.join_date.localeCompare(b.member.join_date);
+          break;
+        case "attendance":
+          result = a.attendanceCount - b.attendanceCount;
+          break;
+        case "last": {
+          const aLast = lastAttendanceByMember[a.member.id];
+          const bLast = lastAttendanceByMember[b.member.id];
+          if (!aLast && !bLast) result = 0;
+          else if (!aLast) return 1;
+          else if (!bLast) return -1;
+          else result = aLast.localeCompare(bLast);
+          break;
+        }
+        case "burden":
+          result = a.expectedAmount - b.expectedAmount;
+          break;
+        case "warning": {
+          const aWarning = Boolean(
+            a.member.active && warningByMember[a.member.id]?.warning
+          );
+          const bWarning = Boolean(
+            b.member.active && warningByMember[b.member.id]?.warning
+          );
+          result = Number(aWarning) - Number(bWarning);
+          break;
+        }
+      }
+
+      if (result === 0) {
+        return a.member.name.localeCompare(b.member.name, "ko");
+      }
+      return result * direction;
+    });
+  }, [
+    monthStats,
+    monthlySortDirection,
+    monthlySortKey,
+    lastAttendanceByMember,
+    warningByMember,
+  ]);
+
+  function toggleMonthlySort(key: MonthlySortKey) {
+    if (monthlySortKey === key) {
+      setMonthlySortDirection((current) => (current === "asc" ? "desc" : "asc"));
+      return;
+    }
+
+    setMonthlySortKey(key);
+    setMonthlySortDirection(
+      key === "attendance" || key === "burden" || key === "warning" || key === "last"
+        ? "desc"
+        : "asc"
+    );
+  }
+
+  function monthlySortIndicator(key: MonthlySortKey) {
+    if (monthlySortKey !== key) return "↕";
+    return monthlySortDirection === "asc" ? "↑" : "↓";
+  }
 
   const monthTotalCost = useMemo(
     () =>
@@ -3323,17 +3414,18 @@ export default function Home() {
               <span className="memberToolbarLabel">회원 상태</span>
               <div className="filterButtons memberStatusFilters">
                 {[
-                  ["all", "전체"],
-                  ["active", "활동중"],
-                  ["warning", "경고"],
-                  ["withdrawn", "탈퇴"],
-                ].map(([value, label]) => (
+                  ["all", "전체", memberStatusCounts.all],
+                  ["active", "활동중", memberStatusCounts.active],
+                  ["warning", "경고", memberStatusCounts.warning],
+                  ["withdrawn", "탈퇴", memberStatusCounts.withdrawn],
+                ].map(([value, label, count]) => (
                   <button
-                    key={value}
+                    key={String(value)}
                     className={memberFilter === value ? "filterButton active" : "filterButton"}
                     onClick={() => setMemberFilter(value as MemberFilter)}
                   >
-                    {label}
+                    <span>{label}</span>
+                    <strong>{count}명</strong>
                   </button>
                 ))}
               </div>
@@ -3590,17 +3682,33 @@ export default function Home() {
               <table className="monthlyTable attendanceOnlyTable">
                 <thead>
                   <tr>
-                    <th>회원</th>
-                    <th>상태</th>
-                    <th>최초 입장</th>
-                    <th>월 참석</th>
-                    <th>최근 참석</th>
-                    <th>월 부담금</th>
-                    <th>경고</th>
+                    {[
+                      ["member", "회원"],
+                      ["status", "상태"],
+                      ["join", "최초 입장"],
+                      ["attendance", "월 참석"],
+                      ["last", "최근 참석"],
+                      ["burden", "월 부담금"],
+                      ["warning", "경고"],
+                    ].map(([key, label]) => (
+                      <th key={key}>
+                        <button
+                          type="button"
+                          className={`monthlySortButton ${
+                            monthlySortKey === key ? "active" : ""
+                          }`}
+                          onClick={() => toggleMonthlySort(key as MonthlySortKey)}
+                          aria-label={`${label} 정렬`}
+                        >
+                          <span>{label}</span>
+                          <em>{monthlySortIndicator(key as MonthlySortKey)}</em>
+                        </button>
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {monthStats.map(({ member, attendanceCount, expectedAmount }) => (
+                  {sortedMonthStats.map(({ member, attendanceCount, expectedAmount }) => (
                     <tr key={member.id}>
                       <td><strong>{member.name}</strong></td>
                       <td>
