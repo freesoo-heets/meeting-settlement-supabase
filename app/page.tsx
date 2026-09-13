@@ -8,6 +8,7 @@ type Member = {
   name: string;
   active: boolean;
   join_date: string;
+  birthday: string | null;
   withdrawn_at: string | null;
   created_at: string;
 };
@@ -116,6 +117,7 @@ export default function Home() {
   const [loginNickname, setLoginNickname] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [signupNickname, setSignupNickname] = useState("");
+  const [signupBirthday, setSignupBirthday] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
   const [signupPasswordConfirm, setSignupPasswordConfirm] = useState("");
   const [loginNotice, setLoginNotice] = useState("");
@@ -156,10 +158,13 @@ export default function Home() {
 
   const [newMemberName, setNewMemberName] = useState("");
   const [newMemberJoinDate, setNewMemberJoinDate] = useState(today);
+  const [newMemberBirthday, setNewMemberBirthday] = useState("");
   const [editingNicknameId, setEditingNicknameId] = useState("");
   const [editingNickname, setEditingNickname] = useState("");
   const [editingJoinId, setEditingJoinId] = useState("");
   const [editingJoinDate, setEditingJoinDate] = useState("");
+  const [editingBirthdayId, setEditingBirthdayId] = useState("");
+  const [editingBirthday, setEditingBirthday] = useState("");
   const [editingCostId, setEditingCostId] = useState("");
   const [editingCost, setEditingCost] = useState("");
 
@@ -186,7 +191,7 @@ export default function Home() {
     ] = await Promise.all([
       supabase
         .from("members")
-        .select("id,name,active,join_date,withdrawn_at,created_at")
+        .select("id,name,active,join_date,birthday,withdrawn_at,created_at")
         .order("active", { ascending: false })
         .order("join_date", { ascending: true }),
       supabase
@@ -948,6 +953,24 @@ export default function Home() {
     [monthMeetings, activeMembers]
   );
 
+  const monthBirthdays = useMemo(() => {
+    const targetMonth = selectedMonth.slice(5, 7);
+
+    return members
+      .filter(
+        (member) =>
+          member.active &&
+          member.birthday &&
+          member.birthday.slice(5, 7) === targetMonth
+      )
+      .sort((a, b) => {
+        const aDay = a.birthday?.slice(8, 10) ?? "99";
+        const bDay = b.birthday?.slice(8, 10) ?? "99";
+        return aDay.localeCompare(bDay) || a.name.localeCompare(b.name, "ko");
+      });
+  }, [members, selectedMonth]);
+
+
 
   async function logActivity(
     action: string,
@@ -1275,8 +1298,13 @@ export default function Home() {
   async function signup() {
     const nickname = signupNickname.trim();
 
-    if (!nickname || signupPassword.length < 6) {
-      setLoginNotice("닉네임과 6자 이상 비밀번호를 입력해주세요.");
+    if (!nickname || !signupBirthday || signupPassword.length < 6) {
+      setLoginNotice("닉네임, 생일, 6자 이상 비밀번호를 입력해주세요.");
+      return;
+    }
+
+    if (signupBirthday > today) {
+      setLoginNotice("생일은 오늘 이후 날짜로 입력할 수 없습니다.");
       return;
     }
 
@@ -1294,6 +1322,7 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           nickname,
+          birthday: signupBirthday,
           password: signupPassword,
         }),
       });
@@ -1316,6 +1345,7 @@ export default function Home() {
         return;
       }
 
+      setSignupBirthday("");
       setSignupPassword("");
       setSignupPasswordConfirm("");
     } catch {
@@ -1437,6 +1467,7 @@ export default function Home() {
         name,
         active: true,
         join_date: newMemberJoinDate,
+        birthday: newMemberBirthday || null,
         withdrawn_at: null,
       })
       .select("id")
@@ -1457,6 +1488,7 @@ export default function Home() {
 
     setNewMemberName("");
     setNewMemberJoinDate(today);
+    setNewMemberBirthday("");
     setNotice(
       `${name} 님을 추가했습니다. 로그인 계정은 해당 회원이 '최초 가입'을 하면 자동 연결됩니다.`
     );
@@ -1766,6 +1798,42 @@ export default function Home() {
       setEditingJoinId("");
       setEditingJoinDate("");
       await loadAll();
+    }
+    setSaving(false);
+  }
+
+  async function saveBirthday(memberId: string) {
+    if (!isAdmin) {
+      setNotice("생일 수정은 관리자만 가능합니다.");
+      return;
+    }
+
+    if (editingBirthday && editingBirthday > today) {
+      setNotice("생일은 오늘 이후 날짜로 입력할 수 없습니다.");
+      return;
+    }
+
+    if (saving) return;
+    setSaving(true);
+
+    const { error } = await supabase
+      .from("members")
+      .update({ birthday: editingBirthday || null })
+      .eq("id", memberId);
+
+    if (error) setNotice(`생일 수정 실패: ${error.message}`);
+    else {
+      const member = members.find((item) => item.id === memberId);
+      await logActivity(
+        "생일 수정",
+        "member",
+        memberId,
+        `${member?.name ?? "회원"} 생일을 ${editingBirthday || "미입력"}(으)로 수정`
+      );
+      setEditingBirthdayId("");
+      setEditingBirthday("");
+      await loadAll();
+      setNotice(`${member?.name ?? "회원"} 님의 생일을 수정했습니다.`);
     }
     setSaving(false);
   }
@@ -2417,6 +2485,16 @@ export default function Home() {
                 />
               </label>
               <label>
+                <span>생일</span>
+                <input
+                  type="date"
+                  value={signupBirthday}
+                  max={today}
+                  onChange={(event) => setSignupBirthday(event.target.value)}
+                  autoComplete="bday"
+                />
+              </label>
+              <label>
                 <span>비밀번호</span>
                 <input
                   type="password"
@@ -2775,6 +2853,39 @@ export default function Home() {
 
                 {topAttendance.length === 0 && (
                   <div className="empty dashboardEmpty">이번 달 참석 기록이 없습니다.</div>
+                )}
+              </div>
+            </div>
+
+            <div className="panel dashboardRankingPanel birthdayPanel">
+              <div className="panelHead compactHead">
+                <div>
+                  <h2>🎂 이달의 생일자</h2>
+                  <p>{selectedMonth.slice(0, 4)}년 {Number(selectedMonth.slice(5, 7))}월 · 활동중 회원</p>
+                </div>
+                <span className="dashboardPanelBadge">{monthBirthdays.length}명</span>
+              </div>
+
+              <div className="birthdayMemberList">
+                {monthBirthdays.map((member) => (
+                  <button
+                    className="birthdayMemberCard"
+                    key={member.id}
+                    onClick={() => setMemberDetailId(member.id)}
+                  >
+                    <span className="birthdayIcon">🎉</span>
+                    <div>
+                      <strong>{member.name}</strong>
+                      <small>생일 축하해요!</small>
+                    </div>
+                    <strong className="birthdayDate">
+                      {member.birthday?.slice(5).replace("-", ".")}
+                    </strong>
+                  </button>
+                ))}
+
+                {monthBirthdays.length === 0 && (
+                  <div className="empty dashboardEmpty">이번 달 생일자가 없습니다.</div>
                 )}
               </div>
             </div>
@@ -3461,6 +3572,15 @@ export default function Home() {
                     onChange={(event) => setNewMemberJoinDate(event.target.value)}
                   />
                 </label>
+                <label>
+                  <span>생일 <em className="optionalLabel">선택</em></span>
+                  <input
+                    type="date"
+                    max={today}
+                    value={newMemberBirthday}
+                    onChange={(event) => setNewMemberBirthday(event.target.value)}
+                  />
+                </label>
                 <button
                   className="primaryButton adminAddMemberButton"
                   onClick={() => void addMemberByAdmin()}
@@ -3570,6 +3690,7 @@ export default function Home() {
                       </div>
                       <div className="metaLine">
                         <span>입장 {member.join_date}</span>
+                        <span>생일 {member.birthday ? member.birthday.slice(5).replace("-", ".") : "미입력"}</span>
                         <span>최근 {last ?? "없음"}</span>
                         {!member.active && member.withdrawn_at && (
                           <span>탈퇴 {member.withdrawn_at}</span>
@@ -3646,6 +3767,19 @@ export default function Home() {
                                     }}
                                   >
                                     입장일 변경
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setEditingBirthdayId(member.id);
+                                      setEditingBirthday(member.birthday ?? "");
+                                      setEditingNicknameId("");
+                                      setEditingNickname("");
+                                      setEditingJoinId("");
+                                      setEditingJoinDate("");
+                                      setOpenMemberMenuId("");
+                                    }}
+                                  >
+                                    생일 변경
                                   </button>
                                 </>
                               )}
@@ -3731,6 +3865,29 @@ export default function Home() {
                         onClick={() => {
                           setEditingJoinId("");
                           setEditingJoinDate("");
+                        }}
+                      >
+                        취소
+                      </button>
+                    </div>
+                  )}
+
+                  {isAdmin && editingBirthdayId === member.id && (
+                    <div className="editRow memberBirthdayEditRow">
+                      <input
+                        type="date"
+                        max={today}
+                        value={editingBirthday}
+                        onChange={(event) => setEditingBirthday(event.target.value)}
+                      />
+                      <button className="tinyButton" onClick={() => void saveBirthday(member.id)}>
+                        저장
+                      </button>
+                      <button
+                        className="tinyButton ghost"
+                        onClick={() => {
+                          setEditingBirthdayId("");
+                          setEditingBirthday("");
                         }}
                       >
                         취소
@@ -4256,6 +4413,7 @@ export default function Home() {
             <div className="modalSummaryGrid">
               <div><span>상태</span><strong>{memberDetail.active ? "활동중" : "탈퇴"}</strong></div>
               <div><span>입장일</span><strong>{memberDetail.join_date}</strong></div>
+              <div><span>생일</span><strong>{memberDetail.birthday ?? "미입력"}</strong></div>
               <div><span>총 참석</span><strong>{memberDetailMeetings.length}회</strong></div>
               <div><span>최근 참석</span><strong>{lastAttendanceByMember[memberDetail.id] ?? "-"}</strong></div>
             </div>

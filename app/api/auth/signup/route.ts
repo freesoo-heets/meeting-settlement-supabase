@@ -7,8 +7,9 @@ function normalizeNickname(value: unknown) {
 
 export async function POST(request: Request) {
   try {
-    const { nickname, password } = await request.json();
+    const { nickname, birthday, password } = await request.json();
     const cleanNickname = normalizeNickname(nickname);
+    const cleanBirthday = String(birthday ?? "").trim();
     const cleanPassword = String(password ?? "");
 
     if (cleanNickname.length < 2 || cleanNickname.length > 20) {
@@ -21,6 +22,27 @@ export async function POST(request: Request) {
     if (cleanPassword.length < 6) {
       return NextResponse.json(
         { error: "비밀번호는 6자 이상으로 입력해주세요." },
+        { status: 400 }
+      );
+    }
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(cleanBirthday)) {
+      return NextResponse.json(
+        { error: "생일을 정확히 입력해주세요." },
+        { status: 400 }
+      );
+    }
+
+    const today = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Seoul",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+
+    if (cleanBirthday > today) {
+      return NextResponse.json(
+        { error: "생일은 오늘 이후 날짜로 입력할 수 없습니다." },
         { status: 400 }
       );
     }
@@ -44,7 +66,7 @@ export async function POST(request: Request) {
     // 기존 회원 명단에 같은 닉네임이 있고 로그인 계정만 없다면 그 회원에 연결합니다.
     const { data: matchedMembers, error: memberFindError } = await admin
       .from("members")
-      .select("id,name,active")
+      .select("id,name,active,birthday")
       .ilike("name", cleanNickname)
       .limit(1);
 
@@ -65,22 +87,32 @@ export async function POST(request: Request) {
       );
     }
 
+    if (member) {
+      const { error: birthdayUpdateError } = await admin
+        .from("members")
+        .update({ birthday: cleanBirthday })
+        .eq("id", member.id);
+
+      if (birthdayUpdateError) {
+        return NextResponse.json(
+          { error: `생일 저장 실패: ${birthdayUpdateError.message}` },
+          { status: 400 }
+        );
+      }
+      member.birthday = cleanBirthday;
+    }
+
     if (!member) {
-      const today = new Intl.DateTimeFormat("en-CA", {
-        timeZone: "Asia/Seoul",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      }).format(new Date());
       const { data: createdMember, error: createMemberError } = await admin
         .from("members")
         .insert({
           name: cleanNickname,
           active: true,
           join_date: today,
+          birthday: cleanBirthday,
           withdrawn_at: null,
         })
-        .select("id,name,active")
+        .select("id,name,active,birthday")
         .single();
 
       if (createMemberError || !createdMember) {

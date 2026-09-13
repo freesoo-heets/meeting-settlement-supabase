@@ -3499,3 +3499,111 @@ button.meetingMetricCard {
     font-size: 11px;
   }
 }
+
+
+/* STEP 32: 생일 정보 + 대시보드 3카드 */
+.dashboardRankingGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  align-items: stretch;
+}
+
+.dashboardRankingPanel {
+  min-width: 0;
+}
+
+.birthdayMemberList {
+  display: grid;
+  gap: 8px;
+}
+
+.birthdayMemberCard {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 54px;
+  padding: 9px 10px;
+  border: 1px solid #eee5de;
+  border-radius: 13px;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+}
+
+.birthdayMemberCard:hover {
+  transform: translateY(-1px);
+  border-color: #ddcfc3;
+  box-shadow: 0 8px 18px rgba(63, 53, 46, .08);
+}
+
+.birthdayIcon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  background: #fff3e8;
+  font-size: 16px;
+}
+
+.birthdayMemberCard > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.birthdayMemberCard > div strong {
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.birthdayMemberCard > div small {
+  color: #9a8d83;
+  font-size: 9px;
+}
+
+.birthdayDate {
+  color: #a46243;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.optionalLabel {
+  margin-left: 4px;
+  color: #a79b92;
+  font-size: 8px;
+  font-style: normal;
+  font-weight: 600;
+}
+
+.memberBirthdayEditRow input[type="date"] {
+  min-width: 160px;
+}
+
+@media (max-width: 1180px) {
+  .dashboardRankingGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .birthdayPanel {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 760px) {
+  .dashboardRankingGrid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .birthdayPanel {
+    grid-column: auto;
+  }
+
+  .birthdayMemberCard {
+    min-height: 52px;
+  }
+}
