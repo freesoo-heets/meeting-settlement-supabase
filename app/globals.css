@@ -3803,3 +3803,153 @@ button.meetingMetricCard {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
 }
+
+
+/* STEP 33.1: 회원현황 상단 레이아웃 긴급 보정 */
+.memberControlWorkspace.withAdminAdd {
+  grid-template-columns: minmax(560px, 1fr) minmax(620px, 1.35fr) !important;
+  align-items: stretch !important;
+}
+
+.memberControlWorkspace .memberControlCard {
+  overflow: visible;
+}
+
+.memberControlWorkspace .memberControlHead {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  align-content: start;
+  gap: 3px !important;
+  min-height: 46px;
+  margin-bottom: 12px !important;
+}
+
+.memberControlWorkspace .memberControlHead p {
+  max-width: none !important;
+  margin: 0 !important;
+  text-align: left !important;
+  line-height: 1.35;
+}
+
+.memberAddCompactForm {
+  grid-template-columns: minmax(150px, 1.15fr) minmax(135px, .9fr) minmax(135px, .9fr) minmax(105px, auto) !important;
+  gap: 8px !important;
+}
+
+.memberAddCompactForm .adminAddMemberButton {
+  width: 100%;
+  min-width: 105px;
+  padding-inline: 12px;
+}
+
+.memberControlCard.memberToolbar {
+  grid-template-rows: auto auto auto;
+  align-content: start;
+}
+
+.memberControlCard .memberToolbarTop {
+  grid-template-columns: minmax(220px, 1fr) minmax(190px, 240px) !important;
+  align-items: end;
+}
+
+.memberControlCard .memberFilterSection {
+  margin-top: 0;
+}
+
+.memberStatusTitleLine {
+  min-height: 18px;
+}
+
+.memberStatusFiltersFour {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(92px, 1fr)) !important;
+  gap: 8px !important;
+}
+
+.memberStatusFiltersFour .filterButton {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 7px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 42px !important;
+  height: 42px !important;
+  padding: 0 10px !important;
+  border-radius: 12px !important;
+  white-space: nowrap !important;
+  line-height: 1 !important;
+}
+
+.memberStatusFiltersFour .filterButton > span {
+  display: inline !important;
+  width: auto !important;
+  font-size: 10px !important;
+  line-height: 1 !important;
+  writing-mode: horizontal-tb !important;
+  word-break: keep-all !important;
+}
+
+.memberStatusFiltersFour .filterButton > strong {
+  display: inline-flex !important;
+  width: auto !important;
+  min-width: 34px !important;
+  min-height: 22px !important;
+  padding: 0 6px !important;
+  border-radius: 999px !important;
+  font-size: 9px !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+}
+
+@media (max-width: 1280px) {
+  .memberControlWorkspace.withAdminAdd {
+    grid-template-columns: 1fr !important;
+  }
+
+  .memberAddCompactForm {
+    grid-template-columns: minmax(180px, 1fr) minmax(150px, .75fr) minmax(150px, .75fr) minmax(120px, auto) !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .memberControlWorkspace.withAdminAdd {
+    grid-template-columns: 1fr !important;
+  }
+
+  .memberAddCompactForm {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  .memberAddCompactForm label:first-child {
+    grid-column: 1 / -1 !important;
+  }
+
+  .memberAddCompactForm .adminAddMemberButton {
+    min-width: 0;
+  }
+
+  .memberControlCard .memberToolbarTop {
+    grid-template-columns: 1fr !important;
+  }
+
+  .memberStatusFiltersFour {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .memberStatusFiltersFour .filterButton {
+    height: 40px !important;
+    min-height: 40px !important;
+  }
+}
+
+@media (max-width: 390px) {
+  .memberAddCompactForm {
+    grid-template-columns: 1fr !important;
+  }
+
+  .memberAddCompactForm label:first-child {
+    grid-column: auto !important;
+  }
+}
