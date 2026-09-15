@@ -159,6 +159,7 @@ export default function Home() {
   const [newMemberName, setNewMemberName] = useState("");
   const [newMemberJoinDate, setNewMemberJoinDate] = useState(today);
   const [newMemberBirthday, setNewMemberBirthday] = useState("");
+  const [showAdminMemberAdd, setShowAdminMemberAdd] = useState(false);
   const [editingNicknameId, setEditingNicknameId] = useState("");
   const [editingNickname, setEditingNickname] = useState("");
   const [editingJoinId, setEditingJoinId] = useState("");
@@ -3545,18 +3546,32 @@ export default function Home() {
 
       {mainTab === "members" && (
         <>
-          <section className={`memberControlWorkspace ${isAdmin ? "withAdminAdd" : "searchOnly"}`}>
-            {isAdmin && (
-              <div className="panel memberControlCard adminMemberAddPanel">
-                <div className="memberControlHead">
-                  <div>
-                    <span className="memberControlEyebrow">ADMIN</span>
-                    <h2>회원 추가</h2>
-                  </div>
-                  <p>회원 명단을 먼저 등록하고 최초 가입 시 계정을 연결합니다.</p>
-                </div>
+          <section className="memberManagementHeader panel standalonePanel">
+            <div className="memberManagementTitleRow">
+              <div>
+                <span className="memberControlEyebrow">MEMBERS</span>
+                <h2>회원 현황</h2>
+                <p>회원 검색, 정렬과 상태별 인원을 한 곳에서 확인합니다.</p>
+              </div>
+              {isAdmin && (
+                <button
+                  className={showAdminMemberAdd ? "smallButton ghost" : "smallButton memberAddToggleButton"}
+                  onClick={() => setShowAdminMemberAdd((current) => !current)}
+                >
+                  {showAdminMemberAdd ? "닫기" : "+ 회원 추가"}
+                </button>
+              )}
+            </div>
 
-                <div className="adminMemberAddForm memberAddCompactForm">
+            {isAdmin && showAdminMemberAdd && (
+              <div className="memberAddDrawer">
+                <div className="memberAddDrawerHead">
+                  <div>
+                    <strong>새 회원 등록</strong>
+                    <span>미리 명단에 등록하면 같은 닉네임으로 최초 가입할 때 계정이 연결됩니다.</span>
+                  </div>
+                </div>
+                <div className="adminMemberAddForm memberAddDrawerForm">
                   <label>
                     <span>닉네임</span>
                     <input
@@ -3591,72 +3606,63 @@ export default function Home() {
                     onClick={() => void addMemberByAdmin()}
                     disabled={saving}
                   >
-                    {saving ? "추가 중..." : "+ 회원 추가"}
+                    {saving ? "추가 중..." : "등록"}
                   </button>
                 </div>
               </div>
             )}
 
-            <div className="panel memberControlCard memberToolbar">
-              <div className="memberControlHead memberSearchHead">
-                <div>
-                  <span className="memberControlEyebrow">MEMBERS</span>
-                  <h2>회원 검색</h2>
-                </div>
-                <p>닉네임 검색과 정렬, 회원 상태를 한 번에 확인합니다.</p>
+            <div className="memberSearchBar">
+              <label className="memberSearchControl">
+                <span>닉네임 검색</span>
+                <input
+                  className="searchInput"
+                  type="search"
+                  placeholder="찾을 회원의 닉네임을 입력하세요"
+                  value={memberSearch}
+                  onChange={(event) => setMemberSearch(event.target.value)}
+                />
+              </label>
+
+              <label className="memberSortControl">
+                <span>정렬 기준</span>
+                <select
+                  value={memberSort}
+                  onChange={(event) => setMemberSort(event.target.value as MemberSort)}
+                  aria-label="회원 정렬"
+                >
+                  <option value="nickname_asc">닉네임 가나다순</option>
+                  <option value="nickname_desc">닉네임 역순</option>
+                  <option value="join_desc">입장일 최신순</option>
+                  <option value="join_asc">입장일 오래된순</option>
+                  <option value="last_desc">최근 참석일 최신순</option>
+                  <option value="last_asc">최근 참석일 오래된순</option>
+                </select>
+              </label>
+            </div>
+
+            <div className="memberStatusSection">
+              <div className="memberStatusTitleLine">
+                <span className="memberToolbarLabel">회원 상태</span>
+                <small>전체 {memberStatusCounts.all}명 = 활동중 {memberStatusCounts.active}명 + 경고 {memberStatusCounts.warning}명 · 탈퇴 제외</small>
               </div>
 
-              <div className="memberToolbarTop">
-                <label className="memberSearchControl">
-                  <span>닉네임 검색</span>
-                  <input
-                    className="searchInput"
-                    type="search"
-                    placeholder="닉네임을 입력하세요"
-                    value={memberSearch}
-                    onChange={(event) => setMemberSearch(event.target.value)}
-                  />
-                </label>
-
-                <label className="memberSortControl">
-                  <span>정렬 기준</span>
-                  <select
-                    value={memberSort}
-                    onChange={(event) => setMemberSort(event.target.value as MemberSort)}
-                    aria-label="회원 정렬"
+              <div className="memberStatusSummary">
+                {[
+                  ["all", "전체", memberStatusCounts.all],
+                  ["active", "활동중", memberStatusCounts.active],
+                  ["warning", "경고", memberStatusCounts.warning],
+                  ["withdrawn", "탈퇴", memberStatusCounts.withdrawn],
+                ].map(([value, label, count]) => (
+                  <button
+                    key={String(value)}
+                    className={`memberStatusCard ${value} ${memberFilter === value ? "active" : ""}`}
+                    onClick={() => setMemberFilter(value as MemberFilter)}
                   >
-                    <option value="nickname_asc">닉네임 가나다순</option>
-                    <option value="nickname_desc">닉네임 역순</option>
-                    <option value="join_desc">입장일 최신순</option>
-                    <option value="join_asc">입장일 오래된순</option>
-                    <option value="last_desc">최근 참석일 최신순</option>
-                    <option value="last_asc">최근 참석일 오래된순</option>
-                  </select>
-                </label>
-              </div>
-
-              <div className="memberFilterSection">
-                <div className="memberStatusTitleLine">
-                  <span className="memberToolbarLabel">회원 상태</span>
-                  <small>전체 = 활동중 + 경고 · 탈퇴 제외</small>
-                </div>
-                <div className="filterButtons memberStatusFilters memberStatusFiltersFour">
-                  {[
-                    ["all", "전체", memberStatusCounts.all],
-                    ["active", "활동중", memberStatusCounts.active],
-                    ["warning", "경고", memberStatusCounts.warning],
-                    ["withdrawn", "탈퇴", memberStatusCounts.withdrawn],
-                  ].map(([value, label, count]) => (
-                    <button
-                      key={String(value)}
-                      className={memberFilter === value ? "filterButton active" : "filterButton"}
-                      onClick={() => setMemberFilter(value as MemberFilter)}
-                    >
-                      <span>{label}</span>
-                      <strong>{count}명</strong>
-                    </button>
-                  ))}
-                </div>
+                    <span>{label}</span>
+                    <strong>{count}<em>명</em></strong>
+                  </button>
+                ))}
               </div>
             </div>
           </section>

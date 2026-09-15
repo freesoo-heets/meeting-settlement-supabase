@@ -3953,3 +3953,267 @@ button.meetingMetricCard {
     grid-column: auto !important;
   }
 }
+
+
+/* STEP 33.2: 회원현황 UX 재설계 - 검색 중심 단일 카드 */
+.memberManagementHeader {
+  display: grid;
+  gap: 18px;
+  padding: 20px !important;
+  border-radius: 18px !important;
+}
+
+.memberManagementTitleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.memberManagementTitleRow > div {
+  display: grid;
+  gap: 2px;
+}
+
+.memberManagementTitleRow h2 {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.25;
+}
+
+.memberManagementTitleRow p {
+  margin: 2px 0 0;
+  color: #8d837b;
+  font-size: 9px;
+}
+
+.memberAddToggleButton {
+  min-width: 100px;
+  min-height: 38px;
+  white-space: nowrap;
+}
+
+.memberAddDrawer {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #e9e1da;
+  border-radius: 14px;
+  background: #faf8f6;
+}
+
+.memberAddDrawerHead > div {
+  display: grid;
+  gap: 2px;
+}
+
+.memberAddDrawerHead strong {
+  font-size: 11px;
+}
+
+.memberAddDrawerHead span {
+  color: #91867e;
+  font-size: 9px;
+}
+
+.memberAddDrawerForm {
+  display: grid !important;
+  grid-template-columns: minmax(180px, 1.4fr) minmax(150px, .8fr) minmax(150px, .8fr) 90px !important;
+  align-items: end;
+  gap: 10px !important;
+}
+
+.memberAddDrawerForm label,
+.memberSearchBar label {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.memberAddDrawerForm label > span,
+.memberSearchBar label > span {
+  color: #746a63;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.memberAddDrawerForm input,
+.memberSearchBar input,
+.memberSearchBar select {
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+}
+
+.memberAddDrawerForm .adminAddMemberButton {
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+}
+
+.memberSearchBar {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(190px, 250px);
+  align-items: end;
+  gap: 10px;
+}
+
+.memberStatusSection {
+  display: grid;
+  gap: 9px;
+}
+
+.memberStatusTitleLine {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.memberStatusTitleLine small {
+  color: #968b83;
+  font-size: 8px;
+  text-align: right;
+}
+
+.memberStatusSummary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.memberStatusCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+  min-height: 62px;
+  padding: 11px 14px;
+  border: 1px solid #e8e1db;
+  border-radius: 14px;
+  background: #fff;
+  color: #625a54;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .15s ease, background .15s ease, transform .15s ease;
+}
+
+.memberStatusCard:hover {
+  transform: translateY(-1px);
+  border-color: #d8cec6;
+}
+
+.memberStatusCard > span {
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.memberStatusCard > strong {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  color: #302b28;
+  font-size: 18px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.memberStatusCard > strong em {
+  color: #938981;
+  font-size: 8px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.memberStatusCard.active {
+  border-color: #5c5149;
+  background: #f5f1ee;
+  box-shadow: inset 0 0 0 1px #5c5149;
+}
+
+.memberStatusCard.warning.active {
+  border-color: #d78b6e;
+  background: #fff5f0;
+  box-shadow: inset 0 0 0 1px #d78b6e;
+}
+
+.memberStatusCard.withdrawn {
+  opacity: .72;
+}
+
+@media (max-width: 900px) {
+  .memberAddDrawerForm {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  .memberAddDrawerForm label:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .memberSearchBar {
+    grid-template-columns: minmax(0, 1fr) minmax(180px, .55fr);
+  }
+}
+
+@media (max-width: 760px) {
+  .memberManagementHeader {
+    gap: 14px;
+    padding: 14px !important;
+  }
+
+  .memberManagementTitleRow {
+    align-items: flex-start;
+  }
+
+  .memberManagementTitleRow p {
+    max-width: 230px;
+    line-height: 1.4;
+  }
+
+  .memberSearchBar {
+    grid-template-columns: 1fr;
+  }
+
+  .memberStatusTitleLine {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .memberStatusTitleLine small {
+    text-align: left;
+  }
+
+  .memberStatusSummary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .memberStatusCard {
+    min-height: 56px;
+    padding: 10px 12px;
+  }
+
+  .memberStatusCard > strong {
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .memberManagementTitleRow {
+    gap: 10px;
+  }
+
+  .memberAddToggleButton {
+    min-width: 86px;
+    padding-inline: 9px;
+  }
+
+  .memberAddDrawerForm {
+    grid-template-columns: 1fr !important;
+  }
+
+  .memberAddDrawerForm label:first-child {
+    grid-column: auto;
+  }
+}
