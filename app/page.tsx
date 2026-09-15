@@ -541,15 +541,18 @@ export default function Home() {
     [activeMembers, warningByMember]
   );
 
-  const memberStatusCounts = useMemo(
-    () => ({
-      all: members.length,
-      active: members.filter((member) => member.active).length,
-      warning: warningMembers.length,
+  const memberStatusCounts = useMemo(() => {
+    const activeTotal = members.filter((member) => member.active).length;
+    const warning = warningMembers.length;
+    const active = Math.max(0, activeTotal - warning);
+
+    return {
+      all: activeTotal,
+      active,
+      warning,
       withdrawn: members.filter((member) => !member.active).length,
-    }),
-    [members, warningMembers]
-  );
+    };
+  }, [members, warningMembers]);
 
 
   const filteredMembers = useMemo(() => {
@@ -557,12 +560,14 @@ export default function Home() {
 
     const rows = members.filter((member) => {
       if (q && !member.name.toLowerCase().includes(q)) return false;
-      if (memberFilter === "active") return member.active;
+      if (memberFilter === "active") {
+        return member.active && !warningByMember[member.id]?.warning;
+      }
       if (memberFilter === "withdrawn") return !member.active;
       if (memberFilter === "warning") {
         return member.active && warningByMember[member.id]?.warning;
       }
-      return true;
+      return member.active;
     });
 
     return [...rows].sort((a, b) => {
@@ -3540,106 +3545,118 @@ export default function Home() {
 
       {mainTab === "members" && (
         <>
-          {isAdmin && (
-            <section className="panel standalonePanel adminMemberAddPanel">
-              <div className="panelHead compactHead">
-                <div>
-                  <h2>회원 추가</h2>
-                  <p>
-                    관리자가 회원 명단을 먼저 등록할 수 있습니다. 회원이 같은 닉네임으로
-                    '최초 가입'하면 기존 회원 기록에 로그인 계정이 자동 연결됩니다.
-                  </p>
+          <section className={`memberControlWorkspace ${isAdmin ? "withAdminAdd" : "searchOnly"}`}>
+            {isAdmin && (
+              <div className="panel memberControlCard adminMemberAddPanel">
+                <div className="memberControlHead">
+                  <div>
+                    <span className="memberControlEyebrow">ADMIN</span>
+                    <h2>회원 추가</h2>
+                  </div>
+                  <p>회원 명단을 먼저 등록하고 최초 가입 시 계정을 연결합니다.</p>
+                </div>
+
+                <div className="adminMemberAddForm memberAddCompactForm">
+                  <label>
+                    <span>닉네임</span>
+                    <input
+                      value={newMemberName}
+                      onChange={(event) => setNewMemberName(event.target.value)}
+                      placeholder="회원 닉네임"
+                      maxLength={20}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") void addMemberByAdmin();
+                      }}
+                    />
+                  </label>
+                  <label>
+                    <span>입장일</span>
+                    <input
+                      type="date"
+                      value={newMemberJoinDate}
+                      onChange={(event) => setNewMemberJoinDate(event.target.value)}
+                    />
+                  </label>
+                  <label>
+                    <span>생일 <em className="optionalLabel">선택</em></span>
+                    <input
+                      type="date"
+                      max={today}
+                      value={newMemberBirthday}
+                      onChange={(event) => setNewMemberBirthday(event.target.value)}
+                    />
+                  </label>
+                  <button
+                    className="primaryButton adminAddMemberButton"
+                    onClick={() => void addMemberByAdmin()}
+                    disabled={saving}
+                  >
+                    {saving ? "추가 중..." : "+ 회원 추가"}
+                  </button>
                 </div>
               </div>
-              <div className="adminMemberAddForm">
-                <label>
-                  <span>닉네임</span>
-                  <input
-                    value={newMemberName}
-                    onChange={(event) => setNewMemberName(event.target.value)}
-                    placeholder="회원 닉네임"
-                    maxLength={20}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") void addMemberByAdmin();
-                    }}
-                  />
-                </label>
-                <label>
-                  <span>입장일</span>
-                  <input
-                    type="date"
-                    value={newMemberJoinDate}
-                    onChange={(event) => setNewMemberJoinDate(event.target.value)}
-                  />
-                </label>
-                <label>
-                  <span>생일 <em className="optionalLabel">선택</em></span>
-                  <input
-                    type="date"
-                    max={today}
-                    value={newMemberBirthday}
-                    onChange={(event) => setNewMemberBirthday(event.target.value)}
-                  />
-                </label>
-                <button
-                  className="primaryButton adminAddMemberButton"
-                  onClick={() => void addMemberByAdmin()}
-                  disabled={saving}
-                >
-                  {saving ? "추가 중..." : "회원 추가"}
-                </button>
+            )}
+
+            <div className="panel memberControlCard memberToolbar">
+              <div className="memberControlHead memberSearchHead">
+                <div>
+                  <span className="memberControlEyebrow">MEMBERS</span>
+                  <h2>회원 검색</h2>
+                </div>
+                <p>닉네임 검색과 정렬, 회원 상태를 한 번에 확인합니다.</p>
               </div>
-            </section>
-          )}
 
-          <section className="memberToolbar panel standalonePanel">
-            <div className="memberToolbarTop">
-              <label className="memberSearchControl">
-                <span>회원 검색</span>
-                <input
-                  className="searchInput"
-                  type="search"
-                  placeholder="닉네임을 입력하세요"
-                  value={memberSearch}
-                  onChange={(event) => setMemberSearch(event.target.value)}
-                />
-              </label>
+              <div className="memberToolbarTop">
+                <label className="memberSearchControl">
+                  <span>닉네임 검색</span>
+                  <input
+                    className="searchInput"
+                    type="search"
+                    placeholder="닉네임을 입력하세요"
+                    value={memberSearch}
+                    onChange={(event) => setMemberSearch(event.target.value)}
+                  />
+                </label>
 
-              <label className="memberSortControl">
-                <span>정렬 기준</span>
-                <select
-                  value={memberSort}
-                  onChange={(event) => setMemberSort(event.target.value as MemberSort)}
-                  aria-label="회원 정렬"
-                >
-                  <option value="nickname_asc">닉네임 가나다순</option>
-                  <option value="nickname_desc">닉네임 역순</option>
-                  <option value="join_desc">입장일 최신순</option>
-                  <option value="join_asc">입장일 오래된순</option>
-                  <option value="last_desc">최근 참석일 최신순</option>
-                  <option value="last_asc">최근 참석일 오래된순</option>
-                </select>
-              </label>
-            </div>
-
-            <div className="memberFilterSection">
-              <span className="memberToolbarLabel">회원 상태</span>
-              <div className="filterButtons memberStatusFilters">
-                {[
-                  ["all", "전체", memberStatusCounts.all],
-                  ["active", "활동중", memberStatusCounts.active],
-                  ["warning", "경고", memberStatusCounts.warning],
-                  ["withdrawn", "탈퇴", memberStatusCounts.withdrawn],
-                ].map(([value, label, count]) => (
-                  <button
-                    key={String(value)}
-                    className={memberFilter === value ? "filterButton active" : "filterButton"}
-                    onClick={() => setMemberFilter(value as MemberFilter)}
+                <label className="memberSortControl">
+                  <span>정렬 기준</span>
+                  <select
+                    value={memberSort}
+                    onChange={(event) => setMemberSort(event.target.value as MemberSort)}
+                    aria-label="회원 정렬"
                   >
-                    <span>{label}</span>
-                    <strong>{count}명</strong>
-                  </button>
-                ))}
+                    <option value="nickname_asc">닉네임 가나다순</option>
+                    <option value="nickname_desc">닉네임 역순</option>
+                    <option value="join_desc">입장일 최신순</option>
+                    <option value="join_asc">입장일 오래된순</option>
+                    <option value="last_desc">최근 참석일 최신순</option>
+                    <option value="last_asc">최근 참석일 오래된순</option>
+                  </select>
+                </label>
+              </div>
+
+              <div className="memberFilterSection">
+                <div className="memberStatusTitleLine">
+                  <span className="memberToolbarLabel">회원 상태</span>
+                  <small>전체 = 활동중 + 경고 · 탈퇴 제외</small>
+                </div>
+                <div className="filterButtons memberStatusFilters memberStatusFiltersFour">
+                  {[
+                    ["all", "전체", memberStatusCounts.all],
+                    ["active", "활동중", memberStatusCounts.active],
+                    ["warning", "경고", memberStatusCounts.warning],
+                    ["withdrawn", "탈퇴", memberStatusCounts.withdrawn],
+                  ].map(([value, label, count]) => (
+                    <button
+                      key={String(value)}
+                      className={memberFilter === value ? "filterButton active" : "filterButton"}
+                      onClick={() => setMemberFilter(value as MemberFilter)}
+                    >
+                      <span>{label}</span>
+                      <strong>{count}명</strong>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </section>
