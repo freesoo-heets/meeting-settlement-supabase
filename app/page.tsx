@@ -97,11 +97,57 @@ function won(value: number) {
   return `${new Intl.NumberFormat("ko-KR").format(Math.round(value))}원`;
 }
 
+function shiftMonth(month: string, offset: number) {
+  const [year, monthNumber] = month.split("-").map(Number);
+  const date = new Date(year, monthNumber - 1 + offset, 1);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function calendarDates(month: string) {
+  const [year, monthNumber] = month.split("-").map(Number);
+  const firstDay = new Date(year, monthNumber - 1, 1).getDay();
+  const lastDate = new Date(year, monthNumber, 0).getDate();
+  const previousLastDate = new Date(year, monthNumber - 1, 0).getDate();
+  const cells: { date: string; day: number; inMonth: boolean }[] = [];
+
+  for (let index = firstDay - 1; index >= 0; index -= 1) {
+    const date = new Date(year, monthNumber - 2, previousLastDate - index);
+    cells.push({
+      date: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`,
+      day: date.getDate(),
+      inMonth: false,
+    });
+  }
+
+  for (let day = 1; day <= lastDate; day += 1) {
+    cells.push({
+      date: `${month}-${String(day).padStart(2, "0")}`,
+      day,
+      inMonth: true,
+    });
+  }
+
+  let nextDay = 1;
+  while (cells.length % 7 !== 0 || cells.length < 42) {
+    const date = new Date(year, monthNumber, nextDay);
+    cells.push({
+      date: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`,
+      day: date.getDate(),
+      inMonth: false,
+    });
+    nextDay += 1;
+  }
+
+  return cells;
+}
+
 export default function Home() {
   const today = todayString();
   const currentMonth = today.slice(0, 7);
 
   const [mainTab, setMainTab] = useState<MainTab>("dashboard");
+  const [meetingCalendarMonth, setMeetingCalendarMonth] = useState(currentMonth);
+  const [memberCalendarMonth, setMemberCalendarMonth] = useState(currentMonth);
   const [members, setMembers] = useState<Member[]>([]);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [adjustments, setAdjustments] = useState<SettlementAdjustment[]>([]);
@@ -890,6 +936,40 @@ export default function Home() {
       .filter((meeting) => meeting.attendeeIds.includes(memberDetail.id))
       .sort((a, b) => b.date.localeCompare(a.date));
   }, [meetings, memberDetail]);
+
+
+  const meetingCalendarCells = useMemo(
+    () => calendarDates(meetingCalendarMonth),
+    [meetingCalendarMonth]
+  );
+
+  const meetingsByDate = useMemo(() => {
+    const map = new Map<string, Meeting[]>();
+    for (const meeting of meetings) {
+      const items = map.get(meeting.date) ?? [];
+      items.push(meeting);
+      map.set(meeting.date, items);
+    }
+    for (const items of map.values()) {
+      items.sort((a, b) => a.title.localeCompare(b.title, "ko"));
+    }
+    return map;
+  }, [meetings]);
+
+  const memberCalendarCells = useMemo(
+    () => calendarDates(memberCalendarMonth),
+    [memberCalendarMonth]
+  );
+
+  const memberMeetingsByDate = useMemo(() => {
+    const map = new Map<string, Meeting[]>();
+    for (const meeting of memberDetailMeetings) {
+      const items = map.get(meeting.date) ?? [];
+      items.push(meeting);
+      map.set(meeting.date, items);
+    }
+    return map;
+  }, [memberDetailMeetings]);
 
   const uniqueMonthParticipants = useMemo(() => {
     const ids = new Set<string>();
@@ -2975,6 +3055,95 @@ export default function Home() {
             </div>
           </section>
 
+          <section className="panel standalonePanel appCalendarPanel meetingCalendarPanel">
+            <div className="calendarHeader">
+              <div>
+                <span className="memberControlEyebrow">CALENDAR</span>
+                <h2>벙 달력</h2>
+                <p>날짜별 예정·진행된 벙을 확인하고 바로 선택할 수 있습니다.</p>
+              </div>
+              <div className="calendarMonthNav">
+                <button
+                  type="button"
+                  aria-label="이전 달"
+                  onClick={() => setMeetingCalendarMonth((month) => shiftMonth(month, -1))}
+                >
+                  ‹
+                </button>
+                <strong>{meetingCalendarMonth.replace("-", "년 ")}월</strong>
+                <button
+                  type="button"
+                  aria-label="다음 달"
+                  onClick={() => setMeetingCalendarMonth((month) => shiftMonth(month, 1))}
+                >
+                  ›
+                </button>
+                {meetingCalendarMonth !== currentMonth && (
+                  <button
+                    type="button"
+                    className="calendarTodayButton"
+                    onClick={() => setMeetingCalendarMonth(currentMonth)}
+                  >
+                    이번 달
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="calendarWeekdays" aria-hidden="true">
+              {["일", "월", "화", "수", "목", "금", "토"].map((day) => (
+                <span key={day}>{day}</span>
+              ))}
+            </div>
+
+            <div className="calendarGrid">
+              {meetingCalendarCells.map((cell) => {
+                const dayMeetings = meetingsByDate.get(cell.date) ?? [];
+                return (
+                  <div
+                    className={`calendarDay ${cell.inMonth ? "" : "outside"} ${cell.date === today ? "today" : ""}`}
+                    key={cell.date}
+                  >
+                    <div className="calendarDayNumber">
+                      <span>{cell.day}</span>
+                      {dayMeetings.length > 0 && <em>{dayMeetings.length}</em>}
+                    </div>
+                    <div className="calendarEvents">
+                      {dayMeetings.slice(0, 3).map((meeting) => (
+                        <button
+                          key={meeting.id}
+                          type="button"
+                          className={meeting.id === selectedMeetingId ? "calendarEvent selected" : "calendarEvent"}
+                          title={`${meeting.date} ${meeting.title}`}
+                          onClick={() => {
+                            setSelectedMeetingId(meeting.id);
+                            setMemberFixedDrafts({});
+                            setGuestFixedDrafts({});
+                          }}
+                        >
+                          {meeting.title}
+                        </button>
+                      ))}
+                      {dayMeetings.length > 3 && (
+                        <button
+                          type="button"
+                          className="calendarMoreEvents"
+                          onClick={() => {
+                            setSelectedMeetingId(dayMeetings[3].id);
+                            setMemberFixedDrafts({});
+                            setGuestFixedDrafts({});
+                          }}
+                        >
+                          +{dayMeetings.length - 3}개 더
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
           <section className="controlGrid">
             <div className="panel standalonePanel">
               <div className="panelHead compactHead">
@@ -4524,6 +4693,74 @@ export default function Home() {
                 )}
               </div>
             )}
+
+            <div className="modalSection memberAttendanceCalendarSection">
+              <div className="calendarHeader memberCalendarHeader">
+                <div>
+                  <strong>참석 달력</strong>
+                  <span>벙에 참석한 날짜를 달력으로 확인합니다.</span>
+                </div>
+                <div className="calendarMonthNav">
+                  <button
+                    type="button"
+                    aria-label="이전 달"
+                    onClick={() => setMemberCalendarMonth((month) => shiftMonth(month, -1))}
+                  >
+                    ‹
+                  </button>
+                  <strong>{memberCalendarMonth.replace("-", "년 ")}월</strong>
+                  <button
+                    type="button"
+                    aria-label="다음 달"
+                    onClick={() => setMemberCalendarMonth((month) => shiftMonth(month, 1))}
+                  >
+                    ›
+                  </button>
+                </div>
+              </div>
+
+              <div className="calendarWeekdays memberCalendarWeekdays" aria-hidden="true">
+                {["일", "월", "화", "수", "목", "금", "토"].map((day) => (
+                  <span key={day}>{day}</span>
+                ))}
+              </div>
+
+              <div className="calendarGrid memberCalendarGrid">
+                {memberCalendarCells.map((cell) => {
+                  const attended = memberMeetingsByDate.get(cell.date) ?? [];
+                  return (
+                    <div
+                      className={`calendarDay memberCalendarDay ${cell.inMonth ? "" : "outside"} ${attended.length > 0 ? "attended" : ""}`}
+                      key={cell.date}
+                    >
+                      <div className="calendarDayNumber">
+                        <span>{cell.day}</span>
+                        {attended.length > 0 && <em>{attended.length}</em>}
+                      </div>
+                      <div className="calendarEvents">
+                        {attended.slice(0, 2).map((meeting) => (
+                          <button
+                            type="button"
+                            className="calendarEvent memberAttendanceEvent"
+                            key={meeting.id}
+                            onClick={() => {
+                              setMemberDetailId("");
+                              setDetailMeetingId(meeting.id);
+                            }}
+                            title={meeting.title}
+                          >
+                            {meeting.title}
+                          </button>
+                        ))}
+                        {attended.length > 2 && (
+                          <span className="calendarMoreEvents">+{attended.length - 2}개</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
 
             <div className="modalSection">
               <div className="modalSectionHead">
