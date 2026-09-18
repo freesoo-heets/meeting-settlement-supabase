@@ -202,6 +202,7 @@ export default function Home() {
   const [newPasswordConfirm, setNewPasswordConfirm] = useState("");
   const [adminResetPassword, setAdminResetPassword] = useState("");
   const [adminResetPasswordConfirm, setAdminResetPasswordConfirm] = useState("");
+  const [showAdminPasswordReset, setShowAdminPasswordReset] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [showMobileMore, setShowMobileMore] = useState(false);
   const [openMemberMenuId, setOpenMemberMenuId] = useState("");
@@ -4588,11 +4589,16 @@ export default function Home() {
 
       {memberDetail && (
         <div className="meetingModalBackdrop" role="presentation">
-          <section className="meetingModal" role="dialog" aria-modal="true">
+          <section className="meetingModal memberDetailModal" role="dialog" aria-modal="true">
             <div className="meetingModalHeader">
               <div>
                 <span>회원 상세</span>
-                <h2>{memberDetail.name}</h2>
+                <div className="memberDetailNameLine">
+                  <h2>{memberDetail.name}</h2>
+                  <span className={`memberDetailStatusTag ${!memberDetail.active ? "withdrawn" : warningByMember[memberDetail.id]?.warning ? "warning" : "active"}`}>
+                    {!memberDetail.active ? "탈퇴" : warningByMember[memberDetail.id]?.warning ? "경고" : "활동중"}
+                  </span>
+                </div>
               </div>
               <button
                 className="modalCloseButton"
@@ -4600,14 +4606,14 @@ export default function Home() {
                   setMemberDetailId("");
                   setAdminResetPassword("");
                   setAdminResetPasswordConfirm("");
+                  setShowAdminPasswordReset(false);
                 }}
               >
                 ×
               </button>
             </div>
 
-            <div className="modalSummaryGrid">
-              <div><span>상태</span><strong>{memberDetail.active ? "활동중" : "탈퇴"}</strong></div>
+            <div className="modalSummaryGrid memberDetailSummaryGrid">
               <div><span>입장일</span><strong>{memberDetail.join_date}</strong></div>
               <div><span>생일</span><strong>{memberDetail.birthday ?? "미입력"}</strong></div>
               <div><span>총 참석</span><strong>{memberDetailMeetings.length}회</strong></div>
@@ -4646,14 +4652,20 @@ export default function Home() {
                     관리자는 다른 관리자의 비밀번호를 재설정할 수 없습니다.
                   </div>
                 ) : (
-                  <div className="adminPasswordResetBox">
-                    <div className="adminPasswordResetDescription">
-                      <strong>비밀번호 재설정</strong>
-                      <span>
-                        기존 비밀번호는 표시하지 않고 새 비밀번호로만 변경합니다.
-                      </span>
-                    </div>
-                    <div className="adminPasswordResetFields">
+                  <div className="adminPasswordResetCompact">
+                    <button
+                      className="smallButton passwordResetToggleButton"
+                      onClick={() => {
+                        setShowAdminPasswordReset((current) => !current);
+                        setAdminResetPassword("");
+                        setAdminResetPasswordConfirm("");
+                      }}
+                    >
+                      {showAdminPasswordReset ? "재설정 취소" : "비밀번호 재설정"}
+                    </button>
+                    {showAdminPasswordReset && (
+                      <div className="adminPasswordResetBox">
+                        <div className="adminPasswordResetFields">
                       <label>
                         <span>새 비밀번호</span>
                         <input
@@ -4690,9 +4702,11 @@ export default function Home() {
                         {saving ? "처리 중..." : "비밀번호 재설정"}
                       </button>
                     </div>
-                    <small className="passwordResetNotice">
-                      비밀번호 값은 변경 이력에 저장하지 않습니다.
-                    </small>
+                        <small className="passwordResetNotice">
+                          기존 비밀번호는 표시하지 않으며 비밀번호 값은 변경 이력에 저장하지 않습니다.
+                        </small>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -4742,7 +4756,7 @@ export default function Home() {
                         {attended.length > 0 && <em>{attended.length}</em>}
                       </div>
                       <div className="calendarEvents">
-                        {attended.slice(0, 2).map((meeting) => (
+                        {attended.slice(0, 1).map((meeting) => (
                           <button
                             type="button"
                             className="calendarEvent memberAttendanceEvent"
@@ -4756,8 +4770,8 @@ export default function Home() {
                             {meeting.title}
                           </button>
                         ))}
-                        {attended.length > 2 && (
-                          <span className="calendarMoreEvents">+{attended.length - 2}개</span>
+                        {attended.length > 1 && (
+                          <span className="calendarMoreEvents">+{attended.length - 1}개</span>
                         )}
                       </div>
                     </div>
