@@ -142,6 +142,10 @@ function calendarDates(month: string) {
 }
 
 export default function Home() {
+  useEffect(() => {
+    document.title = "[86~02] 강서구 찐친만들기❤️";
+  }, []);
+
   const today = todayString();
   const currentMonth = today.slice(0, 7);
 
