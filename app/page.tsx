@@ -198,6 +198,23 @@ export default function Home() {
   const [memberDetailId, setMemberDetailId] = useState("");
   const [showMyActivity, setShowMyActivity] = useState(false);
   const [showAccountPanel, setShowAccountPanel] = useState(false);
+
+  type PetLinkStatus = {
+    linked: boolean;
+    externalMemberId?: string;
+    externalNickname?: string;
+    profileId?: string;
+    petNickname?: string;
+    linkedAt?: string;
+    meetingNickname?: string;
+  };
+
+  const [petLinkStatus, setPetLinkStatus] =
+    useState<PetLinkStatus | null>(null);
+  const [petLinkLoading, setPetLinkLoading] = useState(false);
+  const [petLinkSubmitting, setPetLinkSubmitting] = useState(false);
+  const [petLinkError, setPetLinkError] = useState("");
+
   const [newPassword, setNewPassword] = useState("");
   const [newPasswordConfirm, setNewPasswordConfirm] = useState("");
   const [adminResetPassword, setAdminResetPassword] = useState("");
@@ -1112,69 +1129,286 @@ export default function Home() {
     setSaving(false);
   }
 
-  async function setAttendanceMembers(memberIds: string[]) {
-    if (!selectedMeeting || saving) return;
+  async function loadPetLinkStatus() {
+  setPetLinkLoading(true);
+  setPetLinkError("");
 
-    setSaving(true);
-    setNotice("");
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token ?? "";
 
-    const currentIds = new Set(selectedMeeting.attendeeIds);
-    const nextIds = new Set(memberIds);
-
-    const toAdd = memberIds.filter((id) => !currentIds.has(id));
-    const toRemove = selectedMeeting.attendeeIds.filter((id) => !nextIds.has(id));
-
-    const cleanupTasks = toRemove.flatMap((memberId) => [
-      supabase
-        .from("settlement_adjustments")
-        .delete()
-        .eq("meeting_id", selectedMeeting.id)
-        .eq("member_id", memberId),
-      supabase
-        .from("meeting_prepayments")
-        .delete()
-        .eq("meeting_id", selectedMeeting.id)
-        .eq("member_id", memberId),
-    ]);
-
-    const attendanceTasks = [];
-    if (toRemove.length > 0) {
-      attendanceTasks.push(
-        supabase
-          .from("attendance")
-          .delete()
-          .eq("meeting_id", selectedMeeting.id)
-          .in("member_id", toRemove)
-      );
-    }
-    if (toAdd.length > 0) {
-      attendanceTasks.push(
-        supabase.from("attendance").insert(
-          toAdd.map((memberId) => ({
-            meeting_id: selectedMeeting.id,
-            member_id: memberId,
-          }))
-        )
-      );
+    if (!accessToken) {
+      setPetLinkStatus(null);
+      setPetLinkError("로그인 세션을 확인할 수 없습니다.");
+      return;
     }
 
-    const results = await Promise.all([...cleanupTasks, ...attendanceTasks]);
-    const error = results.find((result) => result.error)?.error;
+    const response = await fetch("/api/pet/link", {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      cache: "no-store",
+    });
 
-    if (error) {
-      setNotice(`참석자 일괄 변경 실패: ${error.message}`);
-    } else {
-      await logActivity(
-        "참석자 일괄 변경",
-        "meeting",
-        selectedMeeting.id,
-        `${selectedMeeting.title} 참석자 ${selectedMeeting.attendeeIds.length}명 → ${memberIds.length}명`
+    const result = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      setPetLinkStatus(null);
+      setPetLinkError(
+        result?.error ?? "PET 연동 상태를 확인하지 못했습니다."
       );
-      await loadAll();
+      return;
     }
 
-    setSaving(false);
+    setPetLinkStatus({
+      linked: Boolean(result?.linked),
+      externalMemberId: result?.externalMemberId,
+      externalNickname: result?.externalNickname,
+      profileId: result?.profileId,
+      petNickname: result?.petNickname,
+      linkedAt: result?.linkedAt,
+      meetingNickname:
+        result?.meetingNickname ?? currentNickname,
+    });
+  } catch (error) {
+    console.error("[PET_LINK_STATUS]", error);
+    setPetLinkStatus(null);
+    setPetLinkError("PET 연동 서버와 통신하지 못했습니다.");
+  } finally {
+    setPetLinkLoading(false);
   }
+}
+
+async function linkMyPetAccount() {
+  if (petLinkSubmitting) return;
+
+  setPetLinkSubmitting(true);
+  setPetLinkError("");
+
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token ?? "";
+
+    if (!accessToken) {
+      setPetLinkError("로그인 세션을 확인할 수 없습니다.");
+      return;
+    }
+
+    const response = await fetch("/api/pet/link", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    const result = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      setPetLinkError(
+        result?.error ?? "PET 계정을 연동하지 못했습니다."
+      );
+      return;
+    }
+
+    setPetLinkStatus({
+      linked: true,
+      externalMemberId: result?.externalMemberId,
+      externalNickname:
+        result?.externalNickname ?? currentNickname,
+      profileId: result?.profileId,
+      petNickname: result?.nickname ?? currentNickname,
+      linkedAt: result?.linkedAt,
+      meetingNickname:
+        result?.meetingNickname ?? currentNickname,
+    });
+
+    setNotice(
+      result?.alreadyLinked
+        ? "이미 PET 계정과 연동되어 있습니다."
+        : "PET 계정 연동이 완료되었습니다."
+    );
+  } catch (error) {
+    console.error("[PET_LINK_SUBMIT]", error);
+    setPetLinkError("PET 연동 서버와 통신하지 못했습니다.");
+  } finally {
+    setPetLinkSubmitting(false);
+  }
+}
+
+  type CreatedAttendanceForPet = {
+  member_id: string;
+};
+
+async function notifyPetAttendances(
+  meetingId: string,
+  attendances: CreatedAttendanceForPet[]
+) {
+  if (attendances.length === 0) return;
+
+  const { data: sessionData } = await supabase.auth.getSession();
+  const accessToken = sessionData.session?.access_token ?? "";
+
+  if (!accessToken) {
+    console.warn(
+      "[PET_ATTENDANCE] 로그인 세션을 확인할 수 없어 PET 보상을 요청하지 않았습니다."
+    );
+    return;
+  }
+
+  const results = await Promise.allSettled(
+    attendances.map(async (attendance) => {
+      const response = await fetch("/api/pet/attendance", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          externalMemberId: attendance.member_id,
+          meetingId,
+        }),
+      });
+
+      const result = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(
+          result?.error ??
+            `PET attendance reward failed (${response.status})`
+        );
+      }
+
+      return result;
+    })
+  );
+
+  results.forEach((result, index) => {
+    if (result.status === "rejected") {
+      console.warn(
+        "[PET_ATTENDANCE] reward notification failed",
+        {
+          meetingId,
+          memberId: attendances[index]?.member_id,
+          reason: result.reason,
+        }
+      );
+    }
+  });
+}
+
+async function setAttendanceMembers(memberIds: string[]) {
+  if (!selectedMeeting || saving) return;
+
+  setSaving(true);
+  setNotice("");
+
+  const currentIds = new Set(selectedMeeting.attendeeIds);
+  const nextIds = new Set(memberIds);
+
+  const toAdd = memberIds.filter((id) => !currentIds.has(id));
+  const toRemove = selectedMeeting.attendeeIds.filter(
+    (id) => !nextIds.has(id)
+  );
+
+  /*
+   * 참석 해제 회원의 정산 관련 데이터 정리
+   */
+  const cleanupTasks = toRemove.flatMap((memberId) => [
+    supabase
+      .from("settlement_adjustments")
+      .delete()
+      .eq("meeting_id", selectedMeeting.id)
+      .eq("member_id", memberId),
+
+    supabase
+      .from("meeting_prepayments")
+      .delete()
+      .eq("meeting_id", selectedMeeting.id)
+      .eq("member_id", memberId),
+  ]);
+
+  const cleanupResults = await Promise.all(cleanupTasks);
+  const cleanupError = cleanupResults.find(
+    (result) => result.error
+  )?.error;
+
+  if (cleanupError) {
+    setNotice(`참석 일괄 변경 실패: ${cleanupError.message}`);
+    setSaving(false);
+    return;
+  }
+
+  /*
+   * 기존 참석 해제
+   */
+  if (toRemove.length > 0) {
+    const { error: removeError } = await supabase
+      .from("attendance")
+      .delete()
+      .eq("meeting_id", selectedMeeting.id)
+      .in("member_id", toRemove);
+
+    if (removeError) {
+      setNotice(`참석 일괄 변경 실패: ${removeError.message}`);
+      setSaving(false);
+      return;
+    }
+  }
+
+  /*
+   * 신규 참석 추가
+   *
+   * DB에서 생성된 실제 created_at을 반환받아
+   * PET 연동에 사용한다.
+   */
+  let createdAttendances: CreatedAttendanceForPet[] = [];
+
+  if (toAdd.length > 0) {
+    const { data, error: addError } = await supabase
+      .from("attendance")
+      .insert(
+        toAdd.map((memberId) => ({
+          meeting_id: selectedMeeting.id,
+          member_id: memberId,
+        }))
+      )
+      .select("member_id, created_at");
+
+    if (addError) {
+      setNotice(`참석 일괄 변경 실패: ${addError.message}`);
+      setSaving(false);
+      await loadAll();
+      return;
+    }
+
+    createdAttendances =
+      (data as CreatedAttendanceForPet[] | null) ?? [];
+  }
+
+  /*
+   * 여기까지 왔다면 attendance 저장은 성공한 상태.
+   *
+   * PET 연동은 별도 처리하므로 PET 서버 장애가
+   * 모임 참석 저장 성공 여부에 영향을 주지 않는다.
+   */
+  if (createdAttendances.length > 0) {
+    await notifyPetAttendances(
+      selectedMeeting.id,
+      createdAttendances
+    );
+  }
+
+  await logActivity(
+    "참석 일괄 변경",
+    "meeting",
+    selectedMeeting.id,
+    `${selectedMeeting.title} 참석자 ${selectedMeeting.attendeeIds.length}명 → ${memberIds.length}명`
+  );
+
+  await loadAll();
+  setSaving(false);
+}
 
   async function loadPreviousMeetingAttendees() {
     if (!selectedMeeting) return;
@@ -2127,21 +2361,51 @@ export default function Home() {
       ]);
     }
 
-    const result = checked
-      ? await supabase
-          .from("attendance")
-          .delete()
-          .eq("meeting_id", selectedMeeting.id)
-          .eq("member_id", memberId)
-      : await supabase.from("attendance").insert({
-          meeting_id: selectedMeeting.id,
-          member_id: memberId,
-        });
+if (checked) {
+  const { error } = await supabase
+    .from("attendance")
+    .delete()
+    .eq("meeting_id", selectedMeeting.id)
+    .eq("member_id", memberId);
 
-    if (result.error) setNotice(`참석 변경 실패: ${result.error.message}`);
-    else await loadAll();
-    setSaving(false);
+  if (error) {
+    setNotice(`참석 변경 실패: ${error.message}`);
+  } else {
+    await loadAll();
   }
+} else {
+  const { data: createdAttendance, error } = await supabase
+    .from("attendance")
+    .insert({
+      meeting_id: selectedMeeting.id,
+      member_id: memberId,
+    })
+    .select("member_id, created_at")
+    .single();
+
+  if (error || !createdAttendance) {
+    setNotice(
+      `참석 변경 실패: ${
+        error?.message ?? "참석 저장 결과를 확인할 수 없습니다."
+      }`
+    );
+  } else {
+    /*
+     * 참석 저장은 이미 성공한 상태다.
+     * PET 연동 실패가 기존 참석 저장을 실패시키지 않도록
+     * 별도 알림으로 처리한다.
+     */
+    await notifyPetAttendances(
+      selectedMeeting.id,
+      [createdAttendance]
+    );
+
+    await loadAll();
+  }
+}
+
+setSaving(false);
+}
 
   async function saveCost(meetingId: string) {
     const value = Number(editingCost);
@@ -2695,7 +2959,10 @@ export default function Home() {
             </button>
             <button
               className="logoutButton"
-              onClick={() => setShowAccountPanel(true)}
+              onClick={() => {
+                setShowAccountPanel(true);
+                void loadPetLinkStatus();
+              }}
             >
               내 계정
             </button>
@@ -2736,8 +3003,9 @@ export default function Home() {
             key={value}
             className={mainTab === value ? "active" : ""}
             onClick={() => {
-              setMainTab(value as MainTab);
+              setShowAccountPanel(true);
               setShowMobileMore(false);
+              void loadPetLinkStatus();
             }}
           >
             <span>{icon}</span>
@@ -4559,7 +4827,107 @@ export default function Home() {
                 {currentRole === "owner" ? "제작자" : currentRole === "admin" ? "관리자" : "일반회원"}
               </strong>
             </div>
+<div className="petLinkCard">
+  <div className="petLinkHeader">
+    <div>
+      <strong>찐친 PET 연동</strong>
+      <span>모임 참석 보상을 PET에서 받아보세요.</span>
+    </div>
 
+    {petLinkStatus?.linked && (
+      <span className="petLinkBadge">연동 완료</span>
+    )}
+  </div>
+
+  {petLinkLoading ? (
+    <div className="petLinkLoading">
+      PET 연동 상태를 확인하고 있습니다.
+    </div>
+  ) : petLinkError ? (
+    <div className="petLinkError">
+      <span>{petLinkError}</span>
+      <button
+        type="button"
+        className="smallButton"
+        onClick={() => void loadPetLinkStatus()}
+      >
+        다시 확인
+      </button>
+    </div>
+  ) : petLinkStatus?.linked ? (
+    <>
+      <div className="petLinkAccountGrid">
+        <div>
+          <span>모임 닉네임</span>
+          <strong>
+            {petLinkStatus.meetingNickname ?? currentNickname}
+          </strong>
+        </div>
+        <div>
+          <span>PET 닉네임</span>
+          <strong>
+            {petLinkStatus.petNickname ??
+              petLinkStatus.externalNickname ??
+              "-"}
+          </strong>
+        </div>
+      </div>
+
+      <div className="petLinkSuccess">
+        ✓ PET 계정과 연동되어 있습니다.
+      </div>
+
+      <div className="petRewardInfo">
+        <strong>모임 참석 시 자동 보상</strong>
+
+        <div>
+          <span>EXP</span>
+          <b>+50</b>
+        </div>
+        <div>
+          <span>친밀도</span>
+          <b>+10</b>
+        </div>
+        <div>
+          <span>PET Coin</span>
+          <b>+100</b>
+        </div>
+        <div>
+          <span>모임상자</span>
+          <b>+1</b>
+        </div>
+      </div>
+    </>
+  ) : (
+    <>
+      <div className="petLinkAccountGrid">
+        <div>
+          <span>모임 닉네임</span>
+          <strong>{currentNickname}</strong>
+        </div>
+        <div>
+          <span>PET 닉네임</span>
+          <strong>미연동</strong>
+        </div>
+      </div>
+
+      <p className="petLinkDescription">
+        PET에서 같은 닉네임을 사용하는 계정과 연결됩니다.
+      </p>
+
+      <button
+        type="button"
+        className="smallButton petLinkButton"
+        onClick={() => void linkMyPetAccount()}
+        disabled={petLinkSubmitting}
+      >
+        {petLinkSubmitting
+          ? "연동 중..."
+          : "PET 계정 연동"}
+      </button>
+    </>
+  )}
+</div>
             <div className="passwordChangeForm">
               <label>
                 <span>새 비밀번호</span>

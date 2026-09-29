@@ -1776,6 +1776,169 @@ th { color: #6b7280; font-size: 11px; }
   font-size: 11px;
 }
 
+.petLinkCard {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid #e8e1da;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.petLinkHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.petLinkHeader > div {
+  display: grid;
+  gap: 3px;
+}
+
+.petLinkHeader strong {
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.petLinkHeader > div > span {
+  color: #716860;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.petLinkBadge {
+  flex: 0 0 auto;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: #eef8f0;
+  color: #2f7a43;
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.petLinkAccountGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.petLinkAccountGrid > div {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border-radius: 10px;
+  background: #f7f4f0;
+}
+
+.petLinkAccountGrid span {
+  color: #716860;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.petLinkAccountGrid strong {
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.petLinkSuccess {
+  padding: 9px 10px;
+  border-radius: 10px;
+  background: #eef8f0;
+  color: #2f7a43;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.petRewardInfo {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.petRewardInfo > strong {
+  grid-column: 1 / -1;
+  margin-bottom: 2px;
+  color: #716860;
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.petRewardInfo > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 8px 5px;
+  border-radius: 9px;
+  background: #f7f4f0;
+  text-align: center;
+}
+
+.petRewardInfo span {
+  overflow: hidden;
+  color: #716860;
+  font-size: 8px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.petRewardInfo b {
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.petLinkDescription {
+  margin: 0;
+  color: #716860;
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.petLinkButton {
+  width: 100%;
+}
+
+.petLinkLoading {
+  padding: 12px;
+  border-radius: 10px;
+  background: #f7f4f0;
+  color: #716860;
+  font-size: 10px;
+  text-align: center;
+}
+
+.petLinkError {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 10px;
+  background: #fff3f1;
+}
+
+.petLinkError > span {
+  color: #a3483c;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.5;
+}
+
+@media (max-width: 480px) {
+  .petLinkCard {
+    padding: 12px;
+  }
+
+  .petRewardInfo {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
 .passwordChangeForm {
   display: grid;
   gap: 10px;
