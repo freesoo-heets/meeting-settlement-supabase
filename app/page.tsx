@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
-import OmokGame from "./OmokGame";
+import GameHub, { type GameKind } from "./GameHub";
 
 type Member = {
   id: string;
@@ -169,19 +169,27 @@ export default function Home() {
   const [members, setMembers] = useState<Member[]>([]);
   const [botPoints, setBotPoints] = useState<BotPoint[]>([]);
   const [showPointRanking, setShowPointRanking] = useState(false);
-  const [showOmok, setShowOmok] = useState(false);
-  // 카톡 대국신청 링크(?omok=대국번호)로 들어온 경우
-  const [omokInvite, setOmokInvite] = useState("");
+  const [showGames, setShowGames] = useState(false);
+  // 카톡 대국신청 링크(?omok= / ?alkkagi= / ?catch=)로 들어온 경우
+  const [gameInvite, setGameInvite] = useState<{ kind: GameKind; id: string } | null>(null);
 
   useEffect(() => {
-    let invite = new URLSearchParams(window.location.search).get("omok") ?? "";
+    const params = new URLSearchParams(window.location.search);
+    let invite: { kind: GameKind; id: string } | null = null;
+    for (const kind of ["omok", "alkkagi", "catch"] as GameKind[]) {
+      const id = params.get(kind);
+      if (id) invite = { kind, id };
+    }
     try {
-      if (invite) window.sessionStorage.setItem("omokInvite", invite);
-      else invite = window.sessionStorage.getItem("omokInvite") ?? "";
+      if (invite) window.sessionStorage.setItem("gameInvite", JSON.stringify(invite));
+      else {
+        const saved = window.sessionStorage.getItem("gameInvite");
+        if (saved) invite = JSON.parse(saved) as { kind: GameKind; id: string };
+      }
     } catch {
       // 저장소를 못 써도 주소의 값으로 진행한다
     }
-    if (invite) setOmokInvite(invite);
+    if (invite) setGameInvite(invite);
   }, []);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [adjustments, setAdjustments] = useState<SettlementAdjustment[]>([]);
@@ -989,9 +997,9 @@ export default function Home() {
   );
 
   useEffect(() => {
-    if (!omokInvite || !currentMember) return;
-    setShowOmok(true);
-  }, [omokInvite, currentMember]);
+    if (!gameInvite || !currentMember) return;
+    setShowGames(true);
+  }, [gameInvite, currentMember]);
 
   const myMonthSummary = useMemo(() => {
     if (!currentMember) {
@@ -2861,9 +2869,15 @@ setSaving(false);
             </div>
           </div>
 
-          {omokInvite && (
+          {gameInvite && (
             <div className="omokInviteNotice">
-              <strong>⚫ 오목 대국신청이 도착했어요!</strong>
+              <strong>
+                {gameInvite.kind === "catch"
+                  ? "🎨 캐치마인드 초대가 도착했어요!"
+                  : gameInvite.kind === "alkkagi"
+                    ? "🥏 알까기 대국신청이 도착했어요!"
+                    : "⚫ 오목 대국신청이 도착했어요!"}
+              </strong>
               <span>로그인하면 바로 대국 화면으로 이동합니다.</span>
               <span>
                 아직 계정이 없다면 <b>최초 가입</b>에서 카톡방 닉네임으로 가입해 주세요.
@@ -4888,31 +4902,31 @@ setSaving(false);
           {currentMember && (
             <button
               className="pointRankingFab omokFab"
-              onClick={() => setShowOmok(true)}
-              aria-label="오목 대결"
+              onClick={() => setShowGames(true)}
+              aria-label="게임"
             >
-              <span aria-hidden="true">⚫</span>
-              <strong>오목</strong>
+              <span aria-hidden="true">🎮</span>
+              <strong>게임</strong>
             </button>
           )}
         </div>
       )}
 
-      {showOmok && currentMember && (
-        <OmokGame
+      {showGames && currentMember && (
+        <GameHub
           onClose={() => {
-            setShowOmok(false);
-            if (omokInvite) {
-              setOmokInvite("");
+            setShowGames(false);
+            if (gameInvite) {
+              setGameInvite(null);
               try {
-                window.sessionStorage.removeItem("omokInvite");
+                window.sessionStorage.removeItem("gameInvite");
               } catch {
                 // 무시
               }
               window.history.replaceState(null, "", window.location.pathname);
             }
           }}
-          initialGameId={omokInvite}
+          initial={gameInvite}
           currentMemberId={currentMember.id}
           myPoints={pointsByMember[currentMember.id]?.exp ?? null}
           myTickets={pointsByMember[currentMember.id]?.tickets ?? null}

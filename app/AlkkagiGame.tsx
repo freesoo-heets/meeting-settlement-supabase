@@ -1,9 +1,24 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { supabase } from "../lib/supabase";
-import { BOARD_SIZE, TURN_SECONDS, boardFromMoves, forbiddenPoints, type Board, type Move } from "../lib/omok";
 import type { RealtimeChannel } from "@supabase/supabase-js";
+import { supabase } from "../lib/supabase";
+import {
+  BOARD_H,
+  BOARD_W,
+  CELL,
+  LABEL,
+  MARGIN,
+  MAX_STRIKES,
+  RADIUS,
+  TURN_SECONDS,
+  VMAX,
+  alive,
+  simulate,
+  type Piece,
+  type Side,
+} from "../lib/alkkagi";
+import { OpponentPicker, type Opponent } from "./OmokGame";
 import {
   EMOTES,
   EMOTE_COOLDOWN_MS,
@@ -11,12 +26,15 @@ import {
   EMOTE_SPOTS,
   EmoteIcon,
   isEmoteKind,
-  pickEmoteSpot,
+  mirrorSpot,
+  pickEmoteSpotFromPoints,
   spotStyle,
   type EmoteKind,
 } from "./OmokEmotes";
 
-type OmokRow = {
+type Seat = "host" | "guest";
+
+type AlkRow = {
   id: string;
   status: "open" | "challenge" | "escrow" | "playing" | "finished" | "cancelled";
   stake: number;
@@ -25,10 +43,14 @@ type OmokRow = {
   guest_member: string | null;
   guest_name: string | null;
   target_member: string | null;
-  black: "host" | "guest" | null;
-  moves: Move[];
+  cho: Seat | null;
+  turn: Seat | null;
+  pieces: Piece[];
+  last_shot: { no: number; id: string; vx: number; vy: number; before: Piece[] } | null;
+  shot_no: number;
+  strikes: Partial<Record<Seat, number>> | null;
   turn_deadline: string | null;
-  winner: "host" | "guest" | "draw" | null;
+  winner: Seat | "draw" | null;
   end_reason: string | null;
   escrow_state: string;
   escrow_note: string | null;
@@ -37,8 +59,6 @@ type OmokRow = {
   finished_at: string | null;
 };
 
-export type Opponent = { id: string; name: string };
-
 type ShownEmote = { kind: EmoteKind; spot: number; name: string; watcher: boolean; key: number };
 
 type Props = {
@@ -46,31 +66,28 @@ type Props = {
   onBack?: () => void;
   initialGameId?: string;
   currentMemberId: string | null;
+  myName: string;
   myPoints: number | null;
   myTickets: number | null;
-  myName: string;
   opponents: Opponent[];
 };
 
 const COLUMNS =
-  "id,status,stake,host_member,host_name,guest_member,guest_name,target_member,black,moves,turn_deadline,winner,end_reason,escrow_state,escrow_note,settle_state,created_at,finished_at";
+  "id,status,stake,host_member,host_name,guest_member,guest_name,target_member,cho,turn,pieces,last_shot,shot_no,strikes,turn_deadline,winner,end_reason,escrow_state,escrow_note,settle_state,created_at,finished_at";
 const STAKE_PRESETS = [100, 300, 500, 1000];
-const CELL = 30;
-const PAD = 20;
-const VIEW = PAD * 2 + CELL * (BOARD_SIZE - 1);
-const STARS: Move[] = [[3, 3], [11, 3], [7, 7], [3, 11], [11, 11]];
+const PULL_MAX = 140; // 이만큼 당기면 최대 세기
 const END_TEXT: Record<string, string> = {
-  five: "오목 완성",
-  timeout: "시간 초과",
+  knockout: "알 전멸",
+  timeout: `시간 초과 ${MAX_STRIKES}회`,
   resign: "기권",
-  draw: "무승부 (판이 가득 참)",
+  draw: "무승부",
 };
 
-async function callOmok(payload: Record<string, unknown>) {
+async function callAlkkagi(payload: Record<string, unknown>) {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
   if (!token) return { ok: false, error: "로그인이 필요합니다." };
-  const response = await fetch("/api/omok", {
+  const response = await fetch("/api/alkkagi", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify(payload),
@@ -82,122 +99,30 @@ async function callOmok(payload: Record<string, unknown>) {
   };
 }
 
-// 한글 초성 검색: "ㅍ" → 푸들·퐁당, "ㅍㄷ" → 푸들, "푸ㄷ" → 푸들
-const CHOSUNG = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ";
-
-function chosungOf(char: string) {
-  const code = char.charCodeAt(0) - 0xac00;
-  if (code < 0 || code > 11171) return char;
-  return CHOSUNG[Math.floor(code / 588)];
-}
-
-function matchesName(name: string, query: string) {
-  const q = query.split(" ").join("").toLowerCase();
-  if (!q) return true;
-  const n = name.split(" ").join("").toLowerCase();
-  for (let start = 0; start + q.length <= n.length; start += 1) {
-    let ok = true;
-    for (let i = 0; i < q.length && ok; i += 1) {
-      const c = n[start + i];
-      ok = CHOSUNG.includes(q[i]) ? chosungOf(c) === q[i] : c === q[i];
-    }
-    if (ok) return true;
-  }
-  return false;
-}
-
-export function OpponentPicker({
-  opponents,
-  value,
-  onChange,
-}: {
-  opponents: Opponent[];
-  value: string;
-  onChange: (id: string) => void;
-}) {
-  const [query, setQuery] = useState("");
-  const [open, setOpen] = useState(false);
-  const selected = opponents.find((member) => member.id === value) ?? null;
-  const matches = useMemo(
-    () => opponents.filter((member) => matchesName(member.name, query)).slice(0, 8),
-    [opponents, query],
-  );
-
-  if (selected) {
-    return (
-      <div className="omokPicked">
-        <span>⚔️ <strong>{selected.name}</strong>님에게 대국신청</span>
-        <button
-          className="omokPickedClear"
-          aria-label="상대 선택 취소"
-          onClick={() => {
-            onChange("");
-            setQuery("");
-          }}
-        >
-          ×
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="omokPicker">
-      <input
-        type="search"
-        value={query}
-        placeholder="상대 닉네임 검색 (초성 가능) · 비우면 누구나"
-        onChange={(event) => {
-          setQuery(event.target.value);
-          setOpen(true);
-        }}
-        onFocus={() => setOpen(true)}
-        onBlur={() => window.setTimeout(() => setOpen(false), 150)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" && matches.length > 0 && query.trim()) {
-            onChange(matches[0].id);
-            setOpen(false);
-          }
-        }}
-        aria-label="대국 상대 검색"
-      />
-      {open && query.trim() && (
-        <ul className="omokPickerList">
-          {matches.length === 0 && <li className="empty">일치하는 회원이 없습니다.</li>}
-          {matches.map((member) => (
-            <li key={member.id}>
-              <button
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => {
-                  onChange(member.id);
-                  setOpen(false);
-                }}
-              >
-                {member.name}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
-
-function nameOf(game: OmokRow, side: "host" | "guest" | null) {
-  if (side === "host") return game.host_name;
-  if (side === "guest") return game.guest_name ?? "?";
+function nameOf(game: AlkRow, seat: Seat | null) {
+  if (seat === "host") return game.host_name;
+  if (seat === "guest") return game.guest_name ?? "?";
   return "?";
 }
 
-export default function OmokGame({ onClose, onBack, initialGameId, currentMemberId, myPoints, myTickets, myName, opponents }: Props) {
-  const [games, setGames] = useState<OmokRow[]>([]);
-  const [viewId, setViewId] = useState<string>(initialGameId ?? "");
-  const [missing, setMissing] = useState(false);
+const otherSeat = (seat: Seat): Seat => (seat === "host" ? "guest" : "host");
+
+export default function AlkkagiGame({
+  onClose,
+  onBack,
+  initialGameId,
+  currentMemberId,
+  myName,
+  myPoints,
+  myTickets,
+  opponents,
+}: Props) {
+  const [games, setGames] = useState<AlkRow[]>([]);
+  const [viewId, setViewId] = useState(initialGameId ?? "");
   const [stake, setStake] = useState("100");
   const [target, setTarget] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  const [pending, setPending] = useState<Move | null>(null);
   const [now, setNow] = useState(Date.now());
   const lastTick = useRef(0);
   const channelRef = useRef<RealtimeChannel | null>(null);
@@ -208,19 +133,16 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
   const load = useCallback(async () => {
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const { data, error } = await supabase
-      .from("omok_games")
+      .from("alkkagi_games")
       .select(COLUMNS)
       .or(`status.in.(open,challenge,escrow,playing),finished_at.gte.${since}`)
       .order("created_at", { ascending: false })
       .limit(40);
     if (error) return;
-    const rows = (data ?? []) as OmokRow[];
-
-    // 링크로 들어온 대국이 목록에 없으면(취소·오래된 결과) 따로 불러온다
+    const rows = (data ?? []) as AlkRow[];
     if (initialGameId && !rows.some((row) => row.id === initialGameId)) {
-      const single = await supabase.from("omok_games").select(COLUMNS).eq("id", initialGameId).maybeSingle();
-      if (single.data) rows.push(single.data as OmokRow);
-      else setMissing(true);
+      const single = await supabase.from("alkkagi_games").select(COLUMNS).eq("id", initialGameId).maybeSingle();
+      if (single.data) rows.push(single.data as AlkRow);
     }
     setGames(rows);
   }, [initialGameId]);
@@ -235,7 +157,6 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
     [games, currentMemberId],
   );
 
-  // 내 대국이 시작되면 자동으로 판을 연다
   useEffect(() => {
     if (myActive && (myActive.status === "escrow" || myActive.status === "playing")) {
       setViewId((current) => current || myActive.id);
@@ -247,32 +168,39 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
 
   useEffect(() => {
     void load();
-    const timer = window.setInterval(() => void load(), live ? 1200 : 3000);
+    const timer = window.setInterval(() => void load(), live ? 1500 : 3000);
     return () => window.clearInterval(timer);
   }, [load, live]);
 
-  // 감정표현: 서버를 거치지 않고 실시간 채널로 주고받는다
-  function showEmote(next: { kind: EmoteKind; spot: number; name: string; watcher: boolean }) {
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 250);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  function showEmote(next: Omit<ShownEmote, "key">) {
     const key = Date.now() + Math.random();
     setEmote({ ...next, key });
     window.setTimeout(() => setEmote((current) => (current?.key === key ? null : current)), EMOTE_SHOW_MS);
   }
 
-  function sendEmote(kind: EmoteKind, board: Board, watcher: boolean) {
+  // 위치(spot)는 '판 기준'으로 주고받고, 판을 뒤집어 보는 사람은 화면에서 뒤집는다
+  function sendEmote(kind: EmoteKind, pieces: Piece[], watcher: boolean) {
     const nowMs = Date.now();
     if (nowMs - lastEmoteAt.current < EMOTE_COOLDOWN_MS) return;
     lastEmoteAt.current = nowMs;
     setEmoteCooldownUntil(nowMs + EMOTE_COOLDOWN_MS);
-    const payload = { kind, spot: pickEmoteSpot(board), name: myName, watcher };
+    const spot = pickEmoteSpotFromPoints(
+      pieces.filter((piece) => !piece.out).map((piece) => [piece.x / BOARD_W, piece.y / BOARD_H]),
+    );
+    const payload = { kind, spot, name: myName, watcher };
     showEmote(payload);
     void channelRef.current?.send({ type: "broadcast", event: "emote", payload });
   }
 
-  // 보고 있는 대국은 실시간 구독으로 바로 받는다 (주기적 확인은 끊겼을 때 대비용)
   useEffect(() => {
     if (!viewId) return;
     const channel = supabase
-      .channel(`omok-${viewId}`, { config: { broadcast: { self: false } } })
+      .channel(`alkkagi-${viewId}`, { config: { broadcast: { self: false } } })
       .on("broadcast", { event: "emote" }, ({ payload }) => {
         const data = payload as { kind?: unknown; spot?: unknown; name?: unknown; watcher?: unknown };
         if (!isEmoteKind(data.kind)) return;
@@ -286,9 +214,9 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
       })
       .on(
         "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "omok_games", filter: `id=eq.${viewId}` },
+        { event: "UPDATE", schema: "public", table: "alkkagi_games", filter: `id=eq.${viewId}` },
         (payload) => {
-          const row = payload.new as OmokRow;
+          const row = payload.new as AlkRow;
           setGames((current) => current.map((game) => (game.id === row.id ? { ...game, ...row } : game)));
         },
       )
@@ -301,53 +229,26 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
   }, [viewId]);
 
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 250);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  // 착수: 서버 응답을 기다리지 않고 내 화면에 먼저 돌을 놓는다 (실패하면 되돌린다)
-  async function playMove(gameId: string, x: number, y: number) {
-    setPending(null);
-    setMessage("");
-    setGames((current) =>
-      current.map((game) =>
-        game.id === gameId ? { ...game, moves: [...game.moves, [x, y] as Move], turn_deadline: null } : game,
-      ),
-    );
-    setBusy(true);
-    const result = await callOmok({ action: "move", gameId, x, y });
-    setBusy(false);
-    if (!result.ok) setMessage(result.error ?? "착수하지 못했습니다.");
-    await load();
-  }
-
-  // 시간이 다 되면 서버에 확인을 요청한다 (상대가 창을 닫아도 끝나도록)
-  useEffect(() => {
     if (!viewing || viewing.status !== "playing" || !viewing.turn_deadline) return;
     const over = now - new Date(viewing.turn_deadline).getTime();
     if (over > 2500 && now - lastTick.current > 3000) {
       lastTick.current = now;
-      void callOmok({ action: "tick", gameId: viewing.id }).then(() => load());
+      void callAlkkagi({ action: "tick", gameId: viewing.id }).then(() => load());
     }
   }, [now, viewing, load]);
 
   async function run(payload: Record<string, unknown>, after?: (id?: string) => void) {
     setBusy(true);
     setMessage("");
-    const result = await callOmok(payload);
+    const result = await callAlkkagi(payload);
     setBusy(false);
-    if (!result.ok) {
-      setMessage(result.error ?? "실패했습니다.");
-    } else {
-      after?.(result.id);
-    }
+    if (!result.ok) setMessage(result.error ?? "실패했습니다.");
+    else after?.(result.id);
     await load();
   }
 
   const openRooms = games.filter((game) => game.status === "open" && game.host_member !== currentMemberId);
-  const challengesToMe = games.filter(
-    (game) => game.status === "challenge" && game.target_member === currentMemberId,
-  );
+  const challengesToMe = games.filter((game) => game.status === "challenge" && game.target_member === currentMemberId);
   const liveGames = games.filter((game) => game.status === "playing" && game.id !== myActive?.id);
   const recent = games.filter((game) => game.status === "finished").slice(0, 8);
 
@@ -362,8 +263,8 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
       <section className="meetingModal omokModal" role="dialog" aria-modal="true">
         <div className="meetingModalHeader">
           <div>
-            <span>렌주룰 · 한 수 {TURN_SECONDS}초 · 티켓 1장씩</span>
-            <h2>⚫ 오목 대결</h2>
+            <span>장기알 · 한 턴 {TURN_SECONDS}초 · 티켓 1장씩</span>
+            <h2>🥏 알까기</h2>
           </div>
           <div className="gameHeaderActions">
             {onBack && <button className="smallButton ghost" onClick={onBack}>← 게임</button>}
@@ -372,34 +273,28 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
         </div>
 
         {message && <div className="omokMessage">{message}</div>}
-        {missing && viewId === initialGameId && !viewing && (
-          <div className="omokMessage">대국신청을 찾지 못했습니다. 주소를 확인해 주세요.</div>
-        )}
 
         {viewing && (viewing.status === "open" || viewing.status === "challenge") ? (
           <div className="omokInvite">
-            <span className="omokInviteIcon">⚔️</span>
+            <span className="omokInviteIcon">🥏</span>
             <strong>
               {viewing.status === "challenge"
-                ? `${viewing.host_name}님의 대국신청`
-                : `${viewing.host_name}님이 상대를 찾고 있어요`}
+                ? `${viewing.host_name}님의 알까기 대국신청`
+                : `${viewing.host_name}님이 알까기 상대를 찾고 있어요`}
             </strong>
             <span>
-              판돈 <b>💎 {viewing.stake.toLocaleString("ko-KR")}점</b> · 티켓 🎫1장 · 렌주룰 · 한 수 {TURN_SECONDS}초
+              판돈 <b>💎 {viewing.stake.toLocaleString("ko-KR")}점</b> · 티켓 🎫1장 · 한 턴 {TURN_SECONDS}초
             </span>
             <span className="muted">
               내 점수 💎 {myPoints !== null ? myPoints.toLocaleString("ko-KR") : "-"} · 티켓 🎫 {myTickets ?? "-"}
             </span>
             {viewing.host_member === currentMemberId ? (
-              <>
-                <span className="muted">내가 만든 대국입니다. 상대를 기다리는 중…</span>
-                <div className="omokControls">
-                  <button className="smallButton ghost" onClick={() => setViewId("")}>← 대기실</button>
-                  <button className="smallButton ghost" disabled={busy} onClick={() => run({ action: "cancel", gameId: viewing.id }, () => setViewId(""))}>
-                    취소
-                  </button>
-                </div>
-              </>
+              <div className="omokControls">
+                <button className="smallButton ghost" onClick={() => setViewId("")}>← 대기실</button>
+                <button className="smallButton ghost" disabled={busy} onClick={() => run({ action: "cancel", gameId: viewing.id }, () => setViewId(""))}>
+                  취소
+                </button>
+              </div>
             ) : viewing.status === "challenge" && viewing.target_member !== currentMemberId ? (
               <>
                 <span className="muted">다른 회원에게 보낸 대국신청입니다.</span>
@@ -418,27 +313,25 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
                 <button className="smallButton ghost" onClick={() => setViewId("")}>대기실</button>
               </div>
             )}
-            {myActive && viewing.host_member !== currentMemberId && (
-              <span className="muted">이미 대기 중이거나 진행 중인 대국이 있어 참여할 수 없습니다.</span>
-            )}
           </div>
         ) : viewing ? (
-          <OmokBoardView
+          <AlkkagiBoardView
             game={viewing}
             me={currentMemberId}
             now={now}
             busy={busy}
-            pending={pending}
-            setPending={setPending}
-            onBack={() => {
-              setViewId("");
-              setPending(null);
+            onBack={() => setViewId("")}
+            onShoot={async (pieceId, vx, vy) => {
+              setBusy(true);
+              setMessage("");
+              const result = await callAlkkagi({ action: "shoot", gameId: viewing.id, pieceId, vx, vy });
+              setBusy(false);
+              if (!result.ok) setMessage(result.error ?? "튕기지 못했습니다.");
+              await load();
+              return result.ok;
             }}
-            onMove={(x, y) => void playMove(viewing.id, x, y)}
             onResign={() => {
-              if (window.confirm("기권하면 판돈을 잃습니다. 기권할까요?")) {
-                void run({ action: "resign", gameId: viewing.id });
-              }
+              if (window.confirm("기권하면 판돈을 잃습니다. 기권할까요?")) void run({ action: "resign", gameId: viewing.id });
             }}
             onCancel={() => run({ action: "cancel", gameId: viewing.id }, () => setViewId(""))}
             emote={emote}
@@ -498,7 +391,7 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
 
             {!myActive && (
               <div className="omokCreate">
-                <strong>새 대국</strong>
+                <strong>새 알까기</strong>
                 <div className="omokStakeRow">
                   {STAKE_PRESETS.map((value) => (
                     <button
@@ -528,7 +421,7 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
                 >
                   {target ? "대국신청 보내기" : "방 만들기"}
                 </button>
-                <small>이기면 상대 판돈을 가져가고, 비기면 돌려받습니다. 티켓은 돌려받지 않습니다.</small>
+                <small>상대 알을 모두 판 밖으로 떨어뜨리면 승리. 이기면 상대 판돈을 가져갑니다.</small>
               </div>
             )}
 
@@ -555,7 +448,7 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
                   <div className="omokCard" key={game.id}>
                     <div>
                       <strong>{game.host_name} vs {game.guest_name}</strong>
-                      <span>판돈 {game.stake.toLocaleString("ko-KR")}점 · {game.moves.length}수</span>
+                      <span>판돈 {game.stake.toLocaleString("ko-KR")}점 · {game.shot_no}수</span>
                     </div>
                     <button className="smallButton ghost" onClick={() => setViewId(game.id)}>관전</button>
                   </div>
@@ -585,167 +478,273 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
   );
 }
 
-function OmokBoardView({
+function AlkkagiBoardView({
   game,
   me,
   now,
   busy,
-  pending,
-  setPending,
   onBack,
-  onMove,
+  onShoot,
   onResign,
   onCancel,
   emote,
   emoteReadyIn,
   onEmote,
 }: {
-  game: OmokRow;
+  game: AlkRow;
   me: string | null;
   now: number;
   busy: boolean;
-  pending: Move | null;
-  setPending: (move: Move | null) => void;
   onBack: () => void;
-  onMove: (x: number, y: number) => void;
+  onShoot: (pieceId: string, vx: number, vy: number) => Promise<boolean>;
   onResign: () => void;
   onCancel: () => void;
   emote: ShownEmote | null;
   emoteReadyIn: number;
-  onEmote: (kind: EmoteKind, board: Board, watcher: boolean) => void;
+  onEmote: (kind: EmoteKind, pieces: Piece[], watcher: boolean) => void;
 }) {
-  const board = useMemo(() => boardFromMoves(game.moves), [game.moves]);
-  const mySide = game.host_member === me ? "host" : game.guest_member === me ? "guest" : null;
-  const blackSide = game.black;
-  const whiteSide = blackSide === "host" ? "guest" : blackSide === "guest" ? "host" : null;
-  const blackTurn = game.moves.length % 2 === 0;
-  const turnSide = blackTurn ? blackSide : whiteSide;
-  const myTurn = game.status === "playing" && mySide !== null && mySide === turnSide;
-  const iAmBlack = mySide !== null && mySide === blackSide;
+  const mySeat: Seat | null = game.host_member === me ? "host" : game.guest_member === me ? "guest" : null;
+  const choSeat = game.cho;
+  const hanSeat = choSeat ? otherSeat(choSeat) : null;
+  const myColor: Side | null = mySeat ? (mySeat === choSeat ? "cho" : "han") : null;
+  const flipped = myColor === "han"; // 내 알이 항상 아래쪽에 오도록
+  const myTurn = game.status === "playing" && mySeat !== null && game.turn === mySeat;
 
-  const forbidden = useMemo(
-    () => (myTurn && iAmBlack ? forbiddenPoints(boardFromMoves(game.moves)) : []),
-    [myTurn, iAmBlack, game.moves],
-  );
-  const forbiddenSet = useMemo(() => new Set(forbidden.map(([x, y]) => `${x},${y}`)), [forbidden]);
+  // 화면에 그릴 알 위치 (애니메이션 중에는 계산 중간값)
+  const [shown, setShown] = useState<Piece[]>(game.pieces);
+  const [animating, setAnimating] = useState(false);
+  const animatedNo = useRef(game.shot_no);
+  const frameRef = useRef(0);
+
+  const play = useCallback((before: Piece[], shot: { id: string; vx: number; vy: number }, final: Piece[] | null) => {
+    const frames: Piece[][] = [];
+    const result = simulate(before, shot, (state) => frames.push(state));
+    window.cancelAnimationFrame(frameRef.current);
+    setAnimating(true);
+    let index = 0;
+    const step = () => {
+      if (index < frames.length) {
+        setShown(frames[index]);
+        index += 1;
+        frameRef.current = window.requestAnimationFrame(step);
+      } else {
+        setShown(final ?? result);
+        setAnimating(false);
+      }
+    };
+    frameRef.current = window.requestAnimationFrame(step);
+  }, []);
+
+  // 서버에서 새 수가 오면 재생한다 (내가 쏜 것은 이미 재생했으므로 건너뜀)
+  useEffect(() => {
+    const shot = game.last_shot;
+    if (shot && shot.no > animatedNo.current && Array.isArray(shot.before)) {
+      animatedNo.current = shot.no;
+      play(shot.before, shot, game.pieces);
+    } else if (!animating) {
+      setShown(game.pieces);
+    }
+  }, [game.last_shot?.no, game.pieces]);
+
+  useEffect(() => () => window.cancelAnimationFrame(frameRef.current), []);
+
+  // ── 조준 (새총: 내 알을 잡고 뒤로 당겼다 놓기) ──
+  const layerRef = useRef<SVGGElement | null>(null);
+  const [aim, setAim] = useState<{ id: string; px: number; py: number; x: number; y: number } | null>(null);
+
+  function toBoard(event: React.PointerEvent) {
+    const layer = layerRef.current;
+    const svg = layer?.ownerSVGElement;
+    const matrix = layer?.getScreenCTM();
+    if (!svg || !matrix) return null;
+    const point = svg.createSVGPoint();
+    point.x = event.clientX;
+    point.y = event.clientY;
+    const local = point.matrixTransform(matrix.inverse());
+    return { x: local.x, y: local.y };
+  }
+
+  const aimVector = aim
+    ? (() => {
+        const dx = aim.px - aim.x;
+        const dy = aim.py - aim.y;
+        const length = Math.hypot(dx, dy);
+        const power = Math.min(length, PULL_MAX) / PULL_MAX;
+        return length > 0 ? { nx: dx / length, ny: dy / length, power } : { nx: 0, ny: 0, power: 0 };
+      })()
+    : null;
+
+  async function release() {
+    if (!aim || !aimVector) return;
+    const current = aim;
+    setAim(null);
+    if (aimVector.power < 0.06) return;
+    const vx = aimVector.nx * aimVector.power * VMAX;
+    const vy = aimVector.ny * aimVector.power * VMAX;
+    // 응답을 기다리지 않고 바로 재생한다
+    animatedNo.current = game.shot_no + 1;
+    play(game.pieces, { id: current.id, vx, vy }, null);
+    const ok = await onShoot(current.id, vx, vy);
+    if (!ok) {
+      animatedNo.current = game.shot_no;
+      window.cancelAnimationFrame(frameRef.current);
+      setAnimating(false);
+      setShown(game.pieces);
+    }
+  }
 
   const remaining = game.turn_deadline
     ? Math.max(0, Math.ceil((new Date(game.turn_deadline).getTime() - now) / 1000))
     : TURN_SECONDS;
-  const last = game.moves[game.moves.length - 1];
-
-  function handleClick(x: number, y: number) {
-    if (!myTurn || busy || board[y][x] !== 0 || forbiddenSet.has(`${x},${y}`)) return;
-    if (pending && pending[0] === x && pending[1] === y) {
-      onMove(x, y);
-    } else {
-      setPending([x, y]);
-    }
-  }
+  const strikes = { host: 0, guest: 0, ...(game.strikes ?? {}) };
+  const choAlive = alive(shown, "cho");
+  const hanAlive = alive(shown, "han");
 
   let status = "";
-  if (game.status === "escrow") {
-    status = "🤖 봇이 점수·티켓을 확인하고 있습니다… (보통 10초 이내)";
-  } else if (game.status === "playing") {
-    status = myTurn ? `내 차례 · ${remaining}초` : `${nameOf(game, turnSide)}님 차례 · ${remaining}초`;
+  if (game.status === "escrow") status = "🤖 봇이 점수·티켓을 확인하고 있습니다… (보통 10초 이내)";
+  else if (game.status === "playing") {
+    status = myTurn
+      ? `내 차례 · ${remaining}초 · 내 알을 뒤로 끌었다 놓으세요`
+      : `${nameOf(game, game.turn)}님 차례 · ${remaining}초`;
   } else if (game.status === "finished") {
     const settle = game.settle_state === "done" ? "카톡 점수에 반영 완료" : "봇이 곧 카톡 점수에 반영합니다";
     if (game.winner === "draw") status = `🤝 무승부 · 판돈 반환 · ${settle}`;
     else {
-      const winnerName = nameOf(game, game.winner);
-      const mine = mySide ? (game.winner === mySide ? "🎉 승리! " : "😢 패배 · ") : "";
-      status = `${mine}🏆 ${winnerName} 승 (${END_TEXT[game.end_reason ?? ""] ?? ""}) · ${settle}`;
+      const mine = mySeat ? (game.winner === mySeat ? "🎉 승리! " : "😢 패배 · ") : "";
+      status = `${mine}🏆 ${nameOf(game, game.winner)} 승 (${END_TEXT[game.end_reason ?? ""] ?? ""}) · ${settle}`;
     }
   } else if (game.status === "cancelled") {
     status = game.escrow_note ? `취소됨 · ${game.escrow_note}` : "취소된 대국입니다.";
   }
 
+  const shownSpot = emote ? (flipped ? mirrorSpot(emote.spot) : emote.spot) : 0;
+
   return (
     <div className="omokGame">
       <div className="omokPlayers">
-        <div className={`omokPlayer ${game.status === "playing" && blackTurn ? "turn" : ""}`}>
-          <i className="omokStoneIcon black" />
-          <strong>{nameOf(game, blackSide)}</strong>
-          {mySide === blackSide && <em>나</em>}
+        <div className={`omokPlayer ${game.status === "playing" && game.turn === choSeat ? "turn" : ""}`}>
+          <i className="alkIcon cho">楚</i>
+          <strong>{nameOf(game, choSeat)}</strong>
+          <em className="alkCount">{choAlive}</em>
+          {mySeat === choSeat && <em>나</em>}
         </div>
         <span className="omokStake">💎 {game.stake.toLocaleString("ko-KR")}</span>
-        <div className={`omokPlayer ${game.status === "playing" && !blackTurn ? "turn" : ""}`}>
-          <i className="omokStoneIcon white" />
-          <strong>{nameOf(game, whiteSide)}</strong>
-          {mySide === whiteSide && <em>나</em>}
+        <div className={`omokPlayer ${game.status === "playing" && game.turn === hanSeat ? "turn" : ""}`}>
+          <i className="alkIcon han">漢</i>
+          <strong>{nameOf(game, hanSeat)}</strong>
+          <em className="alkCount">{hanAlive}</em>
+          {mySeat === hanSeat && <em>나</em>}
         </div>
       </div>
 
       {game.status === "playing" && (
         <div className="omokTimer">
-          <div
-            className={remaining <= 10 ? "urgent" : ""}
-            style={{ width: `${(remaining / TURN_SECONDS) * 100}%` }}
-          />
+          <div className={remaining <= 5 ? "urgent" : ""} style={{ width: `${(remaining / TURN_SECONDS) * 100}%` }} />
         </div>
       )}
-
       <p className={`omokStatus ${myTurn ? "mine" : ""}`}>{status}</p>
-
-      <div className="omokStage">
-      {emote && (
-        <div className="omokEmotePop" key={emote.key} style={spotStyle(emote.spot)}>
-          <EmoteIcon kind={emote.kind} />
-          {emote.name && <span className={emote.watcher ? "watcher" : ""}>{emote.watcher ? `👀 ${emote.name}` : emote.name}</span>}
-        </div>
+      {game.status === "playing" && (strikes.host > 0 || strikes.guest > 0) && (
+        <p className="alkStrikes">
+          시간 초과 · {game.host_name} {strikes.host}/{MAX_STRIKES} · {game.guest_name ?? "?"} {strikes.guest}/{MAX_STRIKES}
+        </p>
       )}
-      <svg className="omokBoard" viewBox={`0 0 ${VIEW} ${VIEW}`} role="img" aria-label="오목판">
-        <rect x="0" y="0" width={VIEW} height={VIEW} rx="10" className="omokBoardBg" />
-        {Array.from({ length: BOARD_SIZE }, (_, i) => (
-          <g key={i} className="omokLine">
-            <line x1={PAD} y1={PAD + i * CELL} x2={PAD + (BOARD_SIZE - 1) * CELL} y2={PAD + i * CELL} />
-            <line x1={PAD + i * CELL} y1={PAD} x2={PAD + i * CELL} y2={PAD + (BOARD_SIZE - 1) * CELL} />
-          </g>
-        ))}
-        {STARS.map(([x, y]) => (
-          <circle key={`s${x},${y}`} cx={PAD + x * CELL} cy={PAD + y * CELL} r="3" className="omokStar" />
-        ))}
-        {forbidden.map(([x, y]) => (
-          <text key={`f${x},${y}`} x={PAD + x * CELL} y={PAD + y * CELL + 5} className="omokForbidden" textAnchor="middle">
-            ×
-          </text>
-        ))}
-        {game.moves.map(([x, y], index) => (
-          <circle
-            key={`m${index}`}
-            cx={PAD + x * CELL}
-            cy={PAD + y * CELL}
-            r="13"
-            className={index % 2 === 0 ? "omokStone black" : "omokStone white"}
-          />
-        ))}
-        {last && <circle cx={PAD + last[0] * CELL} cy={PAD + last[1] * CELL} r="4" className="omokLast" />}
-        {pending && (
-          <circle
-            cx={PAD + pending[0] * CELL}
-            cy={PAD + pending[1] * CELL}
-            r="13"
-            className={`omokStone ghost ${blackTurn ? "black" : "white"}`}
-          />
+
+      <div className="omokStage alkStage">
+        {emote && (
+          <div className="omokEmotePop" key={emote.key} style={spotStyle(shownSpot)}>
+            <EmoteIcon kind={emote.kind} />
+            {emote.name && <span className={emote.watcher ? "watcher" : ""}>{emote.watcher ? `👀 ${emote.name}` : emote.name}</span>}
+          </div>
         )}
-        {myTurn &&
-          Array.from({ length: BOARD_SIZE * BOARD_SIZE }, (_, index) => {
-            const x = index % BOARD_SIZE;
-            const y = Math.floor(index / BOARD_SIZE);
-            if (board[y][x] !== 0) return null;
-            return (
-              <rect
-                key={`h${index}`}
-                x={PAD + x * CELL - CELL / 2}
-                y={PAD + y * CELL - CELL / 2}
-                width={CELL}
-                height={CELL}
-                className="omokHit"
-                onClick={() => handleClick(x, y)}
-              />
-            );
-          })}
-      </svg>
+        <svg
+          className="alkBoard"
+          viewBox={`0 0 ${BOARD_W} ${BOARD_H}`}
+          role="img"
+          aria-label="알까기 판"
+          onPointerMove={(event) => {
+            if (!aim) return;
+            const point = toBoard(event);
+            if (point) setAim({ ...aim, px: point.x, py: point.y });
+          }}
+          onPointerUp={() => void release()}
+          onPointerCancel={() => setAim(null)}
+        >
+          <g ref={layerRef} transform={flipped ? `rotate(180 ${BOARD_W / 2} ${BOARD_H / 2})` : undefined}>
+            <rect x="0" y="0" width={BOARD_W} height={BOARD_H} rx="12" className="alkBoardBg" />
+            {Array.from({ length: 10 }, (_, row) => (
+              <line key={`r${row}`} className="alkLine" x1={MARGIN} y1={MARGIN + row * CELL} x2={MARGIN + 8 * CELL} y2={MARGIN + row * CELL} />
+            ))}
+            {Array.from({ length: 9 }, (_, col) => (
+              <line key={`c${col}`} className="alkLine" x1={MARGIN + col * CELL} y1={MARGIN} x2={MARGIN + col * CELL} y2={MARGIN + 9 * CELL} />
+            ))}
+            {[0, 7].map((top) => (
+              <g key={`p${top}`} className="alkLine">
+                <line x1={MARGIN + 3 * CELL} y1={MARGIN + top * CELL} x2={MARGIN + 5 * CELL} y2={MARGIN + (top + 2) * CELL} />
+                <line x1={MARGIN + 5 * CELL} y1={MARGIN + top * CELL} x2={MARGIN + 3 * CELL} y2={MARGIN + (top + 2) * CELL} />
+              </g>
+            ))}
+
+            {shown
+              .filter((piece) => !piece.out)
+              .map((piece) => {
+                const r = RADIUS[piece.kind];
+                const mine = myTurn && !animating && !busy && piece.side === myColor;
+                const selected = aim?.id === piece.id;
+                return (
+                  <g
+                    key={piece.id}
+                    transform={`translate(${piece.x} ${piece.y})`}
+                    className={`alkPiece ${piece.side} ${mine ? "mine" : ""} ${selected ? "selected" : ""}`}
+                    onPointerDown={(event) => {
+                      if (!mine) return;
+                      event.preventDefault();
+                      (event.currentTarget.ownerSVGElement as SVGSVGElement | null)?.setPointerCapture(event.pointerId);
+                      const point = toBoard(event);
+                      setAim({ id: piece.id, x: piece.x, y: piece.y, px: point?.x ?? piece.x, py: point?.y ?? piece.y });
+                    }}
+                  >
+                    <polygon
+                      points={octagon(r)}
+                      className="alkPieceBody"
+                    />
+                    <text
+                      className="alkPieceText"
+                      textAnchor="middle"
+                      dominantBaseline="central"
+                      fontSize={r * 1.05}
+                      transform={flipped ? "rotate(180)" : undefined}
+                    >
+                      {LABEL[piece.side][piece.kind]}
+                    </text>
+                  </g>
+                );
+              })}
+
+            {aim && aimVector && aimVector.power > 0 && (
+              <g className="alkAim" pointerEvents="none">
+                <line x1={aim.x} y1={aim.y} x2={aim.px} y2={aim.py} className="alkPull" />
+                <line
+                  x1={aim.x}
+                  y1={aim.y}
+                  x2={aim.x + aimVector.nx * (40 + aimVector.power * 160)}
+                  y2={aim.y + aimVector.ny * (40 + aimVector.power * 160)}
+                  className="alkShot"
+                />
+                <circle
+                  cx={aim.x + aimVector.nx * (40 + aimVector.power * 160)}
+                  cy={aim.y + aimVector.ny * (40 + aimVector.power * 160)}
+                  r="5"
+                  className="alkShotHead"
+                />
+              </g>
+            )}
+          </g>
+        </svg>
+        {aim && aimVector && (
+          <div className="alkPower">
+            <div style={{ width: `${Math.round(aimVector.power * 100)}%` }} />
+          </div>
+        )}
       </div>
 
       {me && (game.status === "playing" || game.status === "finished") && (
@@ -757,7 +756,7 @@ function OmokBoardView({
               disabled={emoteReadyIn > 0}
               aria-label={item.label}
               title={item.label}
-              onClick={() => onEmote(item.kind, board, mySide === null)}
+              onClick={() => onEmote(item.kind, shown, mySeat === null)}
             >
               <EmoteIcon kind={item.kind} />
             </button>
@@ -768,19 +767,23 @@ function OmokBoardView({
 
       <div className="omokControls">
         <button className="smallButton ghost" onClick={onBack}>← 대기실</button>
-        {myTurn && pending && (
-          <button className="primaryButton" disabled={busy} onClick={() => onMove(pending[0], pending[1])}>
-            여기에 두기
-          </button>
-        )}
-        {game.status === "playing" && mySide && (
+        {game.status === "playing" && mySeat && (
           <button className="smallButton ghost danger" disabled={busy} onClick={onResign}>기권</button>
         )}
-        {game.status === "escrow" && mySide && game.escrow_state === "requested" && (
+        {game.status === "escrow" && mySeat && game.escrow_state === "requested" && (
           <button className="smallButton ghost" disabled={busy} onClick={onCancel}>취소</button>
         )}
       </div>
-      {myTurn && <small className="muted omokHint">칸을 누르면 미리보기, 한 번 더 누르면 착수됩니다.{iAmBlack ? " × 는 흑 금수 자리입니다." : ""}</small>}
+      {myTurn && <small className="muted omokHint">내 알을 누른 채 반대 방향으로 끌면 조준됩니다. 멀리 끌수록 세게 나갑니다.</small>}
     </div>
   );
+}
+
+function octagon(r: number) {
+  const points: string[] = [];
+  for (let i = 0; i < 8; i += 1) {
+    const angle = Math.PI / 8 + (i * Math.PI) / 4;
+    points.push(`${(Math.cos(angle) * r).toFixed(2)},${(Math.sin(angle) * r).toFixed(2)}`);
+  }
+  return points.join(" ");
 }

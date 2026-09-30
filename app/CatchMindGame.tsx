@@ -1,0 +1,627 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { RealtimeChannel } from "@supabase/supabase-js";
+import { supabase } from "../lib/supabase";
+
+// 캐치마인드 (최대 6명 · 점수 내기 없음)
+
+type Member = { id: string; name: string };
+
+type Room = {
+  id: string;
+  status: "waiting" | "playing" | "finished" | "cancelled";
+  host_member: string;
+  host_name: string;
+  players: Member[];
+  max_players: number;
+  rounds: number;
+  turn_no: number;
+  turn_total: number;
+  drawer_member: string | null;
+  drawer_name: string | null;
+  phase: "drawing" | "reveal" | null;
+  phase_deadline: string | null;
+  hint: string | null;
+  reveal_word: string | null;
+  last_winner: string | null;
+  scores: Record<string, number>;
+  created_at: string;
+  updated_at: string;
+};
+
+type Stroke = { sid: string; color: string; size: number; pts: Array<[number, number]> };
+type ChatLine = { key: number; name: string; text: string; kind?: "system" | "close" };
+
+type Props = {
+  onClose: () => void;
+  onBack?: () => void;
+  initialRoomId?: string;
+  currentMemberId: string | null;
+  myName: string;
+};
+
+const COLUMNS =
+  "id,status,host_member,host_name,players,max_players,rounds,turn_no,turn_total,drawer_member,drawer_name,phase,phase_deadline,hint,reveal_word,last_winner,scores,created_at,updated_at";
+const DRAW_SECONDS = 80;
+const CANVAS_W = 800;
+const CANVAS_H = 560;
+const COLORS = ["#111111", "#e11d48", "#f97316", "#eab308", "#16a34a", "#2563eb", "#7c3aed", "#8b5a2b", "#ffffff"];
+const SIZES = [4, 10, 22];
+
+async function callCatch(payload: Record<string, unknown>) {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  if (!token) return { ok: false, error: "로그인이 필요합니다." };
+  const response = await fetch("/api/catch", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+  return (await response.json().catch(() => ({ ok: false, error: "응답 오류" }))) as {
+    ok: boolean;
+    error?: string;
+    id?: string;
+    word?: string;
+    correct?: boolean;
+  };
+}
+
+export default function CatchMindGame({ onClose, onBack, initialRoomId, currentMemberId, myName }: Props) {
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [roomId, setRoomId] = useState(initialRoomId ?? "");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+
+  const load = useCallback(async () => {
+    const since = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+    const { data, error } = await supabase
+      .from("catch_rooms")
+      .select(COLUMNS)
+      .or(`status.in.(waiting,playing),updated_at.gte.${since}`)
+      .order("created_at", { ascending: false })
+      .limit(30);
+    if (error) return;
+    const rows = (data ?? []) as Room[];
+    if (initialRoomId && !rows.some((row) => row.id === initialRoomId)) {
+      const single = await supabase.from("catch_rooms").select(COLUMNS).eq("id", initialRoomId).maybeSingle();
+      if (single.data) rows.push(single.data as Room);
+    }
+    setRooms(rows);
+  }, [initialRoomId]);
+
+  const myRoom = useMemo(
+    () =>
+      rooms.find(
+        (room) =>
+          (room.status === "waiting" || room.status === "playing") &&
+          room.players.some((player) => player.id === currentMemberId),
+      ) ?? null,
+    [rooms, currentMemberId],
+  );
+
+  useEffect(() => {
+    if (myRoom) setRoomId((current) => current || myRoom.id);
+  }, [myRoom]);
+
+  const room = rooms.find((item) => item.id === roomId) ?? null;
+  const playing = room?.status === "playing";
+
+  useEffect(() => {
+    void load();
+    const timer = window.setInterval(() => void load(), playing ? 2000 : 3000);
+    return () => window.clearInterval(timer);
+  }, [load, playing]);
+
+  async function run(payload: Record<string, unknown>, after?: (id?: string) => void) {
+    setBusy(true);
+    setMessage("");
+    const result = await callCatch(payload);
+    setBusy(false);
+    if (!result.ok) setMessage(result.error ?? "실패했습니다.");
+    else after?.(result.id);
+    await load();
+  }
+
+  const openRooms = rooms.filter((item) => item.status === "waiting" || item.status === "playing");
+
+  return (
+    <div
+      className="meetingModalBackdrop"
+      role="presentation"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <section className="meetingModal catchModal" role="dialog" aria-modal="true">
+        <div className="meetingModalHeader">
+          <div>
+            <span>최대 6명 · 한 사람당 2번 출제 · {DRAW_SECONDS}초</span>
+            <h2>🎨 캐치마인드</h2>
+          </div>
+          <div className="gameHeaderActions">
+            {onBack && <button className="smallButton ghost" onClick={onBack}>← 게임</button>}
+            <button className="modalCloseButton" onClick={onClose}>×</button>
+          </div>
+        </div>
+
+        {message && <div className="omokMessage">{message}</div>}
+
+        {room ? (
+          <CatchRoomView
+            room={room}
+            me={currentMemberId}
+            myName={myName}
+            busy={busy}
+            onReload={load}
+            onBack={() => setRoomId("")}
+            onJoin={() => run({ action: "join", roomId: room.id })}
+            onLeave={() => run({ action: "leave", roomId: room.id }, () => setRoomId(""))}
+            onStart={() => run({ action: "start", roomId: room.id })}
+          />
+        ) : (
+          <div className="omokLobby">
+            {!myRoom && (
+              <div className="omokCreate">
+                <strong>새 방</strong>
+                <button className="primaryButton" disabled={busy} onClick={() => run({ action: "create" }, (id) => id && setRoomId(id))}>
+                  캐치마인드 방 만들기
+                </button>
+                <small>2~6명이 모이면 방장이 시작합니다. 점수는 걸지 않습니다.</small>
+              </div>
+            )}
+            <div className="omokSection">
+              <strong>열린 방</strong>
+              {openRooms.length === 0 && <span className="muted">열린 방이 없습니다.</span>}
+              {openRooms.map((item) => (
+                <div className={`omokCard ${item.id === myRoom?.id ? "highlight" : ""}`} key={item.id}>
+                  <div>
+                    <strong>{item.host_name}님의 방</strong>
+                    <span>
+                      {item.status === "waiting" ? "대기 중" : `진행 중 ${Math.min(item.turn_no + 1, item.turn_total)}/${item.turn_total}`} ·{" "}
+                      {item.players.length}/{item.max_players}명 · {item.players.map((player) => player.name).join(", ")}
+                    </span>
+                  </div>
+                  <button className="smallButton" onClick={() => setRoomId(item.id)}>
+                    {item.id === myRoom?.id ? "돌아가기" : "들어가기"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function CatchRoomView({
+  room,
+  me,
+  myName,
+  busy,
+  onReload,
+  onBack,
+  onJoin,
+  onLeave,
+  onStart,
+}: {
+  room: Room;
+  me: string | null;
+  myName: string;
+  busy: boolean;
+  onReload: () => Promise<void>;
+  onBack: () => void;
+  onJoin: () => void;
+  onLeave: () => void;
+  onStart: () => void;
+}) {
+  const joined = room.players.some((player) => player.id === me);
+  const isHost = room.host_member === me;
+  const isDrawer = room.status === "playing" && room.phase === "drawing" && room.drawer_member === me;
+  const [now, setNow] = useState(Date.now());
+  const [word, setWord] = useState("");
+  const [chat, setChat] = useState<ChatLine[]>([]);
+  const [text, setText] = useState("");
+  const [color, setColor] = useState(COLORS[0]);
+  const [size, setSize] = useState(SIZES[1]);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const strokesRef = useRef<Stroke[]>([]);
+  const drawingRef = useRef<Stroke | null>(null);
+  const pendingRef = useRef<Array<[number, number]>>([]);
+  const channelRef = useRef<RealtimeChannel | null>(null);
+  const lastTick = useRef(0);
+  const turnKey = `${room.turn_no}:${room.drawer_member ?? ""}`;
+  const turnKeyRef = useRef(turnKey);
+  const isDrawerRef = useRef(isDrawer);
+  isDrawerRef.current = isDrawer;
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 250);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const addChat = useCallback((line: Omit<ChatLine, "key">) => {
+    setChat((current) => [...current.slice(-60), { ...line, key: Date.now() + Math.random() }]);
+  }, []);
+
+  // ── 캔버스 ──
+  const paintStroke = useCallback((stroke: Stroke, from = 0) => {
+    const ctx = canvasRef.current?.getContext("2d");
+    if (!ctx || stroke.pts.length === 0) return;
+    ctx.strokeStyle = stroke.color;
+    ctx.fillStyle = stroke.color;
+    ctx.lineWidth = stroke.size;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    const pts = stroke.pts.map(([x, y]) => [x * CANVAS_W, y * CANVAS_H] as [number, number]);
+    if (pts.length === 1) {
+      ctx.beginPath();
+      ctx.arc(pts[0][0], pts[0][1], stroke.size / 2, 0, Math.PI * 2);
+      ctx.fill();
+      return;
+    }
+    ctx.beginPath();
+    const start = Math.max(0, from - 1);
+    ctx.moveTo(pts[start][0], pts[start][1]);
+    for (let i = start + 1; i < pts.length; i += 1) ctx.lineTo(pts[i][0], pts[i][1]);
+    ctx.stroke();
+  }, []);
+
+  const clearCanvas = useCallback(() => {
+    const ctx = canvasRef.current?.getContext("2d");
+    if (!ctx) return;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+  }, []);
+
+  const redraw = useCallback(() => {
+    clearCanvas();
+    strokesRef.current.forEach((stroke) => paintStroke(stroke));
+  }, [clearCanvas, paintStroke]);
+
+  useEffect(() => {
+    redraw();
+  }, [redraw]);
+
+  // 턴이 바뀌면 그림을 지운다
+  useEffect(() => {
+    if (turnKeyRef.current !== turnKey) {
+      turnKeyRef.current = turnKey;
+      strokesRef.current = [];
+      redraw();
+      setWord("");
+    }
+  }, [turnKey, redraw]);
+
+  // 출제자만 제시어를 받는다
+  useEffect(() => {
+    if (!isDrawer) return;
+    void callCatch({ action: "word", roomId: room.id }).then((result) => {
+      if (result.ok && result.word) setWord(result.word);
+    });
+  }, [isDrawer, room.id, turnKey]);
+
+  // ── 실시간 채널 (그림 · 채팅) ──
+  useEffect(() => {
+    const channel = supabase
+      .channel(`catch-${room.id}`, { config: { broadcast: { self: false } } })
+      .on("broadcast", { event: "stroke" }, ({ payload }) => {
+        const data = payload as { turn?: string; sid?: string; color?: string; size?: number; pts?: Array<[number, number]> };
+        if (data.turn !== turnKeyRef.current || !data.sid || !Array.isArray(data.pts)) return;
+        let stroke = strokesRef.current.find((item) => item.sid === data.sid);
+        const from = stroke ? stroke.pts.length : 0;
+        if (!stroke) {
+          stroke = { sid: data.sid, color: String(data.color ?? "#111"), size: Number(data.size ?? 8), pts: [] };
+          strokesRef.current.push(stroke);
+        }
+        stroke.pts.push(...data.pts.slice(0, 200));
+        paintStroke(stroke, from);
+      })
+      .on("broadcast", { event: "clear" }, ({ payload }) => {
+        if ((payload as { turn?: string }).turn !== turnKeyRef.current) return;
+        strokesRef.current = [];
+        redraw();
+      })
+      .on("broadcast", { event: "sync-req" }, () => {
+        if (!isDrawerRef.current) return;
+        void channel.send({
+          type: "broadcast",
+          event: "sync",
+          payload: { turn: turnKeyRef.current, strokes: strokesRef.current },
+        });
+      })
+      .on("broadcast", { event: "sync" }, ({ payload }) => {
+        const data = payload as { turn?: string; strokes?: Stroke[] };
+        if (data.turn !== turnKeyRef.current || !Array.isArray(data.strokes)) return;
+        if (strokesRef.current.length > 0) return;
+        strokesRef.current = data.strokes.slice(0, 500);
+        redraw();
+      })
+      .on("broadcast", { event: "chat" }, ({ payload }) => {
+        const data = payload as { name?: string; text?: string };
+        if (!data.text) return;
+        addChat({ name: String(data.name ?? "").slice(0, 10), text: String(data.text).slice(0, 60) });
+      })
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "catch_rooms", filter: `id=eq.${room.id}` },
+        () => void onReload(),
+      )
+      .subscribe((state) => {
+        if (state === "SUBSCRIBED") void channel.send({ type: "broadcast", event: "sync-req", payload: {} });
+      });
+    channelRef.current = channel;
+    return () => {
+      channelRef.current = null;
+      void supabase.removeChannel(channel);
+    };
+  }, [room.id, addChat, paintStroke, redraw, onReload]);
+
+  // 정답·시간 초과 알림을 채팅에 남긴다
+  const lastPhaseKey = useRef("");
+  useEffect(() => {
+    const key = `${room.turn_no}:${room.phase}`;
+    if (lastPhaseKey.current === key) return;
+    const first = lastPhaseKey.current === "";
+    lastPhaseKey.current = key;
+    if (first) return;
+    if (room.phase === "reveal") {
+      addChat({
+        name: "",
+        kind: "system",
+        text: room.last_winner
+          ? `🎉 ${room.last_winner}님 정답! 정답은 「${room.reveal_word ?? ""}」`
+          : `⏰ 시간 종료! 정답은 「${room.reveal_word ?? ""}」`,
+      });
+    } else if (room.phase === "drawing") {
+      addChat({ name: "", kind: "system", text: `✏️ ${room.drawer_name}님이 그립니다 (${room.turn_no + 1}/${room.turn_total})` });
+    }
+  }, [room.turn_no, room.phase, room.last_winner, room.reveal_word, room.drawer_name, room.turn_total, addChat]);
+
+  // 시간이 지나면 서버에 다음 단계로 넘겨 달라고 한다
+  useEffect(() => {
+    if (room.status !== "playing" || !room.phase_deadline) return;
+    const over = now - new Date(room.phase_deadline).getTime();
+    if (over > 1800 && now - lastTick.current > 2500) {
+      lastTick.current = now;
+      void callCatch({ action: "tick", roomId: room.id }).then(() => onReload());
+    }
+  }, [now, room, onReload]);
+
+  // ── 그리기 (출제자) ──
+  function point(event: React.PointerEvent<HTMLCanvasElement>): [number, number] {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+    const y = Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height));
+    return [Math.round(x * 1000) / 1000, Math.round(y * 1000) / 1000];
+  }
+
+  function flush() {
+    const stroke = drawingRef.current;
+    const pts = pendingRef.current;
+    if (!stroke || pts.length === 0) return;
+    pendingRef.current = [];
+    void channelRef.current?.send({
+      type: "broadcast",
+      event: "stroke",
+      payload: { turn: turnKeyRef.current, sid: stroke.sid, color: stroke.color, size: stroke.size, pts },
+    });
+  }
+
+  useEffect(() => {
+    if (!isDrawer) return;
+    const timer = window.setInterval(flush, 60);
+    return () => window.clearInterval(timer);
+  }, [isDrawer]);
+
+  const remaining = room.phase_deadline
+    ? Math.max(0, Math.ceil((new Date(room.phase_deadline).getTime() - now) / 1000))
+    : 0;
+
+  async function submit() {
+    const value = text.trim();
+    if (!value || !joined) return;
+    setText("");
+    if (room.status === "playing" && room.phase === "drawing" && !isDrawer) {
+      const result = await callCatch({ action: "guess", roomId: room.id, text: value });
+      if (result.ok && result.correct) {
+        void onReload();
+        return;
+      }
+    }
+    if (isDrawer) return;
+    addChat({ name: myName, text: value });
+    void channelRef.current?.send({ type: "broadcast", event: "chat", payload: { name: myName, text: value } });
+  }
+
+  const ranking = [...room.players].sort((a, b) => (room.scores[b.id] ?? 0) - (room.scores[a.id] ?? 0));
+  const chatEndRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ block: "nearest" });
+  }, [chat]);
+
+  return (
+    <div className="catchRoom">
+      <div className="catchPlayers">
+        {room.players.map((player) => (
+          <div
+            key={player.id}
+            className={`catchPlayer ${player.id === room.drawer_member && room.status === "playing" ? "drawer" : ""} ${player.id === me ? "me" : ""}`}
+          >
+            <strong>
+              {player.id === room.host_member && "👑"}
+              {player.id === room.drawer_member && room.status === "playing" && "✏️"}
+              {player.name}
+            </strong>
+            <em>{room.scores[player.id] ?? 0}점</em>
+          </div>
+        ))}
+        {Array.from({ length: Math.max(0, room.max_players - room.players.length) }, (_, i) => (
+          <div key={`empty${i}`} className="catchPlayer empty">
+            <strong>빈 자리</strong>
+          </div>
+        ))}
+      </div>
+
+      {room.status === "playing" && (
+        <div className="catchBar">
+          <span className="catchTurn">{Math.min(room.turn_no + 1, room.turn_total)}/{room.turn_total}</span>
+          <span className="catchWord">
+            {room.phase === "reveal"
+              ? `정답: ${room.reveal_word ?? ""}`
+              : isDrawer
+                ? `제시어: ${word || "…"}`
+                : room.hint ?? ""}
+          </span>
+          <span className={`catchTime ${remaining <= 10 && room.phase === "drawing" ? "urgent" : ""}`}>
+            {room.phase === "drawing" ? `${remaining}초` : "다음 문제…"}
+          </span>
+        </div>
+      )}
+
+      <div className="catchCanvasWrap">
+        <canvas
+          ref={canvasRef}
+          className={`catchCanvas ${isDrawer ? "drawing" : ""}`}
+          width={CANVAS_W}
+          height={CANVAS_H}
+          onPointerDown={(event) => {
+            if (!isDrawer) return;
+            event.currentTarget.setPointerCapture(event.pointerId);
+            const p = point(event);
+            const stroke: Stroke = { sid: `${Date.now()}${Math.random().toString(36).slice(2, 6)}`, color, size, pts: [p] };
+            drawingRef.current = stroke;
+            strokesRef.current.push(stroke);
+            pendingRef.current = [p];
+            paintStroke(stroke);
+          }}
+          onPointerMove={(event) => {
+            const stroke = drawingRef.current;
+            if (!isDrawer || !stroke) return;
+            const p = point(event);
+            const from = stroke.pts.length;
+            stroke.pts.push(p);
+            pendingRef.current.push(p);
+            paintStroke(stroke, from);
+          }}
+          onPointerUp={() => {
+            flush();
+            drawingRef.current = null;
+          }}
+          onPointerCancel={() => {
+            flush();
+            drawingRef.current = null;
+          }}
+        />
+        {room.status === "waiting" && (
+          <div className="catchOverlay">
+            <strong>{room.players.length}/{room.max_players}명 대기 중</strong>
+            <span>{room.players.length < 2 ? "2명 이상 모이면 시작할 수 있어요" : isHost ? "준비되면 시작을 눌러 주세요" : "방장이 시작하면 바로 시작돼요"}</span>
+          </div>
+        )}
+        {room.status === "playing" && room.phase === "reveal" && (
+          <div className="catchOverlay reveal">
+            <strong>{room.last_winner ? `🎉 ${room.last_winner}님 정답!` : "⏰ 시간 종료"}</strong>
+            <span>정답은 「{room.reveal_word}」</span>
+          </div>
+        )}
+        {room.status === "finished" && (
+          <div className="catchOverlay result">
+            <strong>🏁 최종 순위</strong>
+            {ranking.map((player, index) => (
+              <span key={player.id}>
+                {["🥇", "🥈", "🥉"][index] ?? `${index + 1}위`} {player.name} · {room.scores[player.id] ?? 0}점
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {isDrawer && (
+        <div className="catchTools">
+          {COLORS.map((item) => (
+            <button
+              key={item}
+              className={`catchColor ${color === item ? "active" : ""}`}
+              style={{ background: item }}
+              aria-label={item === "#ffffff" ? "지우개" : `색 ${item}`}
+              onClick={() => setColor(item)}
+            >
+              {item === "#ffffff" ? "⌫" : ""}
+            </button>
+          ))}
+          <span className="catchToolGap" />
+          {SIZES.map((item) => (
+            <button
+              key={item}
+              className={`catchSize ${size === item ? "active" : ""}`}
+              aria-label={`굵기 ${item}`}
+              onClick={() => setSize(item)}
+            >
+              <i style={{ width: Math.max(4, item / 2), height: Math.max(4, item / 2) }} />
+            </button>
+          ))}
+          <button
+            className="smallButton ghost"
+            onClick={() => {
+              strokesRef.current = [];
+              redraw();
+              void channelRef.current?.send({ type: "broadcast", event: "clear", payload: { turn: turnKeyRef.current } });
+            }}
+          >
+            전체 지우기
+          </button>
+        </div>
+      )}
+
+      <div className="catchChat">
+        <div className="catchChatLog">
+          {chat.length === 0 && <span className="muted">정답은 채팅으로 입력하세요.</span>}
+          {chat.map((line) => (
+            <div key={line.key} className={`catchChatLine ${line.kind ?? ""}`}>
+              {line.name && <b>{line.name}</b>} {line.text}
+            </div>
+          ))}
+          <div ref={chatEndRef} />
+        </div>
+        {joined && (
+          <form
+            className="catchChatInput"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void submit();
+            }}
+          >
+            <input
+              value={text}
+              onChange={(event) => setText(event.target.value)}
+              placeholder={isDrawer ? "그리는 중에는 채팅할 수 없어요" : room.phase === "drawing" ? "정답을 입력하세요" : "채팅"}
+              disabled={isDrawer}
+              maxLength={40}
+              aria-label="채팅 입력"
+            />
+            <button className="smallButton" type="submit" disabled={isDrawer}>보내기</button>
+          </form>
+        )}
+      </div>
+
+      <div className="omokControls">
+        <button className="smallButton ghost" onClick={onBack}>← 방 목록</button>
+        {!joined && (room.status === "waiting" || room.status === "playing") && (
+          <button className="primaryButton" disabled={busy || room.players.length >= room.max_players} onClick={onJoin}>
+            {room.players.length >= room.max_players ? "방이 가득 찼어요" : "참가하기"}
+          </button>
+        )}
+        {joined && isHost && room.status === "waiting" && (
+          <button className="primaryButton" disabled={busy || room.players.length < 2} onClick={onStart}>
+            시작 ({room.players.length}명)
+          </button>
+        )}
+        {joined && (room.status === "waiting" || room.status === "playing") && (
+          <button className="smallButton ghost danger" disabled={busy} onClick={onLeave}>나가기</button>
+        )}
+      </div>
+    </div>
+  );
+}

@@ -120,3 +120,20 @@ export function spotStyle(spot: number) {
   // 크기(판 너비의 16%)를 각 칸(33%) 가운데에 둔다
   return { left: `${col * 33 + 8.5}%`, top: `${row * 33 + 7}%` };
 }
+
+// 좌표 목록(판 대비 0~1)으로 돌이 가장 적은 가장자리 칸을 고른다 (알까기용)
+export function pickEmoteSpotFromPoints(points: Array<[number, number]>): number {
+  const counts = EMOTE_SPOTS.map(([col, row]) =>
+    points.filter(([x, y]) => Math.min(2, Math.floor(x * 3)) === col && Math.min(2, Math.floor(y * 3)) === row).length,
+  );
+  const min = Math.min(...counts);
+  const best = counts.map((count, index) => (count === min ? index : -1)).filter((index) => index >= 0);
+  return best[Math.floor(Math.random() * best.length)];
+}
+
+// 판을 180도 돌려 보는 사람에게 맞는 칸
+export function mirrorSpot(spot: number): number {
+  const [col, row] = EMOTE_SPOTS[spot] ?? EMOTE_SPOTS[0];
+  const index = EMOTE_SPOTS.findIndex(([c, r]) => c === 2 - col && r === 2 - row);
+  return index >= 0 ? index : spot;
+}
