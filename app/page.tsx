@@ -22,6 +22,7 @@ type BotPoint = {
   trophies: string | null;
   tickets: number;
   season: number | null;
+  last_active: string | null;
   synced_at: string;
 };
 
@@ -166,6 +167,7 @@ export default function Home() {
   const [memberCalendarMonth, setMemberCalendarMonth] = useState(currentMonth);
   const [members, setMembers] = useState<Member[]>([]);
   const [botPoints, setBotPoints] = useState<BotPoint[]>([]);
+  const [showPointRanking, setShowPointRanking] = useState(false);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [adjustments, setAdjustments] = useState<SettlementAdjustment[]>([]);
   const [prepayments, setPrepayments] = useState<MeetingPrepayment[]>([]);
@@ -353,7 +355,7 @@ export default function Home() {
     // 봇 점수는 부가 정보라 실패해도 화면 전체를 막지 않는다.
     const pointResult = await supabase
       .from("bot_points")
-      .select("kakao_uid,name,exp,rank,trophies,tickets,season,synced_at");
+      .select("kakao_uid,name,exp,rank,trophies,tickets,season,last_active,synced_at");
     setBotPoints(pointResult.error ? [] : ((pointResult.data ?? []) as BotPoint[]));
   }, []);
 
@@ -530,6 +532,19 @@ export default function Home() {
     }
     return map;
   }, [botPoints, members]);
+
+  const pointRanking = useMemo(() => {
+    const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const sorted = [...botPoints].sort((a, b) => b.exp - a.exp || a.name.localeCompare(b.name, "ko"));
+    const visible = sorted.filter(
+      (row) => !row.last_active || new Date(row.last_active).getTime() >= cutoff,
+    );
+    return {
+      rows: visible.map((row, index) => ({ ...row, place: index + 1 })),
+      hidden: sorted.length - visible.length,
+      season: sorted[0]?.season ?? null,
+    };
+  }, [botPoints]);
 
   const botPointsSyncedAt = useMemo(() => {
     let latest = "";
@@ -4829,6 +4844,80 @@ setSaving(false);
       <footer className="siteFooter">Made by. 퐁당</footer>
 
       {loading && <div className="loading">불러오는 중...</div>}
+
+      {botPoints.length > 0 && (
+        <button
+          className="pointRankingFab"
+          onClick={() => setShowPointRanking(true)}
+          aria-label="카톡 점수 순위 보기"
+        >
+          <span aria-hidden="true">🏆</span>
+          <strong>점수순위</strong>
+        </button>
+      )}
+
+      {showPointRanking && (
+        <div
+          className="meetingModalBackdrop"
+          role="presentation"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setShowPointRanking(false);
+          }}
+        >
+          <section className="meetingModal pointRankingModal" role="dialog" aria-modal="true">
+            <div className="meetingModalHeader">
+              <div>
+                <span>
+                  카톡 봇 점수판{pointRanking.season ? ` · 시즌 ${pointRanking.season}` : ""}
+                </span>
+                <h2>🏆 점수 순위</h2>
+              </div>
+              <button className="modalCloseButton" onClick={() => setShowPointRanking(false)}>×</button>
+            </div>
+
+            {pointRanking.rows.length >= 3 && (
+              <div className="pointPodium">
+                {[1, 0, 2].map((index) => {
+                  const row = pointRanking.rows[index];
+                  return (
+                    <div key={row.kakao_uid} className={`pointPodiumItem place${row.place}`}>
+                      <span className="pointPodiumMedal">{["🥇", "🥈", "🥉"][index]}</span>
+                      <strong>{row.name}</strong>
+                      <em>{row.exp.toLocaleString("ko-KR")}점</em>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <ol className="pointRankingList">
+              {pointRanking.rows.map((row) => {
+                const isMe = !!currentMember && pointsByMember[currentMember.id]?.kakao_uid === row.kakao_uid;
+                return (
+                  <li key={row.kakao_uid} className={isMe ? "me" : ""}>
+                    <span className={`pointRankNo ${row.place <= 3 ? "top" : ""}`}>{row.place}</span>
+                    <span className="pointRankName">
+                      <strong>{row.name}</strong>
+                      {isMe && <em className="pointRankMe">나</em>}
+                      {row.trophies && <em className="pointRankTrophies">{row.trophies}</em>}
+                    </span>
+                    <span className="pointRankScore">
+                      <strong>{row.exp.toLocaleString("ko-KR")}</strong>
+                      <em>점{row.tickets ? ` · 🎫${row.tickets}` : ""}</em>
+                    </span>
+                  </li>
+                );
+              })}
+            </ol>
+
+            <p className="pointRankingFoot">
+              {pointRanking.hidden > 0 && `💤 7일 이상 미활동 ${pointRanking.hidden}명 숨김 · `}
+              {botPointsSyncedAt &&
+                `${new Date(botPointsSyncedAt).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })} 갱신 · 10분마다 반영`}
+            </p>
+          </section>
+        </div>
+      )}
     
       {showMyActivity && currentMember && (
         <div className="meetingModalBackdrop" role="presentation">

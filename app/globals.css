@@ -4687,3 +4687,120 @@ button.meetingMetricCard {
 .botPointBadge strong { font-weight: 700; }
 .botPointBadge em { font-style: normal; color: #475569; }
 .botPointBadge.empty { background: #f1f5f9; color: #94a3b8; }
+
+/* 점수 순위 플로팅 버튼 + 창 */
+.pointRankingFab {
+  position: fixed;
+  right: 20px;
+  bottom: calc(20px + env(safe-area-inset-bottom));
+  z-index: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 11px 16px;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #f59e0b, #ea580c);
+  color: #fff;
+  font-size: 14px;
+  box-shadow: 0 10px 28px rgba(234, 88, 12, .35);
+  cursor: pointer;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.pointRankingFab:hover { transform: translateY(-2px); box-shadow: 0 14px 32px rgba(234, 88, 12, .42); }
+.pointRankingFab span { font-size: 18px; line-height: 1; }
+.pointRankingFab strong { font-weight: 700; }
+
+.pointRankingModal { max-width: 460px; }
+
+.pointPodium {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  align-items: end;
+  gap: 8px;
+  margin: 4px 0 14px;
+}
+.pointPodiumItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 12px 6px 10px;
+  border-radius: 14px;
+  background: #f8fafc;
+  text-align: center;
+  min-width: 0;
+}
+.pointPodiumItem.place1 { padding-top: 20px; background: #fef3c7; }
+.pointPodiumItem.place2 { background: #f1f5f9; }
+.pointPodiumItem.place3 { background: #fdf0e6; }
+.pointPodiumMedal { font-size: 26px; line-height: 1.1; }
+.pointPodiumItem strong {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+}
+.pointPodiumItem em { font-style: normal; font-size: 12px; color: #64748b; }
+
+.pointRankingList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: min(52vh, 480px);
+  overflow-y: auto;
+  border-top: 1px solid #eee7e0;
+}
+.pointRankingList li {
+  display: grid;
+  grid-template-columns: 34px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 4px;
+  border-bottom: 1px solid #f1ece6;
+}
+.pointRankingList li.me { background: #fff7ed; border-radius: 10px; }
+.pointRankNo {
+  display: inline-flex;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: #94a3b8;
+}
+.pointRankNo.top { color: #ea580c; }
+.pointRankName {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+.pointRankName strong { font-size: 14px; }
+.pointRankName em { font-style: normal; font-size: 12px; }
+.pointRankMe {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #ea580c;
+  color: #fff;
+}
+.pointRankScore { text-align: right; white-space: nowrap; }
+.pointRankScore strong { font-size: 14px; }
+.pointRankScore em { font-style: normal; font-size: 12px; color: #64748b; margin-left: 2px; }
+
+.pointRankingFoot {
+  margin: 10px 0 0;
+  font-size: 11px;
+  color: #94a3b8;
+  text-align: center;
+}
+
+@media (max-width: 760px) {
+  /* 모바일 하단 메뉴 위로 띄운다 */
+  .pointRankingFab {
+    right: 14px;
+    bottom: calc(96px + env(safe-area-inset-bottom));
+    padding: 10px 14px;
+    font-size: 13px;
+  }
+}
