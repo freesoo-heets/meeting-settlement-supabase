@@ -72,13 +72,13 @@ async function cleanupStale(admin: Admin) {
 async function myRooms(admin: Admin, memberId: string) {
   const { data, error } = await admin
     .from(TABLE)
-    .select("id,players,status,created_at")
+    .select("id,players,status,is_test,created_at")
     .in("status", ["waiting", "playing"])
     .contains("players", JSON.stringify([{ id: memberId }]))
     .order("created_at", { ascending: false })
     .limit(20);
   if (error) throw new Error(`방 조회 실패: ${error.message}`);
-  return (data ?? []) as Array<{ id: string; players: Member[]; status: string }>;
+  return (data ?? []) as Array<{ id: string; players: Member[]; status: string; is_test: boolean }>;
 }
 
 async function inOtherRoom(admin: Admin, memberId: string) {
@@ -182,8 +182,21 @@ export async function POST(request: Request) {
     if ("error" in member) return fail(member.error, member.status);
     await cleanupStale(admin);
     // 이미 들어가 있는 방이 있으면 새로 만들지 않고 그 방으로 보낸다
-    const existing = await closeDuplicateRooms(admin, memberId);
-    if (existing) return NextResponse.json({ ok: true, id: existing, existing: true });
+    await closeDuplicateRooms(admin, memberId);
+    const [current] = await myRooms(admin, memberId);
+    if (current) {
+      const aloneWaiting =
+        current.status === "waiting" && current.players.length === 1 && current.players[0].id === memberId;
+      if (!!current.is_test === test || !aloneWaiting) {
+        // 같은 종류의 방이거나, 다른 사람이 함께 있는 방이면 그 방으로
+        return NextResponse.json({ ok: true, id: current.id, existing: true });
+      }
+      // 혼자 기다리던 방이 종류가 다르면(일반 ↔ 테스트) 닫고 새로 만든다
+      await admin
+        .from(TABLE)
+        .update({ status: "cancelled", updated_at: new Date().toISOString() })
+        .eq("id", current.id);
+    }
 
     const { data, error } = await admin
       .from(TABLE)
