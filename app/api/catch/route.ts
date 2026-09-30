@@ -16,6 +16,7 @@ const DRAW_SECONDS = 80;
 const REVEAL_SECONDS = 4;
 const GRACE_MS = 1500;
 const GUESS_POINTS = 10;
+const RECRUIT_COOLDOWN_MS = 60 * 1000; // 모집 알림 도배 방지
 const DRAWER_POINTS = 5;
 
 type Member = { id: string; name: string };
@@ -33,6 +34,8 @@ type Room = {
   phase_deadline: string | null;
   scores: Record<string, number>;
   is_test?: boolean;
+  recruit_at?: string | null;
+  recruit_no?: number;
   updated_at: string;
 };
 
@@ -158,6 +161,9 @@ export async function POST(request: Request) {
         max_players: MAX_PLAYERS,
         rounds: ROUNDS,
         is_test: test,
+        // 테스트 방이 아니면 만들자마자 카톡방에 모집 알림 (봇이 올린다)
+        recruit_at: test ? null : new Date().toISOString(),
+        recruit_no: test ? 0 : 1,
       })
       .select("id")
       .single();
@@ -211,6 +217,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
     await updateIfUnchanged(admin, TABLE, room, { ...hostFields, players });
+    return NextResponse.json({ ok: true });
+  }
+
+  // ── 모집하기: 카톡방 알림 요청 (봇이 올린다) ──
+  if (action === "recruit") {
+    if (room.is_test) return fail("테스트 방은 모집 알림을 보내지 않습니다.");
+    if (room.status !== "waiting" && room.status !== "playing") return fail("끝난 방입니다.");
+    if (room.players.length >= MAX_PLAYERS) return fail("방이 이미 가득 찼습니다.");
+    const last = room.recruit_at ? new Date(room.recruit_at).getTime() : 0;
+    const wait = Math.ceil((last + RECRUIT_COOLDOWN_MS - Date.now()) / 1000);
+    if (wait > 0) return fail(`방금 모집 알림을 보냈어요. ${wait}초 뒤에 다시 보낼 수 있습니다.`);
+    const ok = await updateIfUnchanged(admin, TABLE, room, {
+      recruit_at: new Date().toISOString(),
+      recruit_no: (room.recruit_no ?? 0) + 1,
+    });
+    if (!ok) return fail("잠시 후 다시 시도해 주세요.", 409);
     return NextResponse.json({ ok: true });
   }
 

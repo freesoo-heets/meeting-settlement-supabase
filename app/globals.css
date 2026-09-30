@@ -5107,7 +5107,7 @@ button.meetingMetricCard {
 .alkStrikes { margin: 0; font-size: 11px; text-align: center; color: #dc2626; }
 
 /* ───────── 캐치마인드 ───────── */
-.catchModal { max-width: 620px; }
+
 .catchRoom { display: flex; flex-direction: column; gap: 8px; }
 .catchPlayers { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; }
 .catchPlayer {
@@ -5221,3 +5221,134 @@ button.meetingMetricCard {
 .omokTestButton { border-style: dashed; color: #7c3aed; }
 
 .gameHubTest { align-self: flex-start; font-size: 12px; }
+
+/* ───────── 캐치마인드 (정리된 화면) ───────── */
+.catchModal { max-width: 860px; }
+.omokMessage.info { background: #f0fdf4; color: #15803d; }
+.cmRoom { display: flex; flex-direction: column; gap: 10px; }
+
+.cmTop {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: #1e1b4b;
+  color: #fff;
+}
+.cmPill {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .14);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.cmPill.waiting { background: #f59e0b; color: #1f1300; }
+.cmPill.finished { background: #22c55e; color: #052e12; }
+.cmWord { display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 0; text-align: center; }
+.cmWord small { font-size: 11px; color: #c7d2fe; }
+.cmWord strong {
+  font-size: 20px;
+  letter-spacing: .12em;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.cmWord strong.secret { color: #fde047; }
+.cmTime { min-width: 40px; text-align: right; font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.cmTime.urgent { color: #f87171; }
+.cmTimer { height: 4px; margin-top: -6px; border-radius: 999px; background: #e0e7ff; overflow: hidden; }
+.cmTimer div { height: 100%; background: #6366f1; transition: width .25s linear; }
+.cmTimer div.urgent { background: #ef4444; }
+
+.cmMain { display: grid; grid-template-columns: minmax(0, 1fr) 230px; gap: 12px; align-items: start; }
+.cmStage { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.cmStage .catchCanvas { border-radius: 14px; box-shadow: 0 1px 0 #e2e8f0, 0 8px 24px rgba(30, 27, 75, .06); }
+.cmOverlayIcon { font-size: 34px; line-height: 1; }
+.cmRanking { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; min-width: 200px; }
+.cmRanking li { display: grid; grid-template-columns: 28px 1fr auto; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 10px; background: #fff; }
+.cmRanking em { font-style: normal; font-weight: 700; color: #6366f1; }
+
+.cmTools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid #e0e7ff;
+  border-radius: 12px;
+  background: #fff;
+}
+.cmColors, .cmSizes { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.catchColor.eraser { background: #fff !important; border-style: dashed; }
+.cmClear { border: 0; background: none; color: #dc2626; font-size: 12px; cursor: pointer; padding: 4px 6px; }
+
+.cmSide { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.cmPlayers { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.cmPlayers li {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+.cmPlayers li.drawer { background: #eef2ff; box-shadow: inset 3px 0 0 #6366f1; }
+.cmPlayers li.me .cmName { font-weight: 700; }
+.cmPlayers li.empty { background: transparent; border: 1px dashed #e2e8f0; }
+.cmPlayers li.empty .cmName { color: #cbd5e1; }
+.cmAvatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #e0e7ff;
+  color: #3730a3;
+  font-size: 13px;
+  font-weight: 700;
+}
+.cmPlayers li.empty .cmAvatar { background: #f1f5f9; }
+.cmName { display: flex; align-items: center; gap: 4px; font-size: 13px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.cmName em { font-style: normal; font-size: 10px; padding: 0 5px; border-radius: 999px; background: #fef3c7; color: #92400e; }
+.cmPlayers b { font-size: 13px; color: #6366f1; font-variant-numeric: tabular-nums; }
+
+.cmChat { display: flex; flex-direction: column; gap: 6px; }
+.cmChat .catchChatLog { height: 190px; background: #fff; border-color: #e2e8f0; }
+.cmChat .catchChatInput input { border-radius: 999px; padding: 8px 14px; }
+.cmChat .catchChatInput button {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #6366f1;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.cmChat .catchChatInput button:disabled { background: #cbd5e1; cursor: default; }
+
+.cmActions { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.cmActionsMain { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.cmRecruit { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
+
+@media (max-width: 760px) {
+  .cmMain { grid-template-columns: 1fr; }
+  .cmPlayers { flex-direction: row; overflow-x: auto; padding-bottom: 2px; }
+  .cmPlayers li { grid-template-columns: 24px auto auto; flex-shrink: 0; padding: 4px 8px; }
+  .cmPlayers li.empty { display: none; }
+  .cmAvatar { width: 24px; height: 24px; font-size: 12px; }
+  .cmChat .catchChatLog { height: 110px; }
+  .cmWord strong { font-size: 17px; }
+  .cmTop { padding: 8px 10px; gap: 8px; }
+}
