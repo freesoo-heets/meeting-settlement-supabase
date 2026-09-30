@@ -370,7 +370,8 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
     (game) => game.status === "challenge" && game.target_member === currentMemberId,
   );
   const liveGames = games.filter((game) => game.status === "playing" && game.id !== myActive?.id && (!game.is_test || game.host_member === currentMemberId));
-  const recent = games.filter((game) => game.status === "finished" && (!game.is_test || game.host_member === currentMemberId)).slice(0, 8);
+  // 테스트 대국은 최근 결과에 남기지 않는다 (관리자 본인에게도)
+  const recent = games.filter((game) => game.status === "finished" && !game.is_test).slice(0, 8);
 
   return (
     <div
