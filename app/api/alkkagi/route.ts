@@ -49,6 +49,7 @@ type Game = {
   turn_deadline: string | null;
   escrow_state: string;
   is_test?: boolean;
+  is_friendly?: boolean;
   updated_at: string;
 };
 
@@ -103,7 +104,13 @@ export async function POST(request: Request) {
   const memberId = auth.memberId;
 
   let me: Player = { memberId, name: "", uid: "", exp: 0, tickets: 0 };
-  if (action === "create" || action === "join") {
+  // 친선 대국은 점수·티켓을 보지 않는다 (봇 점수판에 없어도 할 수 있다)
+  const friendly = action === "create" ? body?.friendly === true : !!loaded?.is_friendly;
+  if ((action === "create" || action === "join") && friendly) {
+    const member = await loadMember(admin, memberId);
+    if ("error" in member) return fail(member.error, member.status);
+    me = { memberId, name: member.name, uid: "friendly", exp: 0, tickets: 0 };
+  } else if (action === "create" || action === "join") {
     const player = await loadPlayer(admin, memberId);
     if ("error" in player) return fail(player.error, player.status);
     me = player;
@@ -140,12 +147,14 @@ export async function POST(request: Request) {
 
   // ── 방 만들기 / 대국신청 ──
   if (action === "create") {
-    const stake = Math.floor(Number(body?.stake));
-    if (!Number.isFinite(stake) || stake < MIN_STAKE || stake > MAX_STAKE) {
-      return fail(`판돈은 ${MIN_STAKE}~${MAX_STAKE}점입니다.`);
+    const stake = friendly ? 0 : Math.floor(Number(body?.stake));
+    if (!friendly) {
+      if (!Number.isFinite(stake) || stake < MIN_STAKE || stake > MAX_STAKE) {
+        return fail(`판돈은 ${MIN_STAKE}~${MAX_STAKE}점입니다.`);
+      }
+      if (me.exp < stake) return fail(`점수가 부족합니다. (보유 ${me.exp.toLocaleString("ko-KR")}점)`);
+      if (me.tickets < 1) return fail("티켓이 1장 필요합니다. 카톡에서 !티켓구매 로 살 수 있습니다.");
     }
-    if (me.exp < stake) return fail(`점수가 부족합니다. (보유 ${me.exp.toLocaleString("ko-KR")}점)`);
-    if (me.tickets < 1) return fail("티켓이 1장 필요합니다. 카톡에서 !티켓구매 로 살 수 있습니다.");
     if (await hasActiveStakeGame(admin, TABLE, memberId)) return fail("이미 진행 중이거나 대기 중인 알까기가 있습니다.");
 
     const targetId = body?.targetMemberId ? String(body.targetMemberId) : null;
@@ -160,6 +169,7 @@ export async function POST(request: Request) {
       .insert({
         status: targetId ? "challenge" : "open",
         stake,
+        is_friendly: friendly,
         host_member: memberId,
         host_name: me.name,
         host_uid: me.uid,
@@ -189,20 +199,24 @@ export async function POST(request: Request) {
     if (game.status !== "open" && game.status !== "challenge") return fail("이미 시작했거나 끝난 대국입니다.");
     if (game.host_member === memberId) return fail("내가 만든 방입니다.");
     if (game.status === "challenge" && game.target_member !== memberId) return fail("나에게 온 대국신청이 아닙니다.");
-    if (me.exp < game.stake) return fail(`점수가 부족합니다. (보유 ${me.exp.toLocaleString("ko-KR")}점)`);
-    if (me.tickets < 1) return fail("티켓이 1장 필요합니다. 카톡에서 !티켓구매 로 살 수 있습니다.");
+    if (!friendly) {
+      if (me.exp < game.stake) return fail(`점수가 부족합니다. (보유 ${me.exp.toLocaleString("ko-KR")}점)`);
+      if (me.tickets < 1) return fail("티켓이 1장 필요합니다. 카톡에서 !티켓구매 로 살 수 있습니다.");
+    }
     if (await hasActiveStakeGame(admin, TABLE, memberId)) return fail("이미 진행 중이거나 대기 중인 알까기가 있습니다.");
 
     const cho: Seat = Math.random() < 0.5 ? "host" : "guest";
     const ok = await updateIfUnchanged(admin, TABLE, game, {
-      status: "escrow",
       guest_member: memberId,
       guest_name: me.name,
       guest_uid: me.uid,
       cho,
       turn: cho, // 초가 먼저
       pieces: initialPieces(),
-      escrow_state: "requested",
+      // 친선은 봇 확인 없이 바로 시작, 점수 내기는 봇이 판돈·티켓을 차감한 뒤 시작
+      ...(friendly
+        ? { status: "playing", started_at: now(), turn_deadline: deadline() }
+        : { status: "escrow", escrow_state: "requested" }),
     });
     if (!ok) return fail("다른 사람이 먼저 입장했습니다.", 409);
     return NextResponse.json({ ok: true });

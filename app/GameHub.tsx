@@ -18,6 +18,7 @@ type StakeRow = {
   guest_name: string | null;
   target_member: string | null;
   is_test?: boolean;
+  is_friendly?: boolean;
 };
 
 type CatchRow = {
@@ -42,7 +43,7 @@ type Props = {
   isAdmin?: boolean;
 };
 
-const STAKE_COLUMNS = "id,status,stake,host_member,host_name,guest_member,guest_name,target_member,is_test";
+const STAKE_COLUMNS = "id,status,stake,host_member,host_name,guest_member,guest_name,target_member,is_test,is_friendly";
 
 const GAMES: Array<{ kind: GameKind; icon: string; name: string; desc: string }> = [
   { kind: "omok", icon: "⚫", name: "오목", desc: "렌주룰 · 점수 내기 · 1:1" },
@@ -166,14 +167,14 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
     omok: omok.map((row) => ({
       id: row.id,
       line: stakeLine(row),
-      sub: `💎 ${row.stake.toLocaleString("ko-KR")}점`,
+      sub: row.is_friendly ? "🤝 친선전 · 점수 없음" : `💎 ${row.stake.toLocaleString("ko-KR")}점`,
       action: stakeAction(row),
       hot: row.status === "open" || (row.status === "challenge" && row.target_member === currentMemberId),
     })),
     alkkagi: alkkagi.map((row) => ({
       id: row.id,
       line: stakeLine(row),
-      sub: `💎 ${row.stake.toLocaleString("ko-KR")}점`,
+      sub: row.is_friendly ? "🤝 친선전 · 점수 없음" : `💎 ${row.stake.toLocaleString("ko-KR")}점`,
       action: stakeAction(row),
       hot: row.status === "open" || (row.status === "challenge" && row.target_member === currentMemberId),
     })),

@@ -56,6 +56,7 @@ type AlkRow = {
   escrow_note: string | null;
   settle_state: string;
   is_test?: boolean;
+  is_friendly?: boolean;
   created_at: string;
   finished_at: string | null;
 };
@@ -75,7 +76,7 @@ type Props = {
 };
 
 const COLUMNS =
-  "id,status,stake,host_member,host_name,guest_member,guest_name,target_member,cho,turn,pieces,last_shot,shot_no,strikes,turn_deadline,winner,end_reason,escrow_state,escrow_note,settle_state,is_test,created_at,finished_at";
+  "id,status,stake,host_member,host_name,guest_member,guest_name,target_member,cho,turn,pieces,last_shot,shot_no,strikes,turn_deadline,winner,end_reason,escrow_state,escrow_note,settle_state,is_test,is_friendly,created_at,finished_at";
 const STAKE_PRESETS = [100, 300, 500, 1000];
 const PULL_MAX = 140; // 이만큼 당기면 최대 세기
 const AIM_GUIDE = 34; // 방향 표시 길이 (세기와 무관하게 고정)
@@ -101,6 +102,11 @@ async function callAlkkagi(payload: Record<string, unknown>) {
     error?: string;
     id?: string;
   };
+}
+
+// 판돈 표시 (친선전이면 점수 대신 '친선')
+function stakeText(game: { stake: number; is_friendly?: boolean }) {
+  return game.is_friendly ? "🤝 친선전" : `판돈 ${game.stake.toLocaleString("ko-KR")}점`;
 }
 
 function nameOf(game: AlkRow, seat: Seat | null) {
@@ -288,7 +294,7 @@ export default function AlkkagiGame({
                 : `${viewing.host_name}님이 알까기 상대를 찾고 있어요`}
             </strong>
             <span>
-              판돈 <b>💎 {viewing.stake.toLocaleString("ko-KR")}점</b> · 티켓 🎫1장 · 한 턴 {TURN_SECONDS}초
+              {viewing.is_friendly ? <b>🤝 친선전 · 점수·티켓 없음</b> : <>판돈 <b>💎 {viewing.stake.toLocaleString("ko-KR")}점</b> · 티켓 🎫1장</>} · 한 턴 {TURN_SECONDS}초
             </span>
             <span className="muted">
               내 점수 💎 {myPoints !== null ? myPoints.toLocaleString("ko-KR") : "-"} · 티켓 🎫 {myTickets ?? "-"}
@@ -362,7 +368,7 @@ export default function AlkkagiGame({
                           ? "봇이 점수·티켓 확인 중…"
                           : "대국 진행 중"}
                   </strong>
-                  <span>판돈 {myActive.stake.toLocaleString("ko-KR")}점</span>
+                  <span>{stakeText(myActive)}</span>
                 </div>
                 <div className="omokCardActions">
                   {(myActive.status === "escrow" || myActive.status === "playing") && (
@@ -381,7 +387,7 @@ export default function AlkkagiGame({
               <div className="omokCard challenge" key={game.id}>
                 <div>
                   <strong>⚔️ {game.host_name}님의 대국신청</strong>
-                  <span>판돈 {game.stake.toLocaleString("ko-KR")}점</span>
+                  <span>{stakeText(game)}</span>
                 </div>
                 <div className="omokCardActions">
                   <button className="smallButton" disabled={busy || !!myActive} onClick={() => run({ action: "join", gameId: game.id }, () => setViewId(game.id))}>
@@ -398,6 +404,13 @@ export default function AlkkagiGame({
               <div className="omokCreate">
                 <strong>새 알까기</strong>
                 <div className="omokStakeRow">
+                  <button
+                    className={`omokChip friendly ${stake === "friendly" ? "active" : ""}`}
+                    onClick={() => setStake("friendly")}
+                    title="티켓·점수 없이 두는 친선전"
+                  >
+                    🤝 친선
+                  </button>
                   {STAKE_PRESETS.map((value) => (
                     <button
                       key={value}
@@ -412,7 +425,8 @@ export default function AlkkagiGame({
                     min={10}
                     max={1000}
                     step={10}
-                    value={stake}
+                    value={stake === "friendly" ? "" : stake}
+                    placeholder={stake === "friendly" ? "친선" : ""}
                     onChange={(event) => setStake(event.target.value)}
                     aria-label="판돈"
                   />
@@ -422,7 +436,14 @@ export default function AlkkagiGame({
                 <button
                   className="primaryButton"
                   disabled={busy}
-                  onClick={() => run({ action: "create", stake: Number(stake), targetMemberId: target || null })}
+                  onClick={() =>
+                    run({
+                      action: "create",
+                      friendly: stake === "friendly",
+                      stake: stake === "friendly" ? 0 : Number(stake),
+                      targetMemberId: target || null,
+                    })
+                  }
                 >
                   {target ? "대국신청 보내기" : "방 만들기"}
                 </button>
@@ -446,7 +467,7 @@ export default function AlkkagiGame({
                 <div className="omokCard" key={game.id}>
                   <div>
                     <strong>{game.host_name}</strong>
-                    <span>판돈 {game.stake.toLocaleString("ko-KR")}점</span>
+                    <span>{stakeText(game)}</span>
                   </div>
                   <button className="smallButton" disabled={busy || !!myActive} onClick={() => run({ action: "join", gameId: game.id }, () => setViewId(game.id))}>
                     도전
@@ -462,7 +483,7 @@ export default function AlkkagiGame({
                   <div className="omokCard" key={game.id}>
                     <div>
                       <strong>{game.host_name} vs {game.guest_name}</strong>
-                      <span>판돈 {game.stake.toLocaleString("ko-KR")}점 · {game.shot_no}수</span>
+                      <span>{stakeText(game)} · {game.shot_no}수</span>
                     </div>
                     <button className="smallButton ghost" onClick={() => setViewId(game.id)}>관전</button>
                   </div>
@@ -480,7 +501,7 @@ export default function AlkkagiGame({
                         ? `${game.host_name} = ${game.guest_name}`
                         : `🏆 ${nameOf(game, game.winner)} ▸ ${nameOf(game, game.winner === "host" ? "guest" : "host")}`}
                     </span>
-                    <em>{game.stake.toLocaleString("ko-KR")}점 · {END_TEXT[game.end_reason ?? ""] ?? ""}</em>
+                    <em>{stakeText(game)} · {END_TEXT[game.end_reason ?? ""] ?? ""}</em>
                   </button>
                 ))}
               </div>
@@ -657,10 +678,12 @@ function AlkkagiBoardView({
   } else if (game.status === "finished") {
     const settle = game.is_test
       ? "🧪 테스트 대국 (점수 변동 없음)"
+      : game.is_friendly
+        ? "🤝 친선전 (점수 변동 없음)"
       : game.settle_state === "done"
         ? "카톡 점수에 반영 완료"
         : "봇이 곧 카톡 점수에 반영합니다";
-    if (game.winner === "draw") status = `🤝 무승부 · 판돈 반환 · ${settle}`;
+    if (game.winner === "draw") status = `🤝 무승부 · ${game.is_friendly ? "" : "판돈 반환 · "}${settle}`;
     else {
       const mine = mySeat ? (game.winner === mySeat ? "🎉 승리! " : "😢 패배 · ") : "";
       status = `${mine}🏆 ${nameOf(game, game.winner)} 승 (${END_TEXT[game.end_reason ?? ""] ?? ""}) · ${settle}`;
@@ -680,7 +703,7 @@ function AlkkagiBoardView({
           <em className="alkCount">{choAlive}</em>
           {mySeat === choSeat && <em>나</em>}
         </div>
-        <span className="omokStake">💎 {game.stake.toLocaleString("ko-KR")}</span>
+        <span className="omokStake">{game.is_friendly ? "🤝 친선" : `💎 ${game.stake.toLocaleString("ko-KR")}`}</span>
         <div className={`omokPlayer ${game.status === "playing" && game.turn === hanSeat ? "turn" : ""}`}>
           <i className="alkIcon han">漢</i>
           <strong>{nameOf(game, hanSeat)}</strong>

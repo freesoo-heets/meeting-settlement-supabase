@@ -34,6 +34,7 @@ type OmokRow = {
   escrow_note: string | null;
   settle_state: string;
   is_test?: boolean;
+  is_friendly?: boolean;
   created_at: string;
   finished_at: string | null;
 };
@@ -55,7 +56,7 @@ type Props = {
 };
 
 const COLUMNS =
-  "id,status,stake,host_member,host_name,guest_member,guest_name,target_member,black,moves,turn_deadline,winner,end_reason,escrow_state,escrow_note,settle_state,is_test,created_at,finished_at";
+  "id,status,stake,host_member,host_name,guest_member,guest_name,target_member,black,moves,turn_deadline,winner,end_reason,escrow_state,escrow_note,settle_state,is_test,is_friendly,created_at,finished_at";
 const STAKE_PRESETS = [100, 300, 500, 1000];
 const CELL = 30;
 const PAD = 20;
@@ -183,6 +184,11 @@ export function OpponentPicker({
       )}
     </div>
   );
+}
+
+// 판돈 표시 (친선전이면 점수 대신 '친선')
+function stakeText(game: { stake: number; is_friendly?: boolean }) {
+  return game.is_friendly ? "🤝 친선전" : `판돈 ${game.stake.toLocaleString("ko-KR")}점`;
 }
 
 function nameOf(game: OmokRow, side: "host" | "guest" | null) {
@@ -387,7 +393,7 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
                 : `${viewing.host_name}님이 상대를 찾고 있어요`}
             </strong>
             <span>
-              판돈 <b>💎 {viewing.stake.toLocaleString("ko-KR")}점</b> · 티켓 🎫1장 · 렌주룰 · 한 수 {TURN_SECONDS}초
+              {viewing.is_friendly ? <b>🤝 친선전 · 점수·티켓 없음</b> : <>판돈 <b>💎 {viewing.stake.toLocaleString("ko-KR")}점</b> · 티켓 🎫1장</>} · 렌주룰 · 한 수 {TURN_SECONDS}초
             </span>
             <span className="muted">
               내 점수 💎 {myPoints !== null ? myPoints.toLocaleString("ko-KR") : "-"} · 티켓 🎫 {myTickets ?? "-"}
@@ -466,7 +472,7 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
                           ? "봇이 점수·티켓 확인 중…"
                           : "대국 진행 중"}
                   </strong>
-                  <span>판돈 {myActive.stake.toLocaleString("ko-KR")}점</span>
+                  <span>{stakeText(myActive)}</span>
                 </div>
                 <div className="omokCardActions">
                   {(myActive.status === "escrow" || myActive.status === "playing") && (
@@ -485,7 +491,7 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
               <div className="omokCard challenge" key={game.id}>
                 <div>
                   <strong>⚔️ {game.host_name}님의 대국신청</strong>
-                  <span>판돈 {game.stake.toLocaleString("ko-KR")}점</span>
+                  <span>{stakeText(game)}</span>
                 </div>
                 <div className="omokCardActions">
                   <button className="smallButton" disabled={busy || !!myActive} onClick={() => run({ action: "join", gameId: game.id }, () => setViewId(game.id))}>
@@ -502,6 +508,13 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
               <div className="omokCreate">
                 <strong>새 대국</strong>
                 <div className="omokStakeRow">
+                  <button
+                    className={`omokChip friendly ${stake === "friendly" ? "active" : ""}`}
+                    onClick={() => setStake("friendly")}
+                    title="티켓·점수 없이 두는 친선전"
+                  >
+                    🤝 친선
+                  </button>
                   {STAKE_PRESETS.map((value) => (
                     <button
                       key={value}
@@ -516,7 +529,8 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
                     min={10}
                     max={1000}
                     step={10}
-                    value={stake}
+                    value={stake === "friendly" ? "" : stake}
+                    placeholder={stake === "friendly" ? "친선" : ""}
                     onChange={(event) => setStake(event.target.value)}
                     aria-label="판돈"
                   />
@@ -526,7 +540,14 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
                 <button
                   className="primaryButton"
                   disabled={busy}
-                  onClick={() => run({ action: "create", stake: Number(stake), targetMemberId: target || null })}
+                  onClick={() =>
+                    run({
+                      action: "create",
+                      friendly: stake === "friendly",
+                      stake: stake === "friendly" ? 0 : Number(stake),
+                      targetMemberId: target || null,
+                    })
+                  }
                 >
                   {target ? "대국신청 보내기" : "방 만들기"}
                 </button>
@@ -550,7 +571,7 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
                 <div className="omokCard" key={game.id}>
                   <div>
                     <strong>{game.host_name}</strong>
-                    <span>판돈 {game.stake.toLocaleString("ko-KR")}점</span>
+                    <span>{stakeText(game)}</span>
                   </div>
                   <button className="smallButton" disabled={busy || !!myActive} onClick={() => run({ action: "join", gameId: game.id }, () => setViewId(game.id))}>
                     도전
@@ -566,7 +587,7 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
                   <div className="omokCard" key={game.id}>
                     <div>
                       <strong>{game.host_name} vs {game.guest_name}</strong>
-                      <span>판돈 {game.stake.toLocaleString("ko-KR")}점 · {game.moves.length}수</span>
+                      <span>{stakeText(game)} · {game.moves.length}수</span>
                     </div>
                     <button className="smallButton ghost" onClick={() => setViewId(game.id)}>관전</button>
                   </div>
@@ -584,7 +605,7 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
                         ? `${game.host_name} = ${game.guest_name}`
                         : `🏆 ${nameOf(game, game.winner)} ▸ ${nameOf(game, game.winner === "host" ? "guest" : "host")}`}
                     </span>
-                    <em>{game.stake.toLocaleString("ko-KR")}점 · {END_TEXT[game.end_reason ?? ""] ?? ""}</em>
+                    <em>{stakeText(game)} · {END_TEXT[game.end_reason ?? ""] ?? ""}</em>
                   </button>
                 ))}
               </div>
@@ -666,10 +687,12 @@ function OmokBoardView({
   } else if (game.status === "finished") {
     const settle = game.is_test
       ? "🧪 테스트 대국 (점수 변동 없음)"
+      : game.is_friendly
+        ? "🤝 친선전 (점수 변동 없음)"
       : game.settle_state === "done"
         ? "카톡 점수에 반영 완료"
         : "봇이 곧 카톡 점수에 반영합니다";
-    if (game.winner === "draw") status = `🤝 무승부 · 판돈 반환 · ${settle}`;
+    if (game.winner === "draw") status = `🤝 무승부 · ${game.is_friendly ? "" : "판돈 반환 · "}${settle}`;
     else {
       const winnerName = nameOf(game, game.winner);
       const mine = mySide ? (game.winner === mySide ? "🎉 승리! " : "😢 패배 · ") : "";
@@ -687,7 +710,7 @@ function OmokBoardView({
           <strong>{nameOf(game, blackSide)}</strong>
           {mySide === blackSide && <em>나</em>}
         </div>
-        <span className="omokStake">💎 {game.stake.toLocaleString("ko-KR")}</span>
+        <span className="omokStake">{game.is_friendly ? "🤝 친선" : `💎 ${game.stake.toLocaleString("ko-KR")}`}</span>
         <div className={`omokPlayer ${game.status === "playing" && !blackTurn ? "turn" : ""}`}>
           <i className="omokStoneIcon white" />
           <strong>{nameOf(game, whiteSide)}</strong>

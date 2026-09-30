@@ -5367,3 +5367,6 @@ button.meetingMetricCard {
 }
 .primaryButton:hover:not(:disabled) { background: #6d28d9; }
 .primaryButton:disabled { background: #c4b5fd; box-shadow: none; cursor: default; }
+
+.omokChip.friendly { border-color: #86efac; color: #15803d; }
+.omokChip.friendly.active { background: #16a34a; border-color: #16a34a; color: #fff; }
