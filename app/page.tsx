@@ -14,7 +14,7 @@ type Member = {
   created_at: string;
 };
 
-// 카톡 봇 점수판 스냅샷 (봇이 10분마다 bot_points 에 올린다)
+// 카톡 봇 점수판 스냅샷 (봇이 1분마다 bot_points 에 올린다)
 type BotPoint = {
   kakao_uid: string;
   name: string;
@@ -4981,7 +4981,7 @@ setSaving(false);
             <p className="pointRankingFoot">
               {pointRanking.hidden > 0 && `💤 7일 이상 미활동 ${pointRanking.hidden}명 숨김 · `}
               {botPointsSyncedAt &&
-                `${new Date(botPointsSyncedAt).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })} 갱신 · 10분마다 반영`}
+                `${new Date(botPointsSyncedAt).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })} 갱신 · 1분마다 반영`}
             </p>
           </section>
         </div>
