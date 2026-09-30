@@ -170,7 +170,7 @@ export default function Home() {
   const [botPoints, setBotPoints] = useState<BotPoint[]>([]);
   const [showPointRanking, setShowPointRanking] = useState(false);
   const [showOmok, setShowOmok] = useState(false);
-  // 카톡 도전장 링크(?omok=대국번호)로 들어온 경우
+  // 카톡 대국신청 링크(?omok=대국번호)로 들어온 경우
   const [omokInvite, setOmokInvite] = useState("");
 
   useEffect(() => {
@@ -2863,7 +2863,7 @@ setSaving(false);
 
           {omokInvite && (
             <div className="omokInviteNotice">
-              <strong>⚫ 오목 도전장이 도착했어요!</strong>
+              <strong>⚫ 오목 대국신청이 도착했어요!</strong>
               <span>로그인하면 바로 대국 화면으로 이동합니다.</span>
               <span>
                 아직 계정이 없다면 <b>최초 가입</b>에서 카톡방 닉네임으로 가입해 주세요.

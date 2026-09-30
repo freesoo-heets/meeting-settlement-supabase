@@ -184,7 +184,7 @@ export default function OmokGame({ onClose, initialGameId, currentMemberId, myPo
 
         {message && <div className="omokMessage">{message}</div>}
         {missing && viewId === initialGameId && !viewing && (
-          <div className="omokMessage">도전장을 찾지 못했습니다. 주소를 확인해 주세요.</div>
+          <div className="omokMessage">대국신청을 찾지 못했습니다. 주소를 확인해 주세요.</div>
         )}
 
         {viewing && (viewing.status === "open" || viewing.status === "challenge") ? (
@@ -192,7 +192,7 @@ export default function OmokGame({ onClose, initialGameId, currentMemberId, myPo
             <span className="omokInviteIcon">⚔️</span>
             <strong>
               {viewing.status === "challenge"
-                ? `${viewing.host_name}님의 도전장`
+                ? `${viewing.host_name}님의 대국신청`
                 : `${viewing.host_name}님이 상대를 찾고 있어요`}
             </strong>
             <span>
@@ -213,13 +213,13 @@ export default function OmokGame({ onClose, initialGameId, currentMemberId, myPo
               </>
             ) : viewing.status === "challenge" && viewing.target_member !== currentMemberId ? (
               <>
-                <span className="muted">다른 회원에게 보낸 도전장입니다.</span>
+                <span className="muted">다른 회원에게 보낸 대국신청입니다.</span>
                 <button className="smallButton ghost" onClick={() => setViewId("")}>← 대기실</button>
               </>
             ) : (
               <div className="omokControls">
                 <button className="primaryButton" disabled={busy || !!myActive} onClick={() => run({ action: "join", gameId: viewing.id })}>
-                  {viewing.status === "challenge" ? "도전 수락" : "대결하기"}
+                  {viewing.status === "challenge" ? "대국 수락" : "대결하기"}
                 </button>
                 {viewing.status === "challenge" && (
                   <button className="smallButton ghost" disabled={busy} onClick={() => run({ action: "decline", gameId: viewing.id }, () => setViewId(""))}>
@@ -267,7 +267,7 @@ export default function OmokGame({ onClose, initialGameId, currentMemberId, myPo
                     {myActive.status === "open"
                       ? "상대를 기다리는 중…"
                       : myActive.status === "challenge"
-                        ? "도전장 응답 대기 중…"
+                        ? "대국신청 응답 대기 중…"
                         : myActive.status === "escrow"
                           ? "봇이 점수·티켓 확인 중…"
                           : "대국 진행 중"}
@@ -290,7 +290,7 @@ export default function OmokGame({ onClose, initialGameId, currentMemberId, myPo
             {challengesToMe.map((game) => (
               <div className="omokCard challenge" key={game.id}>
                 <div>
-                  <strong>⚔️ {game.host_name}님의 도전장</strong>
+                  <strong>⚔️ {game.host_name}님의 대국신청</strong>
                   <span>판돈 {game.stake.toLocaleString("ko-KR")}점</span>
                 </div>
                 <div className="omokCardActions">
@@ -332,7 +332,7 @@ export default function OmokGame({ onClose, initialGameId, currentMemberId, myPo
                   <option value="">누구나 (대기실에 방 열기)</option>
                   {opponents.map((member) => (
                     <option key={member.id} value={member.id}>
-                      {member.name}에게 도전장
+                      {member.name}에게 대국신청
                     </option>
                   ))}
                 </select>
@@ -341,7 +341,7 @@ export default function OmokGame({ onClose, initialGameId, currentMemberId, myPo
                   disabled={busy}
                   onClick={() => run({ action: "create", stake: Number(stake), targetMemberId: target || null })}
                 >
-                  {target ? "도전장 보내기" : "방 만들기"}
+                  {target ? "대국신청 보내기" : "방 만들기"}
                 </button>
                 <small>이기면 상대 판돈을 가져가고, 비기면 돌려받습니다. 티켓은 돌려받지 않습니다.</small>
               </div>

@@ -149,7 +149,7 @@ export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
   const action = String(body?.action ?? "");
 
-  // ── 방 만들기 / 도전장 ──
+  // ── 방 만들기 / 대국신청 ──
   if (action === "create") {
     const stake = Math.floor(Number(body?.stake));
     if (!Number.isFinite(stake) || stake < MIN_STAKE || stake > MAX_STAKE) {
@@ -191,7 +191,7 @@ export async function POST(request: Request) {
   if (action === "join") {
     if (game.status !== "open" && game.status !== "challenge") return fail("이미 시작했거나 끝난 대국입니다.");
     if (game.host_member === me.memberId) return fail("내가 만든 방입니다.");
-    if (game.status === "challenge" && game.target_member !== me.memberId) return fail("나에게 온 도전장이 아닙니다.");
+    if (game.status === "challenge" && game.target_member !== me.memberId) return fail("나에게 온 대국신청이 아닙니다.");
     if (me.exp < game.stake) return fail(`점수가 부족합니다. (보유 ${me.exp.toLocaleString("ko-KR")}점)`);
     if (me.tickets < 1) return fail("티켓이 1장 필요합니다. 카톡에서 !티켓구매 로 살 수 있습니다.");
     if (await hasActiveGame(admin, me.memberId)) return fail("이미 진행 중이거나 대기 중인 대국이 있습니다.");
