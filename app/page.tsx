@@ -4916,6 +4916,7 @@ setSaving(false);
           currentMemberId={currentMember.id}
           myPoints={pointsByMember[currentMember.id]?.exp ?? null}
           myTickets={pointsByMember[currentMember.id]?.tickets ?? null}
+          myName={currentMember.name}
           opponents={members
             .filter((member) => member.active && member.id !== currentMember.id && pointsByMember[member.id])
             .map((member) => ({ id: member.id, name: member.name }))

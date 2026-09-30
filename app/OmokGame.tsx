@@ -39,7 +39,7 @@ type OmokRow = {
 
 type Opponent = { id: string; name: string };
 
-type ShownEmote = { kind: EmoteKind; spot: number; name: string; key: number };
+type ShownEmote = { kind: EmoteKind; spot: number; name: string; watcher: boolean; key: number };
 
 type Props = {
   onClose: () => void;
@@ -47,6 +47,7 @@ type Props = {
   currentMemberId: string | null;
   myPoints: number | null;
   myTickets: number | null;
+  myName: string;
   opponents: Opponent[];
 };
 
@@ -187,7 +188,7 @@ function nameOf(game: OmokRow, side: "host" | "guest" | null) {
   return "?";
 }
 
-export default function OmokGame({ onClose, initialGameId, currentMemberId, myPoints, myTickets, opponents }: Props) {
+export default function OmokGame({ onClose, initialGameId, currentMemberId, myPoints, myTickets, myName, opponents }: Props) {
   const [games, setGames] = useState<OmokRow[]>([]);
   const [viewId, setViewId] = useState<string>(initialGameId ?? "");
   const [missing, setMissing] = useState(false);
@@ -250,18 +251,18 @@ export default function OmokGame({ onClose, initialGameId, currentMemberId, myPo
   }, [load, live]);
 
   // 감정표현: 서버를 거치지 않고 실시간 채널로 주고받는다
-  function showEmote(next: { kind: EmoteKind; spot: number; name: string }) {
+  function showEmote(next: { kind: EmoteKind; spot: number; name: string; watcher: boolean }) {
     const key = Date.now() + Math.random();
     setEmote({ ...next, key });
     window.setTimeout(() => setEmote((current) => (current?.key === key ? null : current)), EMOTE_SHOW_MS);
   }
 
-  function sendEmote(kind: EmoteKind, board: Board, name: string) {
+  function sendEmote(kind: EmoteKind, board: Board, watcher: boolean) {
     const nowMs = Date.now();
     if (nowMs - lastEmoteAt.current < EMOTE_COOLDOWN_MS) return;
     lastEmoteAt.current = nowMs;
     setEmoteCooldownUntil(nowMs + EMOTE_COOLDOWN_MS);
-    const payload = { kind, spot: pickEmoteSpot(board), name };
+    const payload = { kind, spot: pickEmoteSpot(board), name: myName, watcher };
     showEmote(payload);
     void channelRef.current?.send({ type: "broadcast", event: "emote", payload });
   }
@@ -272,13 +273,14 @@ export default function OmokGame({ onClose, initialGameId, currentMemberId, myPo
     const channel = supabase
       .channel(`omok-${viewId}`, { config: { broadcast: { self: false } } })
       .on("broadcast", { event: "emote" }, ({ payload }) => {
-        const data = payload as { kind?: unknown; spot?: unknown; name?: unknown };
+        const data = payload as { kind?: unknown; spot?: unknown; name?: unknown; watcher?: unknown };
         if (!isEmoteKind(data.kind)) return;
         const spot = Number(data.spot);
         showEmote({
           kind: data.kind,
           spot: Number.isInteger(spot) && spot >= 0 && spot < EMOTE_SPOTS.length ? spot : 0,
           name: String(data.name ?? "").slice(0, 10),
+          watcher: data.watcher === true,
         });
       })
       .on(
@@ -606,7 +608,7 @@ function OmokBoardView({
   onCancel: () => void;
   emote: ShownEmote | null;
   emoteReadyIn: number;
-  onEmote: (kind: EmoteKind, board: Board, name: string) => void;
+  onEmote: (kind: EmoteKind, board: Board, watcher: boolean) => void;
 }) {
   const board = useMemo(() => boardFromMoves(game.moves), [game.moves]);
   const mySide = game.host_member === me ? "host" : game.guest_member === me ? "guest" : null;
@@ -685,7 +687,7 @@ function OmokBoardView({
       {emote && (
         <div className="omokEmotePop" key={emote.key} style={spotStyle(emote.spot)}>
           <EmoteIcon kind={emote.kind} />
-          {emote.name && <span>{emote.name}</span>}
+          {emote.name && <span className={emote.watcher ? "watcher" : ""}>{emote.watcher ? `👀 ${emote.name}` : emote.name}</span>}
         </div>
       )}
       <svg className="omokBoard" viewBox={`0 0 ${VIEW} ${VIEW}`} role="img" aria-label="오목판">
@@ -742,7 +744,7 @@ function OmokBoardView({
       </svg>
       </div>
 
-      {mySide && (game.status === "playing" || game.status === "finished") && (
+      {me && (game.status === "playing" || game.status === "finished") && (
         <div className="omokEmoteBar" role="group" aria-label="감정표현">
           {EMOTES.map((item) => (
             <button
@@ -751,7 +753,7 @@ function OmokBoardView({
               disabled={emoteReadyIn > 0}
               aria-label={item.label}
               title={item.label}
-              onClick={() => onEmote(item.kind, board, nameOf(game, mySide))}
+              onClick={() => onEmote(item.kind, board, mySide === null)}
             >
               <EmoteIcon kind={item.kind} />
             </button>
