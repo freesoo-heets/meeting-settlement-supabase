@@ -59,6 +59,7 @@ type AlkRow = {
   is_friendly?: boolean;
   created_at: string;
   finished_at: string | null;
+  started_at?: string | null;
 };
 
 type ShownEmote = { kind: EmoteKind; spot: number; name: string; watcher: boolean; key: number };
@@ -76,7 +77,7 @@ type Props = {
 };
 
 const COLUMNS =
-  "id,status,stake,host_member,host_name,guest_member,guest_name,target_member,cho,turn,pieces,last_shot,shot_no,strikes,turn_deadline,winner,end_reason,escrow_state,escrow_note,settle_state,is_test,is_friendly,created_at,finished_at";
+  "id,status,stake,host_member,host_name,guest_member,guest_name,target_member,cho,turn,pieces,last_shot,shot_no,strikes,turn_deadline,winner,end_reason,escrow_state,escrow_note,settle_state,is_test,is_friendly,created_at,started_at,finished_at";
 const STAKE_PRESETS = [100, 300, 500, 1000];
 const PULL_MAX = 140; // 이만큼 당기면 최대 세기
 const AIM_GUIDE = 34; // 방향 표시 길이 (세기와 무관하게 고정)
@@ -107,6 +108,18 @@ async function callAlkkagi(payload: Record<string, unknown>) {
 // 판돈 표시 (친선전이면 점수 대신 '친선')
 function stakeText(game: { stake: number; is_friendly?: boolean }) {
   return game.is_friendly ? "🤝 친선전" : `판돈 ${game.stake.toLocaleString("ko-KR")}점`;
+}
+
+// 최근 결과용: '10. 1. 오후 09:05 시작 · 3분 12초'
+function playTime(started: string | null | undefined, finished: string | null | undefined) {
+  if (!started) return "";
+  const start = new Date(started);
+  const text = start.toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  if (!finished) return `${text} 시작`;
+  const seconds = Math.max(0, Math.round((new Date(finished).getTime() - start.getTime()) / 1000));
+  const minutes = Math.floor(seconds / 60);
+  const rest = String(seconds % 60).padStart(2, "0");
+  return `${text} 시작 · ${minutes}분 ${rest}초`;
 }
 
 function nameOf(game: AlkRow, seat: Seat | null) {
@@ -501,7 +514,11 @@ export default function AlkkagiGame({
                         ? `${game.host_name} = ${game.guest_name}`
                         : `🏆 ${nameOf(game, game.winner)} ▸ ${nameOf(game, game.winner === "host" ? "guest" : "host")}`}
                     </span>
-                    <em>{stakeText(game)} · {END_TEXT[game.end_reason ?? ""] ?? ""}</em>
+                    <em>
+                      {stakeText(game)} · {END_TEXT[game.end_reason ?? ""] ?? ""}
+                      <br />
+                      {playTime(game.started_at ?? game.created_at, game.finished_at)}
+                    </em>
                   </button>
                 ))}
               </div>

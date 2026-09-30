@@ -35,6 +35,10 @@ type Room = {
   scores: Record<string, number>;
   is_test?: boolean;
   recruit_at?: string | null;
+  drawer_name?: string | null;
+  play_no?: number;
+  reveal_word?: string | null;
+  last_winner?: string | null;
   recruit_no?: number;
   updated_at: string;
 };
@@ -254,6 +258,46 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
+  // ── 그림 저장: 문제가 끝나면 출제자 화면이 보낸다 (최근 그림 갤러리용) ──
+  if (action === "save_drawing") {
+    const turnNo = Number(body?.turnNo);
+    if (room.drawer_member !== memberId) return fail("출제자만 저장할 수 있습니다.", 403);
+    // 정답이 공개된 그 문제일 때만 (다음 문제로 넘어갔으면 제시어를 알 수 없다)
+    if (room.turn_no !== turnNo || !room.reveal_word) return fail("저장할 수 있는 때가 지났습니다.", 409);
+
+    const raw = Array.isArray(body?.strokes) ? (body?.strokes as unknown[]) : [];
+    const strokes = raw.slice(0, 400).map((item) => {
+      const stroke = item as { color?: unknown; size?: unknown; pts?: unknown };
+      const pts = Array.isArray(stroke.pts) ? (stroke.pts as unknown[]) : [];
+      return {
+        color: /^#[0-9a-fA-F]{6}$/.test(String(stroke.color)) ? String(stroke.color) : "#111111",
+        size: Math.min(40, Math.max(1, Number(stroke.size) || 8)),
+        pts: pts
+          .slice(0, 800)
+          .map((pt) => (Array.isArray(pt) ? [Number(pt[0]), Number(pt[1])] : [NaN, NaN]))
+          .filter(([x, y]) => Number.isFinite(x) && Number.isFinite(y) && x >= 0 && x <= 1 && y >= 0 && y <= 1)
+          .map(([x, y]) => [Math.round(x * 1000) / 1000, Math.round(y * 1000) / 1000]),
+      };
+    });
+
+    const { error } = await admin.from("catch_drawings").upsert(
+      {
+        room_id: room.id,
+        play_no: room.play_no ?? 0,
+        turn_no: turnNo,
+        drawer_member: memberId,
+        drawer_name: room.drawer_name ?? "",
+        word: room.reveal_word,
+        winner: room.last_winner || null,
+        strokes,
+        is_test: !!room.is_test,
+      },
+      { onConflict: "room_id,play_no,turn_no" },
+    );
+    if (error) return fail(`저장 실패: ${error.message}`, 500);
+    return NextResponse.json({ ok: true });
+  }
+
   // ── 다시하기: 끝난 방을 같은 멤버로 바로 새로 시작 ──
   if (action === "restart") {
     if (room.status !== "finished") return fail("게임이 끝난 뒤에 다시 할 수 있습니다.");
@@ -271,6 +315,7 @@ export async function POST(request: Request) {
       players,
       scores,
       turn_no: 0,
+      play_no: (room.play_no ?? 0) + 1, // 몇 번째 판인지 (그림 기록이 이전 판과 겹치지 않게)
       turn_total: players.length * ROUNDS,
       drawer_member: null,
       drawer_name: null,

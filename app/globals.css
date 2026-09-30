@@ -5370,3 +5370,30 @@ button.meetingMetricCard {
 
 .omokChip.friendly { border-color: #86efac; color: #15803d; }
 .omokChip.friendly.active { background: #16a34a; border-color: #16a34a; color: #fff; }
+
+/* 최근 결과 두 줄 */
+.omokResultRow em { text-align: right; line-height: 1.5; }
+
+/* 캐치마인드 최근 그림 */
+.cgGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.cgItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+}
+.cgItem.active { border-color: #6366f1; box-shadow: 0 0 0 2px #e0e7ff; }
+.cgThumb { width: 100%; height: auto; aspect-ratio: 800 / 560; border-radius: 8px; border: 1px solid #f1f5f9; display: block; }
+.cgCaption { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.cgCaption b { font-size: 14px; }
+.cgCaption em { font-style: normal; font-size: 11px; color: #64748b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cgOpen { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 14px; background: #eef2ff; }
+.cgBig { width: 100%; height: auto; aspect-ratio: 800 / 560; border-radius: 10px; background: #fff; display: block; }
+.cgOpenInfo { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; font-size: 14px; }
+.cgWord { color: #4338ca; }

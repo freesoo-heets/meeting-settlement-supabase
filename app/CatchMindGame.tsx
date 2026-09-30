@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
+import CatchGallery from "./CatchGallery";
 
 // 캐치마인드 (최대 6명 · 점수 내기 없음)
 
@@ -28,6 +29,7 @@ type Room = {
   scores: Record<string, number>;
   is_test?: boolean;
   recruit_no?: number;
+  play_no?: number;
   created_at: string;
   updated_at: string;
 };
@@ -45,7 +47,7 @@ type Props = {
 };
 
 const COLUMNS =
-  "id,status,host_member,host_name,players,max_players,rounds,turn_no,turn_total,drawer_member,drawer_name,phase,phase_deadline,hint,reveal_word,last_winner,scores,is_test,created_at,updated_at";
+  "id,status,host_member,host_name,players,max_players,rounds,turn_no,turn_total,drawer_member,drawer_name,phase,phase_deadline,hint,reveal_word,last_winner,scores,is_test,play_no,created_at,updated_at";
 const DRAW_SECONDS = 80;
 const CANVAS_W = 800;
 const CANVAS_H = 560;
@@ -214,6 +216,7 @@ export default function CatchMindGame({ onClose, onBack, initialRoomId, currentM
                 </div>
               ))}
             </div>
+            <CatchGallery />
           </div>
         )}
       </section>
@@ -390,6 +393,22 @@ function CatchRoomView({
       void supabase.removeChannel(channel);
     };
   }, [room.id, addChat, paintStroke, redraw, onReload]);
+
+  // 문제가 끝나면(정답 공개) 출제자 화면이 그림을 저장한다 → 최근 그림 갤러리
+  const savedDrawing = useRef("");
+  useEffect(() => {
+    if (room.status !== "playing" && room.status !== "finished") return;
+    if (room.phase !== "reveal" || room.drawer_member !== me || !room.reveal_word) return;
+    const key = `${room.play_no ?? 0}:${room.turn_no}`;
+    if (savedDrawing.current === key || strokesRef.current.length === 0) return;
+    savedDrawing.current = key;
+    void callCatch({
+      action: "save_drawing",
+      roomId: room.id,
+      turnNo: room.turn_no,
+      strokes: strokesRef.current.map(({ color, size, pts }) => ({ color, size, pts })),
+    });
+  }, [room.status, room.phase, room.drawer_member, room.reveal_word, room.turn_no, room.play_no, room.id, me]);
 
   // 정답·시간 초과 알림을 채팅에 남긴다
   const lastPhaseKey = useRef("");
