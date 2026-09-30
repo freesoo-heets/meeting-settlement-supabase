@@ -41,7 +41,8 @@ function fail(error: string, status = 400) {
   return NextResponse.json({ ok: false, error }, { status });
 }
 
-async function requirePlayer(request: Request, admin: Admin): Promise<Player | { error: string; status: number }> {
+// 로그인 확인 → 회원 id 만 (착수·기권처럼 자주 오는 요청은 여기까지만 확인해 빠르게 처리)
+async function requireMemberId(request: Request, admin: Admin): Promise<{ memberId: string } | { error: string; status: number }> {
   const authorization = request.headers.get("authorization") ?? "";
   const token = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
   if (!token) return { error: "로그인이 필요합니다.", status: 401 };
@@ -55,11 +56,15 @@ async function requirePlayer(request: Request, admin: Admin): Promise<Player | {
     .eq("id", userData.user.id)
     .maybeSingle();
   if (!profile?.member_id) return { error: "회원 명단과 연결된 계정만 할 수 있습니다.", status: 403 };
+  return { memberId: profile.member_id as string };
+}
 
+// 방 만들기·입장 때만: 활동 회원인지, 봇 점수판의 점수·티켓 확인
+async function loadPlayer(admin: Admin, memberId: string): Promise<Player | { error: string; status: number }> {
   const { data: member } = await admin
     .from("members")
     .select("id,name,active")
-    .eq("id", profile.member_id)
+    .eq("id", memberId)
     .maybeSingle();
   if (!member || !member.active) return { error: "활동 중인 회원만 할 수 있습니다.", status: 403 };
 
@@ -142,12 +147,24 @@ export async function POST(request: Request) {
     return fail("서버 설정 오류", 500);
   }
 
-  const auth = await requirePlayer(request, admin);
-  if ("error" in auth) return fail(auth.error, auth.status);
-  const me = auth;
-
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
   const action = String(body?.action ?? "");
+  const gameId = String(body?.gameId ?? "");
+
+  // 로그인 확인과 대국 불러오기를 동시에 한다
+  const [auth, loaded] = await Promise.all([
+    requireMemberId(request, admin),
+    gameId ? loadGame(admin, gameId) : Promise.resolve(null),
+  ]);
+  if ("error" in auth) return fail(auth.error, auth.status);
+  const memberId = auth.memberId;
+
+  let me: Player = { memberId, name: "", uid: "", exp: 0, tickets: 0 };
+  if (action === "create" || action === "join") {
+    const player = await loadPlayer(admin, memberId);
+    if ("error" in player) return fail(player.error, player.status);
+    me = player;
+  }
 
   // ── 방 만들기 / 대국신청 ──
   if (action === "create") {
@@ -182,9 +199,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, id: data.id });
   }
 
-  const gameId = String(body?.gameId ?? "");
   if (!gameId) return fail("대국 정보가 없습니다.");
-  const game = await loadGame(admin, gameId);
+  const game = loaded;
   if (!game) return fail("대국을 찾지 못했습니다.", 404);
 
   // ── 입장 / 도전 수락 ──

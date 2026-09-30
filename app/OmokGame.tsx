@@ -231,10 +231,45 @@ export default function OmokGame({ onClose, initialGameId, currentMemberId, myPo
     return () => window.clearInterval(timer);
   }, [load, live]);
 
+  // 보고 있는 대국은 실시간 구독으로 바로 받는다 (주기적 확인은 끊겼을 때 대비용)
+  useEffect(() => {
+    if (!viewId) return;
+    const channel = supabase
+      .channel(`omok-${viewId}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "omok_games", filter: `id=eq.${viewId}` },
+        (payload) => {
+          const row = payload.new as OmokRow;
+          setGames((current) => current.map((game) => (game.id === row.id ? { ...game, ...row } : game)));
+        },
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [viewId]);
+
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 250);
     return () => window.clearInterval(timer);
   }, []);
+
+  // 착수: 서버 응답을 기다리지 않고 내 화면에 먼저 돌을 놓는다 (실패하면 되돌린다)
+  async function playMove(gameId: string, x: number, y: number) {
+    setPending(null);
+    setMessage("");
+    setGames((current) =>
+      current.map((game) =>
+        game.id === gameId ? { ...game, moves: [...game.moves, [x, y] as Move], turn_deadline: null } : game,
+      ),
+    );
+    setBusy(true);
+    const result = await callOmok({ action: "move", gameId, x, y });
+    setBusy(false);
+    if (!result.ok) setMessage(result.error ?? "착수하지 못했습니다.");
+    await load();
+  }
 
   // 시간이 다 되면 서버에 확인을 요청한다 (상대가 창을 닫아도 끝나도록)
   useEffect(() => {
@@ -346,7 +381,7 @@ export default function OmokGame({ onClose, initialGameId, currentMemberId, myPo
               setViewId("");
               setPending(null);
             }}
-            onMove={(x, y) => run({ action: "move", gameId: viewing.id, x, y }, () => setPending(null))}
+            onMove={(x, y) => void playMove(viewing.id, x, y)}
             onResign={() => {
               if (window.confirm("기권하면 판돈을 잃습니다. 기권할까요?")) {
                 void run({ action: "resign", gameId: viewing.id });
