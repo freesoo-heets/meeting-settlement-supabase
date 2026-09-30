@@ -132,7 +132,7 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
     };
     setTesting(false);
     if (result.ok && result.id) setActive({ kind, id: result.id });
-    else setTestError(result.error ?? "테스트를 시작하지 못했습니다.");
+    else setTestError(result.error ?? `테스트를 시작하지 못했습니다. (응답: ${JSON.stringify(result).slice(0, 120)})`);
   }
 
   if (active?.kind === "omok") {

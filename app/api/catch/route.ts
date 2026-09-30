@@ -192,6 +192,8 @@ export async function POST(request: Request) {
   ]);
   if ("error" in auth) return fail(auth.error, auth.status);
   const memberId = auth.memberId;
+  // 진단용 기록 (Vercel 로그에서 확인)
+  console.log("[catch]", action, "member", memberId.slice(0, 8), "room", roomId.slice(0, 8), loaded ? `${loaded.status}/${loaded.is_test ? "test" : "normal"}/${loaded.players.length}명` : "-");
 
   // ── 유령 방 정리 (게임 로비·목록을 열 때마다 화면이 부른다. 관리자는 즉시 정리 가능) ──
   if (action === "cleanup") {
@@ -216,6 +218,7 @@ export async function POST(request: Request) {
         current.status === "waiting" && current.players.length === 1 && current.players[0].id === memberId;
       if (!!current.is_test === test || !aloneWaiting) {
         // 같은 종류의 방이거나, 다른 사람이 함께 있는 방이면 그 방으로
+        console.log("[catch] create → 기존 방", current.id.slice(0, 8), current.status, current.is_test ? "test" : "normal");
         return NextResponse.json({ ok: true, id: current.id, existing: true });
       }
       // 혼자 기다리던 방이 종류가 다르면(일반 ↔ 테스트) 닫고 새로 만든다
