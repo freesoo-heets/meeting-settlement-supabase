@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServerAdmin } from "../../../lib/server-admin";
-import { fail, loadMember, requireMemberId, updateIfUnchanged, type Admin } from "../../../lib/gameServer";
+import { fail, isAdminMember, loadMember, requireMemberId, updateIfUnchanged, type Admin } from "../../../lib/gameServer";
 import { hintOf, normalizeGuess, pickWord } from "../../../lib/catchWords";
 
 /*
@@ -32,6 +32,7 @@ type Room = {
   phase: "drawing" | "reveal" | null;
   phase_deadline: string | null;
   scores: Record<string, number>;
+  is_test?: boolean;
   updated_at: string;
 };
 
@@ -69,7 +70,7 @@ async function inOtherRoom(admin: Admin, memberId: string) {
 
 // 새 턴 시작 (턴이 다 끝났으면 게임 종료)
 async function startTurn(admin: Admin, room: Room, turnNo: number, players: Member[]) {
-  if (turnNo >= room.turn_total || players.length < 2) {
+  if (turnNo >= room.turn_total || players.length < (room.is_test ? 1 : 2)) {
     return updateIfUnchanged(admin, TABLE, room, {
       status: "finished",
       players,
@@ -139,7 +140,9 @@ export async function POST(request: Request) {
   if ("error" in auth) return fail(auth.error, auth.status);
   const memberId = auth.memberId;
 
-  if (action === "create") {
+  if (action === "create" || action === "create_test") {
+    const test = action === "create_test";
+    if (test && !(await isAdminMember(admin, memberId))) return fail("관리자만 테스트할 수 있습니다.", 403);
     const member = await loadMember(admin, memberId);
     if ("error" in member) return fail(member.error, member.status);
     await cleanupStale(admin);
@@ -154,6 +157,7 @@ export async function POST(request: Request) {
         players: [{ id: memberId, name: member.name }],
         max_players: MAX_PLAYERS,
         rounds: ROUNDS,
+        is_test: test,
       })
       .select("id")
       .single();
@@ -213,7 +217,7 @@ export async function POST(request: Request) {
   if (action === "start") {
     if (room.host_member !== memberId) return fail("방장만 시작할 수 있습니다.");
     if (room.status !== "waiting") return fail("이미 시작한 방입니다.");
-    if (room.players.length < 2) return fail("2명 이상 모여야 시작할 수 있습니다.");
+    if (room.players.length < (room.is_test ? 1 : 2)) return fail("2명 이상 모여야 시작할 수 있습니다.");
     const scores = Object.fromEntries(room.players.map((player) => [player.id, 0]));
     const prepared = { ...room, turn_total: room.players.length * ROUNDS };
     const { data } = await admin
@@ -239,7 +243,7 @@ export async function POST(request: Request) {
 
   if (action === "guess") {
     if (room.status !== "playing" || room.phase !== "drawing") return NextResponse.json({ ok: true, correct: false });
-    if (room.drawer_member === memberId) return fail("출제자는 맞힐 수 없습니다.");
+    if (room.drawer_member === memberId && !room.is_test) return fail("출제자는 맞힐 수 없습니다.");
     if (room.phase_deadline && Date.now() > new Date(room.phase_deadline).getTime() + GRACE_MS) {
       await advance(admin, room);
       return NextResponse.json({ ok: true, correct: false });

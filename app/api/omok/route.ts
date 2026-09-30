@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerAdmin } from "../../../lib/server-admin";
 import { CENTER, TURN_SECONDS, checkMove, type Move } from "../../../lib/omok";
+import { isAdminMember, loadMember } from "../../../lib/gameServer";
 
 /*
  * 오목 대국 API (모든 쓰기는 여기서만 한다)
@@ -32,6 +33,7 @@ type Game = {
   moves: Move[];
   turn_deadline: string | null;
   escrow_state: string;
+  is_test?: boolean;
   updated_at: string;
 };
 
@@ -166,6 +168,34 @@ export async function POST(request: Request) {
     me = player;
   }
 
+  // ── 관리자 테스트 대국 (혼자 양쪽 · 점수·티켓·봇 없음) ──
+  if (action === "create_test") {
+    if (!(await isAdminMember(admin, memberId))) return fail("관리자만 테스트할 수 있습니다.", 403);
+    const member = await loadMember(admin, memberId);
+    if ("error" in member) return fail(member.error, member.status);
+    const { data, error } = await admin
+      .from("omok_games")
+      .insert({
+        status: "playing",
+        is_test: true,
+        stake: 0,
+        host_member: memberId,
+        host_name: member.name,
+        host_uid: "test",
+        guest_member: memberId,
+        guest_name: `${member.name}(테스트)`,
+        guest_uid: "test",
+        black: "host",
+        moves: [[CENTER, CENTER]],
+        started_at: new Date().toISOString(),
+        turn_deadline: deadlineFromNow(),
+      })
+      .select("id")
+      .single();
+    if (error) return fail(`만들기 실패: ${error.message}`, 500);
+    return NextResponse.json({ ok: true, id: data.id });
+  }
+
   // ── 방 만들기 / 대국신청 ──
   if (action === "create") {
     const stake = Math.floor(Number(body?.stake));
@@ -255,7 +285,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  const side = sideOf(game, me.memberId);
+  // 테스트 대국은 혼자 양쪽을 둔다
+  const side = game.is_test && game.host_member === me.memberId ? turnSide(game) : sideOf(game, me.memberId);
 
   // ── 시간 초과 확인 (양쪽 화면 누구나 호출) ──
   if (action === "tick") {

@@ -33,6 +33,7 @@ type OmokRow = {
   escrow_state: string;
   escrow_note: string | null;
   settle_state: string;
+  is_test?: boolean;
   created_at: string;
   finished_at: string | null;
 };
@@ -49,11 +50,12 @@ type Props = {
   myPoints: number | null;
   myTickets: number | null;
   myName: string;
+  isAdmin?: boolean;
   opponents: Opponent[];
 };
 
 const COLUMNS =
-  "id,status,stake,host_member,host_name,guest_member,guest_name,target_member,black,moves,turn_deadline,winner,end_reason,escrow_state,escrow_note,settle_state,created_at,finished_at";
+  "id,status,stake,host_member,host_name,guest_member,guest_name,target_member,black,moves,turn_deadline,winner,end_reason,escrow_state,escrow_note,settle_state,is_test,created_at,finished_at";
 const STAKE_PRESETS = [100, 300, 500, 1000];
 const CELL = 30;
 const PAD = 20;
@@ -189,7 +191,7 @@ function nameOf(game: OmokRow, side: "host" | "guest" | null) {
   return "?";
 }
 
-export default function OmokGame({ onClose, onBack, initialGameId, currentMemberId, myPoints, myTickets, myName, opponents }: Props) {
+export default function OmokGame({ onClose, onBack, initialGameId, currentMemberId, myPoints, myTickets, myName, isAdmin, opponents }: Props) {
   const [games, setGames] = useState<OmokRow[]>([]);
   const [viewId, setViewId] = useState<string>(initialGameId ?? "");
   const [missing, setMissing] = useState(false);
@@ -344,12 +346,12 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
     await load();
   }
 
-  const openRooms = games.filter((game) => game.status === "open" && game.host_member !== currentMemberId);
+  const openRooms = games.filter((game) => game.status === "open" && game.host_member !== currentMemberId && !game.is_test);
   const challengesToMe = games.filter(
     (game) => game.status === "challenge" && game.target_member === currentMemberId,
   );
-  const liveGames = games.filter((game) => game.status === "playing" && game.id !== myActive?.id);
-  const recent = games.filter((game) => game.status === "finished").slice(0, 8);
+  const liveGames = games.filter((game) => game.status === "playing" && game.id !== myActive?.id && (!game.is_test || game.host_member === currentMemberId));
+  const recent = games.filter((game) => game.status === "finished" && (!game.is_test || game.host_member === currentMemberId)).slice(0, 8);
 
   return (
     <div
@@ -529,6 +531,15 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
                   {target ? "대국신청 보내기" : "방 만들기"}
                 </button>
                 <small>이기면 상대 판돈을 가져가고, 비기면 돌려받습니다. 티켓은 돌려받지 않습니다.</small>
+                {isAdmin && (
+                  <button
+                    className="smallButton ghost omokTestButton"
+                    disabled={busy}
+                    onClick={() => run({ action: "create_test" }, (id) => id && setViewId(id))}
+                  >
+                    🧪 테스트 대국 (관리자 · 혼자 양쪽 · 점수 없음)
+                  </button>
+                )}
               </div>
             )}
 
@@ -615,7 +626,11 @@ function OmokBoardView({
   onEmote: (kind: EmoteKind, board: Board, watcher: boolean) => void;
 }) {
   const board = useMemo(() => boardFromMoves(game.moves), [game.moves]);
-  const mySide = game.host_member === me ? "host" : game.guest_member === me ? "guest" : null;
+  // 테스트 대국은 혼자 양쪽을 두므로 '지금 차례'가 내 쪽
+  const testMine = !!game.is_test && game.host_member === me;
+  const testTurn: "host" | "guest" =
+    game.moves.length % 2 === 0 ? (game.black ?? "host") : game.black === "guest" ? "host" : "guest";
+  const mySide = testMine ? testTurn : game.host_member === me ? "host" : game.guest_member === me ? "guest" : null;
   const blackSide = game.black;
   const whiteSide = blackSide === "host" ? "guest" : blackSide === "guest" ? "host" : null;
   const blackTurn = game.moves.length % 2 === 0;
@@ -649,7 +664,11 @@ function OmokBoardView({
   } else if (game.status === "playing") {
     status = myTurn ? `내 차례 · ${remaining}초` : `${nameOf(game, turnSide)}님 차례 · ${remaining}초`;
   } else if (game.status === "finished") {
-    const settle = game.settle_state === "done" ? "카톡 점수에 반영 완료" : "봇이 곧 카톡 점수에 반영합니다";
+    const settle = game.is_test
+      ? "🧪 테스트 대국 (점수 변동 없음)"
+      : game.settle_state === "done"
+        ? "카톡 점수에 반영 완료"
+        : "봇이 곧 카톡 점수에 반영합니다";
     if (game.winner === "draw") status = `🤝 무승부 · 판돈 반환 · ${settle}`;
     else {
       const winnerName = nameOf(game, game.winner);

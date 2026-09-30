@@ -4927,6 +4927,7 @@ setSaving(false);
             }
           }}
           initial={gameInvite}
+          isAdmin={isAdmin}
           currentMemberId={currentMember.id}
           myPoints={pointsByMember[currentMember.id]?.exp ?? null}
           myTickets={pointsByMember[currentMember.id]?.tickets ?? null}

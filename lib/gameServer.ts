@@ -71,3 +71,14 @@ export async function updateIfUnchanged(
     .select("id");
   return !error && (data ?? []).length === 1;
 }
+
+// 관리자(owner·admin)인지 — 게임 테스트 모드용
+export async function isAdminMember(admin: Admin, memberId: string) {
+  const { data } = await admin
+    .from("profiles")
+    .select("role")
+    .eq("member_id", memberId)
+    .in("role", ["owner", "admin"])
+    .limit(1);
+  return (data ?? []).length > 0;
+}

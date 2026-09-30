@@ -5217,3 +5217,5 @@ button.meetingMetricCard {
 }
 
 .alkPiece { transition: opacity .3s ease; will-change: transform; }
+
+.omokTestButton { border-style: dashed; color: #7c3aed; }

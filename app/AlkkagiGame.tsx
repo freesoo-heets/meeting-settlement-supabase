@@ -55,6 +55,7 @@ type AlkRow = {
   escrow_state: string;
   escrow_note: string | null;
   settle_state: string;
+  is_test?: boolean;
   created_at: string;
   finished_at: string | null;
 };
@@ -70,10 +71,11 @@ type Props = {
   myPoints: number | null;
   myTickets: number | null;
   opponents: Opponent[];
+  isAdmin?: boolean;
 };
 
 const COLUMNS =
-  "id,status,stake,host_member,host_name,guest_member,guest_name,target_member,cho,turn,pieces,last_shot,shot_no,strikes,turn_deadline,winner,end_reason,escrow_state,escrow_note,settle_state,created_at,finished_at";
+  "id,status,stake,host_member,host_name,guest_member,guest_name,target_member,cho,turn,pieces,last_shot,shot_no,strikes,turn_deadline,winner,end_reason,escrow_state,escrow_note,settle_state,is_test,created_at,finished_at";
 const STAKE_PRESETS = [100, 300, 500, 1000];
 const PULL_MAX = 140; // 이만큼 당기면 최대 세기
 const AIM_GUIDE = 34; // 방향 표시 길이 (세기와 무관하게 고정)
@@ -118,6 +120,7 @@ export default function AlkkagiGame({
   myPoints,
   myTickets,
   opponents,
+  isAdmin,
 }: Props) {
   const [games, setGames] = useState<AlkRow[]>([]);
   const [viewId, setViewId] = useState(initialGameId ?? "");
@@ -249,10 +252,10 @@ export default function AlkkagiGame({
     await load();
   }
 
-  const openRooms = games.filter((game) => game.status === "open" && game.host_member !== currentMemberId);
+  const openRooms = games.filter((game) => game.status === "open" && game.host_member !== currentMemberId && !game.is_test);
   const challengesToMe = games.filter((game) => game.status === "challenge" && game.target_member === currentMemberId);
-  const liveGames = games.filter((game) => game.status === "playing" && game.id !== myActive?.id);
-  const recent = games.filter((game) => game.status === "finished").slice(0, 8);
+  const liveGames = games.filter((game) => game.status === "playing" && game.id !== myActive?.id && (!game.is_test || game.host_member === currentMemberId));
+  const recent = games.filter((game) => game.status === "finished" && (!game.is_test || game.host_member === currentMemberId)).slice(0, 8);
 
   return (
     <div
@@ -424,6 +427,15 @@ export default function AlkkagiGame({
                   {target ? "대국신청 보내기" : "방 만들기"}
                 </button>
                 <small>상대 알을 모두 판 밖으로 떨어뜨리면 승리. 이기면 상대 판돈을 가져갑니다.</small>
+                {isAdmin && (
+                  <button
+                    className="smallButton ghost omokTestButton"
+                    disabled={busy}
+                    onClick={() => run({ action: "create_test" }, (id) => id && setViewId(id))}
+                  >
+                    🧪 테스트 대국 (관리자 · 혼자 양쪽 · 점수 없음)
+                  </button>
+                )}
               </div>
             )}
 
@@ -505,11 +517,19 @@ function AlkkagiBoardView({
   emoteReadyIn: number;
   onEmote: (kind: EmoteKind, pieces: Piece[], watcher: boolean) => void;
 }) {
-  const mySeat: Seat | null = game.host_member === me ? "host" : game.guest_member === me ? "guest" : null;
+  // 테스트 대국은 혼자 양쪽을 치므로 '지금 차례'가 내 쪽
+  const testMine = !!game.is_test && game.host_member === me;
+  const mySeat: Seat | null = testMine
+    ? game.turn ?? "host"
+    : game.host_member === me
+      ? "host"
+      : game.guest_member === me
+        ? "guest"
+        : null;
   const choSeat = game.cho;
   const hanSeat = choSeat ? otherSeat(choSeat) : null;
   const myColor: Side | null = mySeat ? (mySeat === choSeat ? "cho" : "han") : null;
-  const flipped = myColor === "han"; // 내 알이 항상 아래쪽에 오도록
+  const flipped = !testMine && myColor === "han"; // 내 알이 항상 아래쪽에 오도록 (테스트는 고정)
   const myTurn = game.status === "playing" && mySeat !== null && game.turn === mySeat;
 
   // 화면에 그릴 알 위치 (애니메이션 중에는 계산 중간값)
@@ -635,7 +655,11 @@ function AlkkagiBoardView({
       ? `내 차례 · ${remaining}초 · 내 알을 뒤로 끌었다 놓으세요`
       : `${nameOf(game, game.turn)}님 차례 · ${remaining}초`;
   } else if (game.status === "finished") {
-    const settle = game.settle_state === "done" ? "카톡 점수에 반영 완료" : "봇이 곧 카톡 점수에 반영합니다";
+    const settle = game.is_test
+      ? "🧪 테스트 대국 (점수 변동 없음)"
+      : game.settle_state === "done"
+        ? "카톡 점수에 반영 완료"
+        : "봇이 곧 카톡 점수에 반영합니다";
     if (game.winner === "draw") status = `🤝 무승부 · 판돈 반환 · ${settle}`;
     else {
       const mine = mySeat ? (game.winner === mySeat ? "🎉 승리! " : "😢 패배 · ") : "";

@@ -26,6 +26,7 @@ type Room = {
   reveal_word: string | null;
   last_winner: string | null;
   scores: Record<string, number>;
+  is_test?: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -39,10 +40,11 @@ type Props = {
   initialRoomId?: string;
   currentMemberId: string | null;
   myName: string;
+  isAdmin?: boolean;
 };
 
 const COLUMNS =
-  "id,status,host_member,host_name,players,max_players,rounds,turn_no,turn_total,drawer_member,drawer_name,phase,phase_deadline,hint,reveal_word,last_winner,scores,created_at,updated_at";
+  "id,status,host_member,host_name,players,max_players,rounds,turn_no,turn_total,drawer_member,drawer_name,phase,phase_deadline,hint,reveal_word,last_winner,scores,is_test,created_at,updated_at";
 const DRAW_SECONDS = 80;
 const CANVAS_W = 800;
 const CANVAS_H = 560;
@@ -67,7 +69,7 @@ async function callCatch(payload: Record<string, unknown>) {
   };
 }
 
-export default function CatchMindGame({ onClose, onBack, initialRoomId, currentMemberId, myName }: Props) {
+export default function CatchMindGame({ onClose, onBack, initialRoomId, currentMemberId, myName, isAdmin }: Props) {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [roomId, setRoomId] = useState(initialRoomId ?? "");
   const [busy, setBusy] = useState(false);
@@ -123,7 +125,11 @@ export default function CatchMindGame({ onClose, onBack, initialRoomId, currentM
     await load();
   }
 
-  const openRooms = rooms.filter((item) => item.status === "waiting" || item.status === "playing");
+  const openRooms = rooms.filter(
+    (item) =>
+      (item.status === "waiting" || item.status === "playing") &&
+      (!item.is_test || item.players.some((player) => player.id === currentMemberId)),
+  );
 
   return (
     <div
@@ -168,6 +174,15 @@ export default function CatchMindGame({ onClose, onBack, initialRoomId, currentM
                   캐치마인드 방 만들기
                 </button>
                 <small>2~6명이 모이면 방장이 시작합니다. 점수는 걸지 않습니다.</small>
+                {isAdmin && (
+                  <button
+                    className="smallButton ghost omokTestButton"
+                    disabled={busy}
+                    onClick={() => run({ action: "create_test" }, (id) => id && setRoomId(id))}
+                  >
+                    🧪 테스트 방 (관리자 · 혼자 시작 · 출제자도 정답 입력 가능)
+                  </button>
+                )}
               </div>
             )}
             <div className="omokSection">
@@ -219,6 +234,9 @@ function CatchRoomView({
   const joined = room.players.some((player) => player.id === me);
   const isHost = room.host_member === me;
   const isDrawer = room.status === "playing" && room.phase === "drawing" && room.drawer_member === me;
+  // 테스트 방: 혼자 시작 가능, 출제자도 정답을 입력해 흐름을 확인할 수 있다
+  const minPlayers = room.is_test ? 1 : 2;
+  const chatLocked = isDrawer && !room.is_test;
   const [now, setNow] = useState(Date.now());
   const [word, setWord] = useState("");
   const [chat, setChat] = useState<ChatLine[]>([]);
@@ -423,14 +441,14 @@ function CatchRoomView({
     const value = text.trim();
     if (!value || !joined) return;
     setText("");
-    if (room.status === "playing" && room.phase === "drawing" && !isDrawer) {
+    if (room.status === "playing" && room.phase === "drawing" && !chatLocked) {
       const result = await callCatch({ action: "guess", roomId: room.id, text: value });
       if (result.ok && result.correct) {
         void onReload();
         return;
       }
     }
-    if (isDrawer) return;
+    if (chatLocked) return;
     addChat({ name: myName, text: value });
     void channelRef.current?.send({ type: "broadcast", event: "chat", payload: { name: myName, text: value } });
   }
@@ -517,7 +535,7 @@ function CatchRoomView({
         {room.status === "waiting" && (
           <div className="catchOverlay">
             <strong>{room.players.length}/{room.max_players}명 대기 중</strong>
-            <span>{room.players.length < 2 ? "2명 이상 모이면 시작할 수 있어요" : isHost ? "준비되면 시작을 눌러 주세요" : "방장이 시작하면 바로 시작돼요"}</span>
+            <span>{room.players.length < minPlayers ? "2명 이상 모이면 시작할 수 있어요" : isHost ? "준비되면 시작을 눌러 주세요" : "방장이 시작하면 바로 시작돼요"}</span>
           </div>
         )}
         {room.status === "playing" && room.phase === "reveal" && (
@@ -596,12 +614,12 @@ function CatchRoomView({
             <input
               value={text}
               onChange={(event) => setText(event.target.value)}
-              placeholder={isDrawer ? "그리는 중에는 채팅할 수 없어요" : room.phase === "drawing" ? "정답을 입력하세요" : "채팅"}
-              disabled={isDrawer}
+              placeholder={chatLocked ? "그리는 중에는 채팅할 수 없어요" : room.phase === "drawing" ? "정답을 입력하세요" : "채팅"}
+              disabled={chatLocked}
               maxLength={40}
               aria-label="채팅 입력"
             />
-            <button className="smallButton" type="submit" disabled={isDrawer}>보내기</button>
+            <button className="smallButton" type="submit" disabled={chatLocked}>보내기</button>
           </form>
         )}
       </div>
@@ -614,7 +632,7 @@ function CatchRoomView({
           </button>
         )}
         {joined && isHost && room.status === "waiting" && (
-          <button className="primaryButton" disabled={busy || room.players.length < 2} onClick={onStart}>
+          <button className="primaryButton" disabled={busy || room.players.length < minPlayers} onClick={onStart}>
             시작 ({room.players.length}명)
           </button>
         )}

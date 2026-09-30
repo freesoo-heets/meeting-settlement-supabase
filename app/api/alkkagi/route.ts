@@ -3,6 +3,8 @@ import { getServerAdmin } from "../../../lib/server-admin";
 import {
   fail,
   hasActiveStakeGame,
+  isAdminMember,
+  loadMember,
   loadPlayer,
   requireMemberId,
   updateIfUnchanged,
@@ -46,6 +48,7 @@ type Game = {
   strikes: Partial<Record<Seat, number>> | null;
   turn_deadline: string | null;
   escrow_state: string;
+  is_test?: boolean;
   updated_at: string;
 };
 
@@ -106,6 +109,35 @@ export async function POST(request: Request) {
     me = player;
   }
 
+  // ── 관리자 테스트 대국 (혼자 양쪽 · 점수·티켓·봇 없음) ──
+  if (action === "create_test") {
+    if (!(await isAdminMember(admin, memberId))) return fail("관리자만 테스트할 수 있습니다.", 403);
+    const member = await loadMember(admin, memberId);
+    if ("error" in member) return fail(member.error, member.status);
+    const { data, error } = await admin
+      .from(TABLE)
+      .insert({
+        status: "playing",
+        is_test: true,
+        stake: 0,
+        host_member: memberId,
+        host_name: member.name,
+        host_uid: "test",
+        guest_member: memberId,
+        guest_name: `${member.name}(테스트)`,
+        guest_uid: "test",
+        cho: "host",
+        turn: "host",
+        pieces: initialPieces(),
+        started_at: now(),
+        turn_deadline: deadline(),
+      })
+      .select("id")
+      .single();
+    if (error) return fail(`만들기 실패: ${error.message}`, 500);
+    return NextResponse.json({ ok: true, id: data.id });
+  }
+
   // ── 방 만들기 / 대국신청 ──
   if (action === "create") {
     const stake = Math.floor(Number(body?.stake));
@@ -142,8 +174,15 @@ export async function POST(request: Request) {
   if (!gameId) return fail("대국 정보가 없습니다.");
   const game = loaded;
   if (!game) return fail("대국을 찾지 못했습니다.", 404);
+  // 테스트 대국은 혼자 양쪽을 친다
   const seat: Seat | null =
-    game.host_member === memberId ? "host" : game.guest_member === memberId ? "guest" : null;
+    game.is_test && game.host_member === memberId
+      ? game.turn ?? "host"
+      : game.host_member === memberId
+        ? "host"
+        : game.guest_member === memberId
+          ? "guest"
+          : null;
 
   // ── 입장 / 수락 ──
   if (action === "join") {
