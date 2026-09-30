@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
+import OmokGame from "./OmokGame";
 
 type Member = {
   id: string;
@@ -168,6 +169,7 @@ export default function Home() {
   const [members, setMembers] = useState<Member[]>([]);
   const [botPoints, setBotPoints] = useState<BotPoint[]>([]);
   const [showPointRanking, setShowPointRanking] = useState(false);
+  const [showOmok, setShowOmok] = useState(false);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [adjustments, setAdjustments] = useState<SettlementAdjustment[]>([]);
   const [prepayments, setPrepayments] = useState<MeetingPrepayment[]>([]);
@@ -4846,14 +4848,39 @@ setSaving(false);
       {loading && <div className="loading">불러오는 중...</div>}
 
       {botPoints.length > 0 && (
-        <button
-          className="pointRankingFab"
-          onClick={() => setShowPointRanking(true)}
-          aria-label="카톡 점수 순위 보기"
-        >
-          <span aria-hidden="true">🏆</span>
-          <strong>점수순위</strong>
-        </button>
+        <div className="floatingActions">
+          <button
+            className="pointRankingFab"
+            onClick={() => setShowPointRanking(true)}
+            aria-label="카톡 점수 순위 보기"
+          >
+            <span aria-hidden="true">🏆</span>
+            <strong>점수순위</strong>
+          </button>
+          {currentMember && (
+            <button
+              className="pointRankingFab omokFab"
+              onClick={() => setShowOmok(true)}
+              aria-label="오목 대결"
+            >
+              <span aria-hidden="true">⚫</span>
+              <strong>오목</strong>
+            </button>
+          )}
+        </div>
+      )}
+
+      {showOmok && currentMember && (
+        <OmokGame
+          onClose={() => setShowOmok(false)}
+          currentMemberId={currentMember.id}
+          myPoints={pointsByMember[currentMember.id]?.exp ?? null}
+          myTickets={pointsByMember[currentMember.id]?.tickets ?? null}
+          opponents={members
+            .filter((member) => member.active && member.id !== currentMember.id && pointsByMember[member.id])
+            .map((member) => ({ id: member.id, name: member.name }))
+            .sort((a, b) => a.name.localeCompare(b.name, "ko"))}
+        />
       )}
 
       {showPointRanking && (
