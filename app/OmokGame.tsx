@@ -66,6 +66,107 @@ async function callOmok(payload: Record<string, unknown>) {
   };
 }
 
+// 한글 초성 검색: "ㅍ" → 푸들·퐁당, "ㅍㄷ" → 푸들, "푸ㄷ" → 푸들
+const CHOSUNG = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ";
+
+function chosungOf(char: string) {
+  const code = char.charCodeAt(0) - 0xac00;
+  if (code < 0 || code > 11171) return char;
+  return CHOSUNG[Math.floor(code / 588)];
+}
+
+function matchesName(name: string, query: string) {
+  const q = query.split(" ").join("").toLowerCase();
+  if (!q) return true;
+  const n = name.split(" ").join("").toLowerCase();
+  for (let start = 0; start + q.length <= n.length; start += 1) {
+    let ok = true;
+    for (let i = 0; i < q.length && ok; i += 1) {
+      const c = n[start + i];
+      ok = CHOSUNG.includes(q[i]) ? chosungOf(c) === q[i] : c === q[i];
+    }
+    if (ok) return true;
+  }
+  return false;
+}
+
+function OpponentPicker({
+  opponents,
+  value,
+  onChange,
+}: {
+  opponents: Opponent[];
+  value: string;
+  onChange: (id: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const selected = opponents.find((member) => member.id === value) ?? null;
+  const matches = useMemo(
+    () => opponents.filter((member) => matchesName(member.name, query)).slice(0, 8),
+    [opponents, query],
+  );
+
+  if (selected) {
+    return (
+      <div className="omokPicked">
+        <span>⚔️ <strong>{selected.name}</strong>님에게 대국신청</span>
+        <button
+          className="omokPickedClear"
+          aria-label="상대 선택 취소"
+          onClick={() => {
+            onChange("");
+            setQuery("");
+          }}
+        >
+          ×
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="omokPicker">
+      <input
+        type="search"
+        value={query}
+        placeholder="상대 닉네임 검색 (초성 가능) · 비우면 누구나"
+        onChange={(event) => {
+          setQuery(event.target.value);
+          setOpen(true);
+        }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => window.setTimeout(() => setOpen(false), 150)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && matches.length > 0 && query.trim()) {
+            onChange(matches[0].id);
+            setOpen(false);
+          }
+        }}
+        aria-label="대국 상대 검색"
+      />
+      {open && query.trim() && (
+        <ul className="omokPickerList">
+          {matches.length === 0 && <li className="empty">일치하는 회원이 없습니다.</li>}
+          {matches.map((member) => (
+            <li key={member.id}>
+              <button
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  onChange(member.id);
+                  setOpen(false);
+                }}
+              >
+                {member.name}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function nameOf(game: OmokRow, side: "host" | "guest" | null) {
   if (side === "host") return game.host_name;
   if (side === "guest") return game.guest_name ?? "?";
@@ -328,14 +429,7 @@ export default function OmokGame({ onClose, initialGameId, currentMemberId, myPo
                   />
                   <span>점</span>
                 </div>
-                <select value={target} onChange={(event) => setTarget(event.target.value)} aria-label="상대">
-                  <option value="">누구나 (대기실에 방 열기)</option>
-                  {opponents.map((member) => (
-                    <option key={member.id} value={member.id}>
-                      {member.name}에게 대국신청
-                    </option>
-                  ))}
-                </select>
+                <OpponentPicker opponents={opponents} value={target} onChange={setTarget} />
                 <button
                   className="primaryButton"
                   disabled={busy}
