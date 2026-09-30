@@ -612,25 +612,14 @@ function AlkkagiBoardView({
       });
     });
 
-    let startedAt = 0;
-    const step = (time: number) => {
-      if (!startedAt) startedAt = time;
-      // 실제 흐른 시간 기준 (물리 계산은 1/60초 단위) → 화면 주사율과 상관없이 같은 속도
-      const t = ((time - startedAt) / 1000) * SIM_FPS;
+    // t(물리 계산 단위 시각)의 장면을 캔버스에 그린다
+    const last = frames.length - 1;
+    const drawAt = (t: number) => {
       const index = Math.floor(t);
-      const last = frames.length - 1;
-      const fadeDone = [...outAt.values()].every((at) => index - at > FADE_FRAMES);
-      if (index >= last && fadeDone) {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        setShown(final ?? result);
-        setAnimating(false);
-        return;
-      }
       const i = Math.min(index, last);
       const frac = index >= last ? 0 : t - index;
       const a = frames[i];
       const b = frames[Math.min(i + 1, last)];
-
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.setTransform(scale, 0, 0, scale, 0, 0);
@@ -647,10 +636,42 @@ function AlkkagiBoardView({
         const y = piece.y + (b[k].y - piece.y) * frac;
         drawPiece(ctx, piece, flip ? BOARD_W - x : x, flip ? BOARD_H - y : y, alpha);
       }
+    };
+
+    // ★ 깜빡임 방지 1: 원래 판의 알을 숨기기 전에 캔버스에 첫 장면부터 그려 둔다
+    drawAt(0);
+
+    let startedAt = 0;
+    const step = (time: number) => {
+      if (!startedAt) startedAt = time;
+      // 실제 흐른 시간 기준 (물리 계산은 1/60초 단위) → 화면 주사율과 상관없이 같은 속도
+      const t = ((time - startedAt) / 1000) * SIM_FPS;
+      const fadeDone = [...outAt.values()].every((at) => t - at > FADE_FRAMES);
+      if (t >= last && fadeDone) {
+        // ★ 깜빡임 방지 2: 캔버스는 마지막 장면 그대로 두고, 원래 판의 알이 다시 그려진 뒤에 지운다
+        drawAt(last + FADE_FRAMES + 1);
+        setShown(final ?? result);
+        setAnimating(false);
+        return;
+      }
+      drawAt(t);
       frameRef.current = window.requestAnimationFrame(step);
     };
     frameRef.current = window.requestAnimationFrame(step);
   }, []);
+
+  // 원래 판의 알이 다시 보이게 된 다음 화면에서 캔버스를 비운다
+  useEffect(() => {
+    if (animating) return;
+    const id = window.requestAnimationFrame(() => {
+      const canvas = animCanvas.current;
+      const ctx = canvas?.getContext("2d");
+      if (!canvas || !ctx) return;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [animating]);
 
   // 서버에서 새 수가 오면 재생한다 (내가 쏜 것은 이미 재생했으므로 건너뜀)
   useEffect(() => {

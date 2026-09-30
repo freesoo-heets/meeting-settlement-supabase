@@ -9,10 +9,10 @@ export const BOARD_H = MARGIN * 2 + CELL * 9; // 420
 export const TURN_SECONDS = 20;
 export const MAX_STRIKES = 3; // 연속 시간 초과 3번이면 패배
 export const MAX_SHOTS = 120; // 이 수를 넘기면 남은 알 수로 판정
-export const VMAX = 900; // 최대 속도 (단위/초)
+export const VMAX = 650; // 최대 속도 (단위/초) — 900에서 낮춤
 
 const DT = 1 / 60;
-const FRICTION = 260; // 감속 (단위/초²)
+const FRICTION = 300; // 감속 (단위/초²) — 조금 더 빨리 멈추게
 const RESTITUTION = 0.92;
 const MAX_STEPS = 900;
 
@@ -37,8 +37,8 @@ export const POWER: Record<Kind, number> = {
   po: 1,
   ma: 1,
   sang: 1,
-  sa: 0.8,
-  jol: 0.8,
+  sa: 0.55,
+  jol: 0.55,
 };
 
 export const RADIUS: Record<Kind, number> = {
