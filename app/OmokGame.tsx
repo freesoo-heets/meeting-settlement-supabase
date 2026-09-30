@@ -35,6 +35,7 @@ type OmokRow = {
   settle_state: string;
   is_test?: boolean;
   is_friendly?: boolean;
+  undo?: { pending?: { by: "host" | "guest"; n: number } | null; used?: Partial<Record<"host" | "guest", number>> } | null;
   created_at: string;
   finished_at: string | null;
   started_at?: string | null;
@@ -57,8 +58,9 @@ type Props = {
 };
 
 const COLUMNS =
-  "id,status,stake,host_member,host_name,guest_member,guest_name,target_member,black,moves,turn_deadline,winner,end_reason,escrow_state,escrow_note,settle_state,is_test,is_friendly,created_at,started_at,finished_at";
+  "id,status,stake,host_member,host_name,guest_member,guest_name,target_member,black,moves,turn_deadline,winner,end_reason,escrow_state,escrow_note,settle_state,is_test,is_friendly,undo,created_at,started_at,finished_at";
 const STAKE_PRESETS = [100, 300, 500, 1000];
+const MAX_UNDO = 3; // 한 사람당 한 판에 무르기 (서버와 같게)
 const CELL = 30;
 const PAD = 20;
 const VIEW = PAD * 2 + CELL * (BOARD_SIZE - 1);
@@ -228,14 +230,18 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
 
   const load = useCallback(async () => {
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    const { data, error } = await supabase
-      .from("omok_games")
-      .select(COLUMNS)
-      .or(`status.in.(open,challenge,escrow,playing),finished_at.gte.${since}`)
-      .order("created_at", { ascending: false })
-      .limit(40);
+    const query = (columns: string) =>
+      supabase
+        .from("omok_games")
+        .select(columns)
+        .or(`status.in.(open,challenge,escrow,playing),finished_at.gte.${since}`)
+        .order("created_at", { ascending: false })
+        .limit(40);
+    let { data, error } = await query(COLUMNS);
+    // 새로 추가한 칸(무르기)이 DB에 아직 없으면 그 칸만 빼고 다시 불러온다 → 목록이 비지 않게
+    if (error?.code === "42703") ({ data, error } = await query(COLUMNS.replace(",undo", "")));
     if (error) return;
-    const rows = (data ?? []) as OmokRow[];
+    const rows = (data ?? []) as unknown as OmokRow[];
 
     // 링크로 들어온 대국이 목록에 없으면(취소·오래된 결과) 따로 불러온다
     if (initialGameId && !rows.some((row) => row.id === initialGameId)) {
@@ -463,6 +469,8 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
               }
             }}
             onCancel={() => run({ action: "cancel", gameId: viewing.id }, () => setViewId(""))}
+            onUndoRequest={() => run({ action: "undo_request", gameId: viewing.id })}
+            onUndoAnswer={(accept) => run({ action: "undo_answer", gameId: viewing.id, accept })}
             emote={emote}
             emoteReadyIn={Math.max(0, emoteCooldownUntil - now)}
             onEmote={sendEmote}
@@ -646,6 +654,8 @@ function OmokBoardView({
   onMove,
   onResign,
   onCancel,
+  onUndoRequest,
+  onUndoAnswer,
   emote,
   emoteReadyIn,
   onEmote,
@@ -660,6 +670,8 @@ function OmokBoardView({
   onMove: (x: number, y: number) => void;
   onResign: () => void;
   onCancel: () => void;
+  onUndoRequest: () => void;
+  onUndoAnswer: (accept: boolean) => void;
   emote: ShownEmote | null;
   emoteReadyIn: number;
   onEmote: (kind: EmoteKind, board: Board, watcher: boolean) => void;
@@ -687,6 +699,21 @@ function OmokBoardView({
     ? Math.max(0, Math.ceil((new Date(game.turn_deadline).getTime() - now) / 1000))
     : TURN_SECONDS;
   const last = game.moves[game.moves.length - 1];
+
+  // ── 무르기 ──
+  const realSide = game.host_member === me ? "host" : game.guest_member === me ? "guest" : null;
+  const whiteOf = game.black === "host" ? "guest" : "host";
+  const lastBy = game.moves.length % 2 === 1 ? game.black : whiteOf;
+  const undoPending = game.undo?.pending ?? null;
+  const undoUsed = realSide ? game.undo?.used?.[realSide] ?? 0 : 0;
+  const canUndo =
+    game.status === "playing" &&
+    realSide !== null &&
+    game.moves.length >= 2 &&
+    !undoPending &&
+    (game.is_test ? true : lastBy === realSide && undoUsed < MAX_UNDO);
+  const undoIncoming = game.status === "playing" && !!undoPending && realSide !== null && undoPending.by !== realSide;
+  const undoWaiting = game.status === "playing" && !!undoPending && undoPending.by === realSide;
 
   function handleClick(x: number, y: number) {
     if (!myTurn || busy || board[y][x] !== 0 || forbiddenSet.has(`${x},${y}`)) return;
@@ -826,8 +853,24 @@ function OmokBoardView({
         </div>
       )}
 
+      {undoIncoming && (
+        <div className="omokUndoAsk" role="alert">
+          <span>↩ <b>{nameOf(game, undoPending!.by)}</b>님이 방금 둔 수를 무르고 싶어 해요.</span>
+          <div>
+            <button className="primaryButton" disabled={busy} onClick={() => onUndoAnswer(true)}>수락</button>
+            <button className="smallButton ghost" disabled={busy} onClick={() => onUndoAnswer(false)}>거절</button>
+          </div>
+        </div>
+      )}
+      {undoWaiting && <p className="omokUndoWait">↩ 무르기 요청 중… 상대의 응답을 기다리고 있어요.</p>}
+
       <div className="omokControls">
         <button className="smallButton ghost" onClick={onBack}>← 대기실</button>
+        {canUndo && (
+          <button className="smallButton ghost" disabled={busy} onClick={onUndoRequest}>
+            ↩ 무르기{game.is_test ? "" : ` (${MAX_UNDO - undoUsed}회 남음)`}
+          </button>
+        )}
         {myTurn && pending && (
           <button className="primaryButton" disabled={busy} onClick={() => onMove(pending[0], pending[1])}>
             여기에 두기

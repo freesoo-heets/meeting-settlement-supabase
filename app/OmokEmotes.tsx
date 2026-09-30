@@ -9,6 +9,8 @@ export const EMOTES = [
   { kind: "laugh", label: "웃음" },
   { kind: "cry", label: "눈물" },
   { kind: "angry", label: "화내기" },
+  { kind: "question", label: "물음표" },
+  { kind: "hurry", label: "재촉하기" },
 ] as const;
 
 export type EmoteKind = (typeof EMOTES)[number]["kind"];
@@ -72,6 +74,40 @@ export function EmoteIcon({ kind }: { kind: EmoteKind }) {
           <path d="M30 50q-2 20 2 40h8q2-20 0-40z" fill="#60a5fa" opacity=".9" />
           <path d="M70 50q2 20-2 40h-8q-2-20 0-40z" fill="#60a5fa" opacity=".9" />
           <path d="M40 76q10-10 20 0" fill="none" stroke="#5b3a0a" strokeWidth="4" strokeLinecap="round" />
+        </>
+      )}
+
+      {kind === "question" && (
+        <>
+          <circle cx="50" cy="52" r="44" fill={`url(#${face})`} stroke="#c98a12" strokeWidth="2" />
+          {/* 갸우뚱한 눈썹 · 눈 · 입 */}
+          <path d="M28 40q7-5 14-1M60 36q7-2 13 3" fill="none" stroke="#5b3a0a" strokeWidth="3.5" strokeLinecap="round" />
+          <circle cx="36" cy="52" r="5" fill="#5b3a0a" />
+          <circle cx="65" cy="50" r="5" fill="#5b3a0a" />
+          <path d="M40 76q8-5 18-1" fill="none" stroke="#5b3a0a" strokeWidth="4" strokeLinecap="round" />
+          {/* ??? */}
+          <g fill="#7c3aed" stroke="#fff" strokeWidth="1.5" fontWeight="900" fontFamily="Arial, sans-serif">
+            <text x="58" y="26" fontSize="24">?</text>
+            <text x="72" y="20" fontSize="28">?</text>
+            <text x="86" y="30" fontSize="22">?</text>
+          </g>
+        </>
+      )}
+
+      {kind === "hurry" && (
+        <>
+          {/* 초시계 */}
+          <rect x="44" y="6" width="12" height="9" rx="2" fill="#475569" />
+          <path d="M74 20l7-7" stroke="#475569" strokeWidth="5" strokeLinecap="round" />
+          <circle cx="50" cy="56" r="40" fill="#fff" stroke="#ef4444" strokeWidth="6" />
+          <path d="M50 56V30" stroke="#0f172a" strokeWidth="5" strokeLinecap="round" />
+          <path d="M50 56l16 10" stroke="#ef4444" strokeWidth="4" strokeLinecap="round" />
+          <circle cx="50" cy="56" r="4" fill="#0f172a" />
+          {/* 움직임 선 */}
+          <path d="M4 40h8M2 54h10M5 68h8" stroke="#f59e0b" strokeWidth="3.5" strokeLinecap="round" />
+          {/* 빨리! */}
+          <rect x="54" y="74" width="44" height="22" rx="11" fill="#ef4444" />
+          <text x="76" y="90" fontSize="14" fontWeight="900" fill="#fff" textAnchor="middle" fontFamily="'Noto Sans KR', 'Malgun Gothic', sans-serif">빨리!</text>
         </>
       )}
 

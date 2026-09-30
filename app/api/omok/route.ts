@@ -15,6 +15,7 @@ const MIN_STAKE = 10;
 const MAX_STAKE = 1000;
 const GRACE_MS = 2000; // 통신 지연 여유
 const ACTIVE = ["open", "challenge", "escrow", "playing"];
+const MAX_UNDO = 3; // 한 사람당 한 판에 무르기 횟수
 
 type Admin = ReturnType<typeof getServerAdmin>;
 
@@ -35,6 +36,7 @@ type Game = {
   escrow_state: string;
   is_test?: boolean;
   is_friendly?: boolean;
+  undo?: { pending?: { by: "host" | "guest"; n: number } | null; used?: Partial<Record<"host" | "guest", number>> } | null;
   updated_at: string;
 };
 
@@ -323,6 +325,53 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
+  // ── 무르기 요청: 방금 내가 둔 수를, 상대가 두기 전에 ──
+  if (action === "undo_request") {
+    if (game.status !== "playing") return fail("진행 중인 대국이 아닙니다.");
+    if (game.moves.length < 2) return fail("무를 수가 없습니다.");
+    const lastBy = game.moves.length % 2 === 1 ? game.black : game.black === "host" ? "guest" : "host";
+    const used = { host: 0, guest: 0, ...(game.undo?.used ?? {}) };
+
+    // 테스트 대국은 혼자 두므로 바로 물러준다
+    if (game.is_test && game.host_member === me.memberId) {
+      const ok = await updateGame(admin, game, {
+        moves: game.moves.slice(0, -1),
+        turn_deadline: deadlineFromNow(),
+        undo: { ...(game.undo ?? {}), pending: null },
+      });
+      return ok ? NextResponse.json({ ok: true, undone: true }) : fail("판이 바뀌었습니다.", 409);
+    }
+
+    if (lastBy !== side) return fail("방금 내가 둔 수만 무를 수 있습니다. (상대가 두기 전에)");
+    if (game.undo?.pending) return fail("이미 무르기를 요청했습니다.");
+    if ((used[side] ?? 0) >= MAX_UNDO) return fail(`무르기는 한 판에 ${MAX_UNDO}번까지입니다.`);
+    const ok = await updateGame(admin, game, {
+      undo: { ...(game.undo ?? {}), used, pending: { by: side, n: game.moves.length } },
+    });
+    if (!ok) return fail("판이 바뀌었습니다. 다시 시도해 주세요.", 409);
+    return NextResponse.json({ ok: true });
+  }
+
+  // ── 무르기 응답: 상대가 수락하면 마지막 수를 되돌린다 ──
+  if (action === "undo_answer") {
+    const pending = game.undo?.pending;
+    if (game.status !== "playing" || !pending) return fail("무르기 요청이 없습니다.");
+    if (pending.by === side) return fail("상대의 응답을 기다리는 중입니다.");
+    const used = { host: 0, guest: 0, ...(game.undo?.used ?? {}) };
+    if (body?.accept !== true || pending.n !== game.moves.length) {
+      const ok = await updateGame(admin, game, { undo: { used, pending: null } });
+      return ok ? NextResponse.json({ ok: true, undone: false }) : fail("판이 바뀌었습니다.", 409);
+    }
+    used[pending.by] = (used[pending.by] ?? 0) + 1;
+    const ok = await updateGame(admin, game, {
+      moves: game.moves.slice(0, -1),
+      turn_deadline: deadlineFromNow(), // 다시 요청한 사람 차례, 시간 새로
+      undo: { used, pending: null },
+    });
+    if (!ok) return fail("판이 바뀌었습니다. 다시 시도해 주세요.", 409);
+    return NextResponse.json({ ok: true, undone: true });
+  }
+
   // ── 착수 ──
   if (action === "move") {
     if (game.status !== "playing") return fail("진행 중인 대국이 아닙니다.");
@@ -335,7 +384,8 @@ export async function POST(request: Request) {
     if (!result.ok) return fail(result.reason);
 
     const moves = [...game.moves, [x, y]];
-    const fields: Record<string, unknown> = { moves };
+    // 상대가 다음 수를 두면 걸려 있던 무르기 요청은 사라진다
+    const fields: Record<string, unknown> = { moves, undo: { ...(game.undo ?? {}), pending: null } };
     if (result.win || result.draw) {
       fields.status = "finished";
       fields.winner = result.win ? side : "draw";

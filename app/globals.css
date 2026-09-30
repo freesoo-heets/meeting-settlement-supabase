@@ -5402,3 +5402,22 @@ button.meetingMetricCard {
 .alkStage { position: relative; }
 .alkAnim { position: absolute; left: 0; top: 0; width: 100%; aspect-ratio: 380 / 420; pointer-events: none; }
 .alkBoard.animating .alkPiece { visibility: hidden; }
+
+/* 오목 무르기 */
+.omokUndoAsk {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid #fcd34d;
+  border-radius: 12px;
+  background: #fffbeb;
+  font-size: 14px;
+}
+.omokUndoAsk > div { display: flex; gap: 6px; }
+.omokUndoWait { margin: 0; text-align: center; font-size: 13px; color: #b45309; }
+
+/* 감정표현 6개 — 좁은 화면에서 한 줄에 들어가게 */
+@media (max-width: 420px) { .omokEmoteBar { gap: 6px; } .omokEmoteButton { width: 40px; height: 40px; padding: 4px; } }
