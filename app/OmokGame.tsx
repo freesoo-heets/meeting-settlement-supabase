@@ -29,6 +29,7 @@ type Opponent = { id: string; name: string };
 
 type Props = {
   onClose: () => void;
+  initialGameId?: string;
   currentMemberId: string | null;
   myPoints: number | null;
   myTickets: number | null;
@@ -71,9 +72,10 @@ function nameOf(game: OmokRow, side: "host" | "guest" | null) {
   return "?";
 }
 
-export default function OmokGame({ onClose, currentMemberId, myPoints, myTickets, opponents }: Props) {
+export default function OmokGame({ onClose, initialGameId, currentMemberId, myPoints, myTickets, opponents }: Props) {
   const [games, setGames] = useState<OmokRow[]>([]);
-  const [viewId, setViewId] = useState<string>("");
+  const [viewId, setViewId] = useState<string>(initialGameId ?? "");
+  const [missing, setMissing] = useState(false);
   const [stake, setStake] = useState("100");
   const [target, setTarget] = useState("");
   const [busy, setBusy] = useState(false);
@@ -90,8 +92,17 @@ export default function OmokGame({ onClose, currentMemberId, myPoints, myTickets
       .or(`status.in.(open,challenge,escrow,playing),finished_at.gte.${since}`)
       .order("created_at", { ascending: false })
       .limit(40);
-    if (!error) setGames((data ?? []) as OmokRow[]);
-  }, []);
+    if (error) return;
+    const rows = (data ?? []) as OmokRow[];
+
+    // 링크로 들어온 대국이 목록에 없으면(취소·오래된 결과) 따로 불러온다
+    if (initialGameId && !rows.some((row) => row.id === initialGameId)) {
+      const single = await supabase.from("omok_games").select(COLUMNS).eq("id", initialGameId).maybeSingle();
+      if (single.data) rows.push(single.data as OmokRow);
+      else setMissing(true);
+    }
+    setGames(rows);
+  }, [initialGameId]);
 
   const myActive = useMemo(
     () =>
@@ -172,8 +183,57 @@ export default function OmokGame({ onClose, currentMemberId, myPoints, myTickets
         </div>
 
         {message && <div className="omokMessage">{message}</div>}
+        {missing && viewId === initialGameId && !viewing && (
+          <div className="omokMessage">도전장을 찾지 못했습니다. 주소를 확인해 주세요.</div>
+        )}
 
-        {viewing ? (
+        {viewing && (viewing.status === "open" || viewing.status === "challenge") ? (
+          <div className="omokInvite">
+            <span className="omokInviteIcon">⚔️</span>
+            <strong>
+              {viewing.status === "challenge"
+                ? `${viewing.host_name}님의 도전장`
+                : `${viewing.host_name}님이 상대를 찾고 있어요`}
+            </strong>
+            <span>
+              판돈 <b>💎 {viewing.stake.toLocaleString("ko-KR")}점</b> · 티켓 🎫1장 · 렌주룰 · 한 수 {TURN_SECONDS}초
+            </span>
+            <span className="muted">
+              내 점수 💎 {myPoints !== null ? myPoints.toLocaleString("ko-KR") : "-"} · 티켓 🎫 {myTickets ?? "-"}
+            </span>
+            {viewing.host_member === currentMemberId ? (
+              <>
+                <span className="muted">내가 만든 대국입니다. 상대를 기다리는 중…</span>
+                <div className="omokControls">
+                  <button className="smallButton ghost" onClick={() => setViewId("")}>← 대기실</button>
+                  <button className="smallButton ghost" disabled={busy} onClick={() => run({ action: "cancel", gameId: viewing.id }, () => setViewId(""))}>
+                    취소
+                  </button>
+                </div>
+              </>
+            ) : viewing.status === "challenge" && viewing.target_member !== currentMemberId ? (
+              <>
+                <span className="muted">다른 회원에게 보낸 도전장입니다.</span>
+                <button className="smallButton ghost" onClick={() => setViewId("")}>← 대기실</button>
+              </>
+            ) : (
+              <div className="omokControls">
+                <button className="primaryButton" disabled={busy || !!myActive} onClick={() => run({ action: "join", gameId: viewing.id })}>
+                  {viewing.status === "challenge" ? "도전 수락" : "대결하기"}
+                </button>
+                {viewing.status === "challenge" && (
+                  <button className="smallButton ghost" disabled={busy} onClick={() => run({ action: "decline", gameId: viewing.id }, () => setViewId(""))}>
+                    거절
+                  </button>
+                )}
+                <button className="smallButton ghost" onClick={() => setViewId("")}>대기실</button>
+              </div>
+            )}
+            {myActive && viewing.host_member !== currentMemberId && (
+              <span className="muted">이미 대기 중이거나 진행 중인 대국이 있어 참여할 수 없습니다.</span>
+            )}
+          </div>
+        ) : viewing ? (
           <OmokBoardView
             game={viewing}
             me={currentMemberId}

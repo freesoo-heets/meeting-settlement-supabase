@@ -170,6 +170,19 @@ export default function Home() {
   const [botPoints, setBotPoints] = useState<BotPoint[]>([]);
   const [showPointRanking, setShowPointRanking] = useState(false);
   const [showOmok, setShowOmok] = useState(false);
+  // 카톡 도전장 링크(?omok=대국번호)로 들어온 경우
+  const [omokInvite, setOmokInvite] = useState("");
+
+  useEffect(() => {
+    let invite = new URLSearchParams(window.location.search).get("omok") ?? "";
+    try {
+      if (invite) window.sessionStorage.setItem("omokInvite", invite);
+      else invite = window.sessionStorage.getItem("omokInvite") ?? "";
+    } catch {
+      // 저장소를 못 써도 주소의 값으로 진행한다
+    }
+    if (invite) setOmokInvite(invite);
+  }, []);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [adjustments, setAdjustments] = useState<SettlementAdjustment[]>([]);
   const [prepayments, setPrepayments] = useState<MeetingPrepayment[]>([]);
@@ -974,6 +987,11 @@ export default function Home() {
         : null,
     [members, currentProfile]
   );
+
+  useEffect(() => {
+    if (!omokInvite || !currentMember) return;
+    setShowOmok(true);
+  }, [omokInvite, currentMember]);
 
   const myMonthSummary = useMemo(() => {
     if (!currentMember) {
@@ -2842,6 +2860,16 @@ setSaving(false);
               <h1>강서구 찐친만들기</h1>
             </div>
           </div>
+
+          {omokInvite && (
+            <div className="omokInviteNotice">
+              <strong>⚫ 오목 도전장이 도착했어요!</strong>
+              <span>로그인하면 바로 대국 화면으로 이동합니다.</span>
+              <span>
+                아직 계정이 없다면 <b>최초 가입</b>에서 카톡방 닉네임으로 가입해 주세요.
+              </span>
+            </div>
+          )}
 
           <div className="authModeTabs">
             <button
@@ -4872,7 +4900,19 @@ setSaving(false);
 
       {showOmok && currentMember && (
         <OmokGame
-          onClose={() => setShowOmok(false)}
+          onClose={() => {
+            setShowOmok(false);
+            if (omokInvite) {
+              setOmokInvite("");
+              try {
+                window.sessionStorage.removeItem("omokInvite");
+              } catch {
+                // 무시
+              }
+              window.history.replaceState(null, "", window.location.pathname);
+            }
+          }}
+          initialGameId={omokInvite}
           currentMemberId={currentMember.id}
           myPoints={pointsByMember[currentMember.id]?.exp ?? null}
           myTickets={pointsByMember[currentMember.id]?.tickets ?? null}

@@ -4916,3 +4916,29 @@ button.meetingMetricCard {
 .omokControls { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; }
 .omokControls .danger { color: #dc2626; }
 .omokHint { text-align: center; font-size: 11px; }
+
+.omokInviteNotice {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #fff7ed;
+  border: 1px solid #fdba74;
+  font-size: 13px;
+  color: #7c2d12;
+}
+.omokInviteNotice strong { font-size: 15px; }
+.omokInvite {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 18px 8px 8px;
+  text-align: center;
+  font-size: 14px;
+}
+.omokInvite > strong { font-size: 18px; }
+.omokInvite b { color: #1d4ed8; }
+.omokInviteIcon { font-size: 40px; line-height: 1; }
