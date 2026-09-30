@@ -82,6 +82,29 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
 
   const back = () => setActive(null);
 
+  // 관리자 테스트: 바로 만들어 그 판으로 들어간다
+  const [testing, setTesting] = useState(false);
+  const [testError, setTestError] = useState("");
+  async function startTest(kind: GameKind) {
+    setTesting(true);
+    setTestError("");
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    const response = await fetch(`/api/${kind}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token ?? ""}` },
+      body: JSON.stringify({ action: "create_test" }),
+    });
+    const result = (await response.json().catch(() => ({ ok: false, error: "응답 오류" }))) as {
+      ok: boolean;
+      error?: string;
+      id?: string;
+    };
+    setTesting(false);
+    if (result.ok && result.id) setActive({ kind, id: result.id });
+    else setTestError(result.error ?? "테스트를 시작하지 못했습니다.");
+  }
+
   if (active?.kind === "omok") {
     return (
       <OmokGame
@@ -184,6 +207,7 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
           <button className="modalCloseButton" onClick={onClose}>×</button>
         </div>
 
+        {testError && <div className="omokMessage">{testError}</div>}
         <div className="gameHubGrid">
           {GAMES.map((game) => {
             const rows = sections[game.kind];
@@ -199,6 +223,15 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
                     {game.kind === "catch" ? "방 만들기" : "대국 만들기"}
                   </button>
                 </div>
+                {isAdmin && (
+                  <button
+                    className="smallButton ghost omokTestButton gameHubTest"
+                    disabled={testing}
+                    onClick={() => void startTest(game.kind)}
+                  >
+                    🧪 {game.kind === "catch" ? "테스트 방 (혼자 시작 · 출제자도 정답 입력)" : "테스트 대국 (혼자 양쪽 · 점수 없음)"}
+                  </button>
+                )}
                 <div className="gameHubRooms">
                   {rows.length === 0 && <span className="muted">열린 방이 없습니다.</span>}
                   {rows.map((row) => (
