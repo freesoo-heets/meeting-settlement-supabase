@@ -13,6 +13,18 @@ type Member = {
   created_at: string;
 };
 
+// 카톡 봇 점수판 스냅샷 (봇이 10분마다 bot_points 에 올린다)
+type BotPoint = {
+  kakao_uid: string;
+  name: string;
+  exp: number;
+  rank: number | null;
+  trophies: string | null;
+  tickets: number;
+  season: number | null;
+  synced_at: string;
+};
+
 type MeetingRow = {
   id: string;
   date: string;
@@ -55,7 +67,7 @@ type Meeting = MeetingRow & {
 
 type MainTab = "dashboard" | "meetings" | "members" | "monthly" | "history" | "help";
 type MemberFilter = "all" | "active" | "warning" | "withdrawn";
-type MemberSort = "nickname_asc" | "nickname_desc" | "join_desc" | "join_asc" | "last_desc" | "last_asc";
+type MemberSort = "nickname_asc" | "nickname_desc" | "join_desc" | "join_asc" | "last_desc" | "last_asc" | "points_desc";
 type MonthlySortKey = "member" | "status" | "join" | "attendance" | "last" | "burden" | "warning";
 type SortDirection = "asc" | "desc";
 type AttendeeSort = "selected_first" | "nickname_asc" | "nickname_desc" | "join_desc" | "join_asc" | "last_desc" | "last_asc";
@@ -153,6 +165,7 @@ export default function Home() {
   const [meetingCalendarMonth, setMeetingCalendarMonth] = useState(currentMonth);
   const [memberCalendarMonth, setMemberCalendarMonth] = useState(currentMonth);
   const [members, setMembers] = useState<Member[]>([]);
+  const [botPoints, setBotPoints] = useState<BotPoint[]>([]);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [adjustments, setAdjustments] = useState<SettlementAdjustment[]>([]);
   const [prepayments, setPrepayments] = useState<MeetingPrepayment[]>([]);
@@ -336,6 +349,12 @@ export default function Home() {
     setProfiles((profileResult.data ?? []) as Profile[]);
     setActivityLogs((activityLogResult.data ?? []) as ActivityLog[]);
     setLoading(false);
+
+    // 봇 점수는 부가 정보라 실패해도 화면 전체를 막지 않는다.
+    const pointResult = await supabase
+      .from("bot_points")
+      .select("kakao_uid,name,exp,rank,trophies,tickets,season,synced_at");
+    setBotPoints(pointResult.error ? [] : ((pointResult.data ?? []) as BotPoint[]));
   }, []);
 
   const applySignedInUser = useCallback(
@@ -495,6 +514,31 @@ export default function Home() {
     [members]
   );
 
+  // members.name(짧은 닉네임) ↔ 봇 점수판 짧은 닉네임. 같은 이름이 여럿이면 점수가 높은 쪽.
+  const pointsByMember = useMemo(() => {
+    const normalize = (value: string) => value.split(" ").join("").toLowerCase();
+    const byName = new Map<string, BotPoint>();
+    for (const row of botPoints) {
+      const key = normalize(row.name);
+      const current = byName.get(key);
+      if (!current || row.exp > current.exp) byName.set(key, row);
+    }
+    const map: Record<string, BotPoint> = {};
+    for (const member of members) {
+      const row = byName.get(normalize(member.name));
+      if (row) map[member.id] = row;
+    }
+    return map;
+  }, [botPoints, members]);
+
+  const botPointsSyncedAt = useMemo(() => {
+    let latest = "";
+    for (const row of botPoints) {
+      if (row.synced_at > latest) latest = row.synced_at;
+    }
+    return latest;
+  }, [botPoints]);
+
   const lastAttendanceByMember = useMemo(() => {
     const map: Record<string, string | null> = Object.fromEntries(
       members.map((member) => [member.id, null])
@@ -652,6 +696,11 @@ export default function Home() {
       if (memberSort === "join_asc") {
         return a.join_date.localeCompare(b.join_date) || a.name.localeCompare(b.name, "ko");
       }
+      if (memberSort === "points_desc") {
+        const aExp = pointsByMember[a.id]?.exp ?? -1;
+        const bExp = pointsByMember[b.id]?.exp ?? -1;
+        return bExp - aExp || a.name.localeCompare(b.name, "ko");
+      }
 
       const aLast = lastAttendanceByMember[a.id];
       const bLast = lastAttendanceByMember[b.id];
@@ -673,6 +722,7 @@ export default function Home() {
     memberSort,
     warningByMember,
     lastAttendanceByMember,
+    pointsByMember,
   ]);
 
   const adjustmentByKey = useMemo(() => {
@@ -4078,6 +4128,7 @@ setSaving(false);
                   <option value="join_asc">입장일 오래된순</option>
                   <option value="last_desc">최근 참석일 최신순</option>
                   <option value="last_asc">최근 참석일 오래된순</option>
+                  <option value="points_desc">카톡 점수 높은순</option>
                 </select>
               </label>
             </div>
@@ -4087,6 +4138,11 @@ setSaving(false);
                 <span className="memberToolbarLabel">회원 상태</span>
                 <small>전체 {memberStatusCounts.all}명 = 활동중 {memberStatusCounts.active}명 + 경고 {memberStatusCounts.warning}명 · 탈퇴 제외</small>
               </div>
+              {botPointsSyncedAt && (
+                <small className="muted">
+                  💎 카톡 점수는 봇 점수판 기준 · {new Date(botPointsSyncedAt).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })} 갱신
+                </small>
+              )}
 
               <div className="memberStatusSummary">
                 {[
@@ -4128,6 +4184,7 @@ setSaving(false);
               const warning = warningByMember[member.id];
               const last = lastAttendanceByMember[member.id];
               const profile = profiles.find((item) => item.member_id === member.id);
+              const point = pointsByMember[member.id];
 
               return (
                 <article
@@ -4145,6 +4202,16 @@ setSaving(false);
                         >
                           {member.name}
                         </button>
+                        {point ? (
+                          <span className="botPointBadge" title="카톡 봇 점수판 기준">
+                            <strong>💎 {point.exp.toLocaleString("ko-KR")}점</strong>
+                            {point.rank ? <em>{point.rank}위</em> : null}
+                            {point.tickets ? <em>🎫{point.tickets}</em> : null}
+                            {point.trophies ? <em>{point.trophies}</em> : null}
+                          </span>
+                        ) : botPoints.length > 0 ? (
+                          <span className="botPointBadge empty">💎 점수 없음</span>
+                        ) : null}
                         <span className={`statusBadge ${member.active ? "active" : "withdrawn"}`}>
                           {member.active ? "활동중" : "탈퇴"}
                         </span>

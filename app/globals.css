@@ -4669,3 +4669,21 @@ button.meetingMetricCard {
   .memberDetailModal .memberCalendarGrid .calendarDay { min-height:52px; height:52px; padding:3px; }
   .memberDetailModal .calendarEvent { font-size:6.5px; padding:3px; }
 }
+
+/* 카톡 봇 점수 배지 (회원 현황) */
+.botPointBadge {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #eef4ff;
+  color: #1d4ed8;
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+.botPointBadge strong { font-weight: 700; }
+.botPointBadge em { font-style: normal; color: #475569; }
+.botPointBadge.empty { background: #f1f5f9; color: #94a3b8; }
