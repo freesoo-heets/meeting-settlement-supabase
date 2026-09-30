@@ -65,14 +65,42 @@ async function cleanupStale(admin: Admin) {
     .lt("updated_at", new Date(now - 5 * 60 * 1000).toISOString());
 }
 
-async function inOtherRoom(admin: Admin, memberId: string) {
-  const { data } = await admin
+// 내가 들어가 있는 방들 (최근 것부터)
+// ★ players 는 jsonb 라서 JSON 문자열로 넘겨야 한다.
+//   배열을 그대로 넘기면 'cs.{[object Object]}' 로 바뀌어 조회가 늘 실패했고,
+//   그 바람에 방 만들기를 누를 때마다 새 방이 생기는 버그가 있었다.
+async function myRooms(admin: Admin, memberId: string) {
+  const { data, error } = await admin
     .from(TABLE)
-    .select("id")
+    .select("id,players,status,created_at")
     .in("status", ["waiting", "playing"])
-    .contains("players", [{ id: memberId }])
-    .limit(1);
-  return (data ?? [])[0]?.id as string | undefined;
+    .contains("players", JSON.stringify([{ id: memberId }]))
+    .order("created_at", { ascending: false })
+    .limit(20);
+  if (error) throw new Error(`방 조회 실패: ${error.message}`);
+  return (data ?? []) as Array<{ id: string; players: Member[]; status: string }>;
+}
+
+async function inOtherRoom(admin: Admin, memberId: string) {
+  return (await myRooms(admin, memberId))[0]?.id as string | undefined;
+}
+
+// 나 혼자 남아 있는 대기방이 여러 개면 가장 최근 것만 남기고 닫는다 (예전 버그로 쌓인 방 정리)
+async function closeDuplicateRooms(admin: Admin, memberId: string) {
+  const rooms = await myRooms(admin, memberId);
+  const extra = rooms
+    .slice(1)
+    .filter((room) => room.status === "waiting" && room.players.length === 1 && room.players[0].id === memberId);
+  if (extra.length > 0) {
+    await admin
+      .from(TABLE)
+      .update({ status: "cancelled", updated_at: new Date().toISOString() })
+      .in(
+        "id",
+        extra.map((room) => room.id),
+      );
+  }
+  return rooms[0]?.id as string | undefined;
 }
 
 // 새 턴 시작 (턴이 다 끝났으면 게임 종료)
@@ -153,7 +181,8 @@ export async function POST(request: Request) {
     const member = await loadMember(admin, memberId);
     if ("error" in member) return fail(member.error, member.status);
     await cleanupStale(admin);
-    const existing = await inOtherRoom(admin, memberId);
+    // 이미 들어가 있는 방이 있으면 새로 만들지 않고 그 방으로 보낸다
+    const existing = await closeDuplicateRooms(admin, memberId);
     if (existing) return NextResponse.json({ ok: true, id: existing, existing: true });
 
     const { data, error } = await admin

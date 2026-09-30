@@ -180,7 +180,7 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
     })),
     catch: catchRooms.map((row) => ({
       id: row.id,
-      line: `${row.host_name}님의 방 · ${row.status === "waiting" ? "대기 중" : `진행 중 ${Math.min(row.turn_no + 1, row.turn_total)}/${row.turn_total}`}`,
+      line: `${row.is_test ? "🧪 테스트 · " : ""}${row.host_name}님의 방 · ${row.status === "waiting" ? "대기 중" : `진행 중 ${Math.min(row.turn_no + 1, row.turn_total)}/${row.turn_total}`}`,
       sub: `👥 ${row.players.length}/${row.max_players}명`,
       action: row.players.some((player) => player.id === currentMemberId)
         ? "내 방"
