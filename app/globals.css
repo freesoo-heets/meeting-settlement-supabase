@@ -5216,7 +5216,7 @@ button.meetingMetricCard {
   .catchChatLog { height: 96px; }
 }
 
-.alkPiece { transition: opacity .3s ease; will-change: transform; }
+
 
 .omokTestButton { border-style: dashed; color: #7c3aed; }
 
@@ -5397,3 +5397,8 @@ button.meetingMetricCard {
 .cgBig { width: 100%; height: auto; aspect-ratio: 800 / 560; border-radius: 10px; background: #fff; display: block; }
 .cgOpenInfo { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; font-size: 14px; }
 .cgWord { color: #4338ca; }
+
+/* 알까기: 움직이는 동안은 캔버스에 그리고 SVG 알은 숨긴다 */
+.alkStage { position: relative; }
+.alkAnim { position: absolute; left: 0; top: 0; width: 100%; aspect-ratio: 380 / 420; pointer-events: none; }
+.alkBoard.animating .alkPiece { visibility: hidden; }

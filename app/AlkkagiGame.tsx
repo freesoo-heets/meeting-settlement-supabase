@@ -81,7 +81,8 @@ const COLUMNS =
 const STAKE_PRESETS = [100, 300, 500, 1000];
 const PULL_MAX = 140; // 이만큼 당기면 최대 세기
 const AIM_GUIDE = 34; // 방향 표시 길이 (세기와 무관하게 고정)
-const SIM_FPS = 60; // 물리 계산 단위 (lib/alkkagi.ts 의 DT = 1/60)
+const SIM_FPS = 60;
+const FADE_FRAMES = 18; // 떨어진 알이 사라지는 시간 (0.3초) // 물리 계산 단위 (lib/alkkagi.ts 의 DT = 1/60)
 const END_TEXT: Record<string, string> = {
   knockout: "알 전멸",
   timeout: `시간 초과 ${MAX_STRIKES}회`,
@@ -576,8 +577,11 @@ function AlkkagiBoardView({
   const animatedNo = useRef(game.shot_no);
   const frameRef = useRef(0);
 
-  // 알 요소를 직접 움직인다 (매 순간 화면 전체를 다시 그리지 않아 끊기지 않는다)
-  const pieceEls = useRef(new Map<string, SVGGElement>());
+  // 움직이는 동안에는 판 위에 캔버스를 올려 알을 그린다.
+  // (SVG 알 32개와 한자를 매 순간 다시 그리면 휴대폰에서 끊기기 때문)
+  const animCanvas = useRef<HTMLCanvasElement | null>(null);
+  const flippedRef = useRef(flipped);
+  flippedRef.current = flipped;
 
   const play = useCallback((before: Piece[], shot: { id: string; vx: number; vy: number }, final: Piece[] | null) => {
     const frames: Piece[][] = [before];
@@ -586,34 +590,62 @@ function AlkkagiBoardView({
     setShown(before);
     setAnimating(true);
 
+    const canvas = animCanvas.current;
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) {
+      setShown(final ?? result);
+      setAnimating(false);
+      return;
+    }
+    const rect = canvas.getBoundingClientRect();
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.max(1, Math.round(rect.width * dpr));
+    canvas.height = Math.max(1, Math.round(rect.height * dpr));
+    const scale = canvas.width / BOARD_W;
+    const flip = flippedRef.current;
+
+    // 판 밖으로 나간 순간을 기억해 서서히 사라지게 한다
+    const outAt = new Map<string, number>();
+    frames.forEach((frame, index) => {
+      frame.forEach((piece) => {
+        if (piece.out && !outAt.has(piece.id) && !before.find((b) => b.id === piece.id)?.out) outAt.set(piece.id, index);
+      });
+    });
+
     let startedAt = 0;
     const step = (time: number) => {
       if (!startedAt) startedAt = time;
       // 실제 흐른 시간 기준 (물리 계산은 1/60초 단위) → 화면 주사율과 상관없이 같은 속도
       const t = ((time - startedAt) / 1000) * SIM_FPS;
       const index = Math.floor(t);
-      if (index >= frames.length - 1) {
-        // 서버 결과와 다르게 사라졌던 알이 있어도 다시 보이도록 되돌린 뒤 확정 위치로
-        pieceEls.current.forEach((el) => {
-          el.style.opacity = "";
-        });
+      const last = frames.length - 1;
+      const fadeDone = [...outAt.values()].every((at) => index - at > FADE_FRAMES);
+      if (index >= last && fadeDone) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
         setShown(final ?? result);
         setAnimating(false);
         return;
       }
-      const frac = t - index;
-      const a = frames[index];
-      const b = frames[index + 1];
+      const i = Math.min(index, last);
+      const frac = index >= last ? 0 : t - index;
+      const a = frames[i];
+      const b = frames[Math.min(i + 1, last)];
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.setTransform(scale, 0, 0, scale, 0, 0);
       for (let k = 0; k < a.length; k += 1) {
-        const el = pieceEls.current.get(a[k].id);
-        if (!el) continue;
-        if (b[k].out) {
-          el.style.opacity = "0";
-          continue;
+        const piece = a[k];
+        let alpha = 1;
+        const gone = outAt.get(piece.id);
+        if (piece.out || b[k].out) {
+          if (gone === undefined) continue; // 원래 나가 있던 알
+          alpha = Math.max(0, 1 - (t - gone) / FADE_FRAMES);
+          if (alpha <= 0) continue;
         }
-        const x = a[k].x + (b[k].x - a[k].x) * frac;
-        const y = a[k].y + (b[k].y - a[k].y) * frac;
-        el.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)})`);
+        const x = piece.x + (b[k].x - piece.x) * frac;
+        const y = piece.y + (b[k].y - piece.y) * frac;
+        drawPiece(ctx, piece, flip ? BOARD_W - x : x, flip ? BOARD_H - y : y, alpha);
       }
       frameRef.current = window.requestAnimationFrame(step);
     };
@@ -749,7 +781,7 @@ function AlkkagiBoardView({
           </div>
         )}
         <svg
-          className="alkBoard"
+          className={`alkBoard ${animating ? "animating" : ""}`}
           viewBox={`0 0 ${BOARD_W} ${BOARD_H}`}
           role="img"
           aria-label="알까기 판"
@@ -785,11 +817,6 @@ function AlkkagiBoardView({
                 return (
                   <g
                     key={piece.id}
-                    ref={(el) => {
-                      if (el) pieceEls.current.set(piece.id, el);
-                      else pieceEls.current.delete(piece.id);
-                    }}
-                    style={{ opacity: 1 }}
                     transform={`translate(${piece.x} ${piece.y})`}
                     className={`alkPiece ${piece.side} ${mine ? "mine" : ""} ${selected ? "selected" : ""}`}
                     onPointerDown={(event) => {
@@ -838,6 +865,7 @@ function AlkkagiBoardView({
             )}
           </g>
         </svg>
+        <canvas ref={animCanvas} className="alkAnim" aria-hidden="true" />
         {aim && aimVector && (
           <div className="alkPower">
             <div style={{ width: `${Math.round(aimVector.power * 100)}%` }} />
@@ -875,6 +903,31 @@ function AlkkagiBoardView({
       {myTurn && <small className="muted omokHint">새총처럼 내 알을 누른 채 뒤로 당겼다 놓으세요. 당긴 반대쪽으로 날아가고, 많이 당길수록 세게 나갑니다.</small>}
     </div>
   );
+}
+
+function drawPiece(ctx: CanvasRenderingContext2D, piece: Piece, x: number, y: number, alpha: number) {
+  const r = RADIUS[piece.kind];
+  ctx.globalAlpha = alpha;
+  ctx.beginPath();
+  for (let i = 0; i < 8; i += 1) {
+    const angle = Math.PI / 8 + (i * Math.PI) / 4;
+    const px = x + Math.cos(angle) * r;
+    const py = y + Math.sin(angle) * r;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fillStyle = "#fbf1dc";
+  ctx.fill();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "#6b4a1f";
+  ctx.stroke();
+  ctx.fillStyle = piece.side === "cho" ? "#15803d" : "#b91c1c";
+  ctx.font = `800 ${(r * 1.05).toFixed(1)}px "Noto Serif KR", Batang, serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(LABEL[piece.side][piece.kind], x, y + 1);
+  ctx.globalAlpha = 1;
 }
 
 function octagon(r: number) {

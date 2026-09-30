@@ -30,6 +30,17 @@ export type Piece = {
 
 export type Shot = { id: string; vx: number; vy: number };
 
+// 알마다 낼 수 있는 최고 세기 (작은 사·졸은 약하게)
+export const POWER: Record<Kind, number> = {
+  gung: 1,
+  cha: 1,
+  po: 1,
+  ma: 1,
+  sang: 1,
+  sa: 0.8,
+  jol: 0.8,
+};
+
 export const RADIUS: Record<Kind, number> = {
   gung: 21,
   cha: 17,
@@ -86,12 +97,17 @@ export function simulate(pieces: Piece[], shot: Shot, onStep?: (state: Piece[]) 
   const { vx, vy } = clampShot(shot.vx, shot.vy);
   const bodies: Body[] = pieces.map((piece) => {
     const r = RADIUS[piece.kind];
-    return { ...piece, r, m: r * r, vx: 0, vy: 0 };
+    // 무게는 부피 기준 (반지름³) → 궁은 졸보다 약 4배 무겁다
+    return { ...piece, r, m: r * r * r, vx: 0, vy: 0 };
   });
   const shooter = bodies.find((body) => body.id === shot.id && !body.out);
   if (!shooter) return pieces.map((piece) => ({ ...piece }));
-  shooter.vx = vx;
-  shooter.vy = vy;
+  // 알 종류별 최고 세기를 넘지 않게
+  const cap = VMAX * POWER[shooter.kind];
+  const speed = Math.hypot(vx, vy);
+  const scale = speed > cap ? cap / speed : 1;
+  shooter.vx = vx * scale;
+  shooter.vy = vy * scale;
 
   for (let step = 0; step < MAX_STEPS; step += 1) {
     let moving = false;
