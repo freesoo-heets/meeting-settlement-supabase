@@ -50,11 +50,29 @@ async function loadRoom(admin: Admin, id: string) {
   return (data as Room | null) ?? null;
 }
 
-async function cleanupStale(admin: Admin) {
+// 유령 방 정리. force=true 면 한 명만 있는 대기방을 시간과 상관없이 모두 닫는다 (관리자 버튼)
+async function cleanupStale(admin: Admin, force = false) {
   const now = Date.now();
+  const stamp = new Date().toISOString();
+
+  // 혼자 남은 대기방: 10분 동안 변화가 없으면 (force 면 바로) 닫는다
+  const { data: waiting } = await admin
+    .from(TABLE)
+    .select("id,players,updated_at")
+    .eq("status", "waiting")
+    .limit(200);
+  const lonely = (waiting ?? [])
+    .filter((room) => ((room.players as Member[] | null) ?? []).length <= 1)
+    .filter((room) => force || new Date(room.updated_at as string).getTime() < now - 10 * 60 * 1000)
+    .map((room) => room.id as string);
+  if (lonely.length > 0) {
+    await admin.from(TABLE).update({ status: "cancelled", updated_at: stamp }).in("id", lonely);
+  }
+
+  // 여러 명이어도 30분 동안 시작하지 않은 대기방
   await admin
     .from(TABLE)
-    .update({ status: "cancelled", updated_at: new Date().toISOString() })
+    .update({ status: "cancelled", updated_at: stamp })
     .eq("status", "waiting")
     .lt("updated_at", new Date(now - 30 * 60 * 1000).toISOString());
   // 모두 떠나서 아무도 진행시키지 않는 방
@@ -174,6 +192,15 @@ export async function POST(request: Request) {
   ]);
   if ("error" in auth) return fail(auth.error, auth.status);
   const memberId = auth.memberId;
+
+  // ── 유령 방 정리 (게임 로비·목록을 열 때마다 화면이 부른다. 관리자는 즉시 정리 가능) ──
+  if (action === "cleanup") {
+    const force = body?.force === true && (await isAdminMember(admin, memberId));
+    const before = await admin.from(TABLE).select("id", { count: "exact", head: true }).in("status", ["waiting", "playing"]);
+    await cleanupStale(admin, force);
+    const after = await admin.from(TABLE).select("id", { count: "exact", head: true }).in("status", ["waiting", "playing"]);
+    return NextResponse.json({ ok: true, closed: Math.max(0, (before.count ?? 0) - (after.count ?? 0)) });
+  }
 
   if (action === "create" || action === "create_test") {
     const test = action === "create_test";

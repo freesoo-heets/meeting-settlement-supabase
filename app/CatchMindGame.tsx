@@ -96,6 +96,11 @@ export default function CatchMindGame({ onClose, onBack, initialRoomId, currentM
     setRooms(rows);
   }, [initialRoomId]);
 
+  // 목록을 열 때 유령 방 정리 (한 번)
+  useEffect(() => {
+    void callCatch({ action: "cleanup" }).then(() => load());
+  }, [load]);
+
   const myRoom = useMemo(
     () =>
       rooms.find(
