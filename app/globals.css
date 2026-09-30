@@ -4972,7 +4972,7 @@ button.meetingMetricCard {
 .omokEmotePop {
   position: absolute;
   z-index: 2;
-  width: 31%;
+  width: 16%;
   display: flex;
   flex-direction: column;
   align-items: center;

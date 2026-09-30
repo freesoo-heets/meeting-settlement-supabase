@@ -117,5 +117,6 @@ export function pickEmoteSpot(board: Board): number {
 
 export function spotStyle(spot: number) {
   const [col, row] = EMOTE_SPOTS[spot] ?? EMOTE_SPOTS[0];
-  return { left: `${col * 33 + 1.5}%`, top: `${row * 33 + 1.5}%` };
+  // 크기(판 너비의 16%)를 각 칸(33%) 가운데에 둔다
+  return { left: `${col * 33 + 8.5}%`, top: `${row * 33 + 7}%` };
 }
