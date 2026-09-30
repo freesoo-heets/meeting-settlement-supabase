@@ -5215,3 +5215,5 @@ button.meetingMetricCard {
   .catchPlayers { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .catchChatLog { height: 96px; }
 }
+
+.alkPiece { transition: opacity .3s ease; will-change: transform; }

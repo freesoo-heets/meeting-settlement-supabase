@@ -76,6 +76,8 @@ const COLUMNS =
   "id,status,stake,host_member,host_name,guest_member,guest_name,target_member,cho,turn,pieces,last_shot,shot_no,strikes,turn_deadline,winner,end_reason,escrow_state,escrow_note,settle_state,created_at,finished_at";
 const STAKE_PRESETS = [100, 300, 500, 1000];
 const PULL_MAX = 140; // 이만큼 당기면 최대 세기
+const AIM_GUIDE = 34; // 방향 표시 길이 (세기와 무관하게 고정)
+const SIM_FPS = 60; // 물리 계산 단위 (lib/alkkagi.ts 의 DT = 1/60)
 const END_TEXT: Record<string, string> = {
   knockout: "알 전멸",
   timeout: `시간 초과 ${MAX_STRIKES}회`,
@@ -516,21 +518,46 @@ function AlkkagiBoardView({
   const animatedNo = useRef(game.shot_no);
   const frameRef = useRef(0);
 
+  // 알 요소를 직접 움직인다 (매 순간 화면 전체를 다시 그리지 않아 끊기지 않는다)
+  const pieceEls = useRef(new Map<string, SVGGElement>());
+
   const play = useCallback((before: Piece[], shot: { id: string; vx: number; vy: number }, final: Piece[] | null) => {
-    const frames: Piece[][] = [];
+    const frames: Piece[][] = [before];
     const result = simulate(before, shot, (state) => frames.push(state));
     window.cancelAnimationFrame(frameRef.current);
+    setShown(before);
     setAnimating(true);
-    let index = 0;
-    const step = () => {
-      if (index < frames.length) {
-        setShown(frames[index]);
-        index += 1;
-        frameRef.current = window.requestAnimationFrame(step);
-      } else {
+
+    let startedAt = 0;
+    const step = (time: number) => {
+      if (!startedAt) startedAt = time;
+      // 실제 흐른 시간 기준 (물리 계산은 1/60초 단위) → 화면 주사율과 상관없이 같은 속도
+      const t = ((time - startedAt) / 1000) * SIM_FPS;
+      const index = Math.floor(t);
+      if (index >= frames.length - 1) {
+        // 서버 결과와 다르게 사라졌던 알이 있어도 다시 보이도록 되돌린 뒤 확정 위치로
+        pieceEls.current.forEach((el) => {
+          el.style.opacity = "";
+        });
         setShown(final ?? result);
         setAnimating(false);
+        return;
       }
+      const frac = t - index;
+      const a = frames[index];
+      const b = frames[index + 1];
+      for (let k = 0; k < a.length; k += 1) {
+        const el = pieceEls.current.get(a[k].id);
+        if (!el) continue;
+        if (b[k].out) {
+          el.style.opacity = "0";
+          continue;
+        }
+        const x = a[k].x + (b[k].x - a[k].x) * frac;
+        const y = a[k].y + (b[k].y - a[k].y) * frac;
+        el.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)})`);
+      }
+      frameRef.current = window.requestAnimationFrame(step);
     };
     frameRef.current = window.requestAnimationFrame(step);
   }, []);
@@ -566,8 +593,9 @@ function AlkkagiBoardView({
 
   const aimVector = aim
     ? (() => {
-        const dx = aim.px - aim.x;
-        const dy = aim.py - aim.y;
+        // 새총: 끈 방향의 반대로 날아간다
+        const dx = aim.x - aim.px;
+        const dy = aim.y - aim.py;
         const length = Math.hypot(dx, dy);
         const power = Math.min(length, PULL_MAX) / PULL_MAX;
         return length > 0 ? { nx: dx / length, ny: dy / length, power } : { nx: 0, ny: 0, power: 0 };
@@ -693,6 +721,11 @@ function AlkkagiBoardView({
                 return (
                   <g
                     key={piece.id}
+                    ref={(el) => {
+                      if (el) pieceEls.current.set(piece.id, el);
+                      else pieceEls.current.delete(piece.id);
+                    }}
+                    style={{ opacity: 1 }}
                     transform={`translate(${piece.x} ${piece.y})`}
                     className={`alkPiece ${piece.side} ${mine ? "mine" : ""} ${selected ? "selected" : ""}`}
                     onPointerDown={(event) => {
@@ -723,17 +756,18 @@ function AlkkagiBoardView({
             {aim && aimVector && aimVector.power > 0 && (
               <g className="alkAim" pointerEvents="none">
                 <line x1={aim.x} y1={aim.y} x2={aim.px} y2={aim.py} className="alkPull" />
+                {/* 방향만 짧게 보여준다 (얼마나 멀리 갈지는 감으로) */}
                 <line
                   x1={aim.x}
                   y1={aim.y}
-                  x2={aim.x + aimVector.nx * (40 + aimVector.power * 160)}
-                  y2={aim.y + aimVector.ny * (40 + aimVector.power * 160)}
+                  x2={aim.x + aimVector.nx * AIM_GUIDE}
+                  y2={aim.y + aimVector.ny * AIM_GUIDE}
                   className="alkShot"
                 />
                 <circle
-                  cx={aim.x + aimVector.nx * (40 + aimVector.power * 160)}
-                  cy={aim.y + aimVector.ny * (40 + aimVector.power * 160)}
-                  r="5"
+                  cx={aim.x + aimVector.nx * AIM_GUIDE}
+                  cy={aim.y + aimVector.ny * AIM_GUIDE}
+                  r="4"
                   className="alkShotHead"
                 />
               </g>
@@ -774,7 +808,7 @@ function AlkkagiBoardView({
           <button className="smallButton ghost" disabled={busy} onClick={onCancel}>취소</button>
         )}
       </div>
-      {myTurn && <small className="muted omokHint">내 알을 누른 채 반대 방향으로 끌면 조준됩니다. 멀리 끌수록 세게 나갑니다.</small>}
+      {myTurn && <small className="muted omokHint">새총처럼 내 알을 누른 채 뒤로 당겼다 놓으세요. 당긴 반대쪽으로 날아가고, 많이 당길수록 세게 나갑니다.</small>}
     </div>
   );
 }
