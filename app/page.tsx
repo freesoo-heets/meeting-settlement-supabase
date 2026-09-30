@@ -3003,9 +3003,8 @@ setSaving(false);
             key={value}
             className={mainTab === value ? "active" : ""}
             onClick={() => {
-              setShowAccountPanel(true);
+              setMainTab(value as MainTab);
               setShowMobileMore(false);
-              void loadPetLinkStatus();
             }}
           >
             <span>{icon}</span>
