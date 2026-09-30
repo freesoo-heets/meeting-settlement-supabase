@@ -168,6 +168,7 @@ export default function CatchMindGame({ onClose, onBack, initialRoomId, currentM
             onJoin={() => run({ action: "join", roomId: room.id })}
             onLeave={() => run({ action: "leave", roomId: room.id }, () => setRoomId(""))}
             onStart={() => run({ action: "start", roomId: room.id })}
+            onRestart={() => run({ action: "restart", roomId: room.id })}
             onRecruit={() => {
               if (!window.confirm("카톡방에 참가자 모집 알림을 보낼까요?")) return;
               void run({ action: "recruit", roomId: room.id }, () =>
@@ -231,6 +232,7 @@ function CatchRoomView({
   onLeave,
   onStart,
   onRecruit,
+  onRestart,
 }: {
   room: Room;
   me: string | null;
@@ -242,6 +244,7 @@ function CatchRoomView({
   onLeave: () => void;
   onStart: () => void;
   onRecruit: () => void;
+  onRestart: () => void;
 }) {
   const joined = room.players.some((player) => player.id === me);
   const isHost = room.host_member === me;
@@ -700,6 +703,11 @@ function CatchRoomView({
           {!joined && (room.status === "waiting" || room.status === "playing") && (
             <button className="primaryButton" disabled={busy || seatsLeft <= 0} onClick={onJoin}>
               {seatsLeft <= 0 ? "방이 가득 찼어요" : "참가하기"}
+            </button>
+          )}
+          {joined && room.status === "finished" && (
+            <button className="primaryButton" disabled={busy} onClick={onRestart}>
+              🔁 다시하기 ({room.players.length}명)
             </button>
           )}
           {canRecruit && (

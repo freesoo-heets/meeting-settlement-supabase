@@ -254,6 +254,58 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
+  // ── 다시하기: 끝난 방을 같은 멤버로 바로 새로 시작 ──
+  if (action === "restart") {
+    if (room.status !== "finished") return fail("게임이 끝난 뒤에 다시 할 수 있습니다.");
+    // 그사이 다른 방에 들어간 사람은 빼고 시작한다
+    const players: Member[] = [];
+    for (const player of room.players) {
+      const other = await inOtherRoom(admin, player.id);
+      if (!other || other === room.id) players.push(player);
+    }
+    const hostStays = players.some((player) => player.id === room.host_member);
+    const hostFields = hostStays || players.length === 0 ? {} : { host_member: players[0].id, host_name: players[0].name };
+    const scores = Object.fromEntries(players.map((player) => [player.id, 0]));
+    const reset = {
+      ...hostFields,
+      players,
+      scores,
+      turn_no: 0,
+      turn_total: players.length * ROUNDS,
+      drawer_member: null,
+      drawer_name: null,
+      phase: null,
+      phase_deadline: null,
+      hint: null,
+      reveal_word: null,
+      last_winner: null,
+    };
+
+    // 인원이 모자라면 대기실로만 되돌린다
+    if (players.length < (room.is_test ? 1 : 2)) {
+      const ok = await updateIfUnchanged(admin, TABLE, room, { ...reset, status: "waiting" });
+      if (!ok) return fail("이미 다시 시작했습니다.", 409);
+      return NextResponse.json({ ok: true, waiting: true });
+    }
+
+    const { data } = await admin
+      .from(TABLE)
+      .update({ ...reset, updated_at: new Date().toISOString() })
+      .eq("id", room.id)
+      .eq("status", "finished")
+      .eq("updated_at", room.updated_at)
+      .select("updated_at")
+      .single();
+    if (!data) return fail("이미 다시 시작했습니다.", 409);
+    await startTurn(
+      admin,
+      { ...room, ...reset, status: "finished", updated_at: data.updated_at as string } as Room,
+      0,
+      players,
+    );
+    return NextResponse.json({ ok: true });
+  }
+
   // 출제자에게만 제시어를 알려준다
   if (action === "word") {
     if (room.status !== "playing" || room.phase !== "drawing" || room.drawer_member !== memberId) {
