@@ -168,9 +168,15 @@ export async function POST(request: Request) {
   // 친선 대국은 점수·티켓을 보지 않는다 (봇 점수판에 없어도 할 수 있다)
   const friendly = action === "create" ? body?.friendly === true : !!loaded?.is_friendly;
   if ((action === "create" || action === "join") && friendly) {
-    const member = await loadMember(admin, memberId);
-    if ("error" in member) return fail(member.error, member.status);
-    me = { memberId, name: member.name, uid: "friendly", exp: 0, tickets: 0 };
+    // 친선은 점수·티켓을 보지 않지만, !전적 기록용으로 카톡 user_id 는 있으면 저장한다
+    const player = await loadPlayer(admin, memberId);
+    if ("error" in player) {
+      const member = await loadMember(admin, memberId);
+      if ("error" in member) return fail(member.error, member.status);
+      me = { memberId, name: member.name, uid: "friendly", exp: 0, tickets: 0 };
+    } else {
+      me = player;
+    }
   } else if (action === "create" || action === "join") {
     const player = await loadPlayer(admin, memberId);
     if ("error" in player) return fail(player.error, player.status);
