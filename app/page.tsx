@@ -168,6 +168,8 @@ export default function Home() {
   const [mainTab, setMainTab] = useState<MainTab>("dashboard");
   const [showDashboardCosts, setShowDashboardCosts] = useState(false);
   const [meetingCalendarMonth, setMeetingCalendarMonth] = useState(currentMonth);
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState(today);
+  const backupRestoreInputRef = useRef<HTMLInputElement | null>(null);
   const [memberCalendarMonth, setMemberCalendarMonth] = useState(currentMonth);
   const [members, setMembers] = useState<Member[]>([]);
   const [botPoints, setBotPoints] = useState<BotPoint[]>([]);
@@ -1071,6 +1073,16 @@ export default function Home() {
       .sort((a, b) => b.meeting.date.localeCompare(a.meeting.date));
   }, [currentMember, monthMeetings, meetingAllocation]);
 
+  const myAllMeetings = useMemo(() => {
+    if (!currentMember) return [];
+    return meetings.filter((meeting) => meeting.attendeeIds.includes(currentMember.id)).sort((a,b) => b.date.localeCompare(a.date));
+  }, [currentMember, meetings]);
+
+  const myUpcomingMeetings = useMemo(() =>
+    myAllMeetings.filter((meeting) => meeting.date >= today).sort((a,b) => a.date.localeCompare(b.date)).slice(0, 3),
+    [myAllMeetings, today]
+  );
+
   const memberDetail = useMemo(
     () => members.find((member) => member.id === memberDetailId) ?? null,
     [members, memberDetailId]
@@ -1110,6 +1122,8 @@ export default function Home() {
     return map;
   }, [meetings]);
 
+  const selectedCalendarMeetings = useMemo(() => meetingsByDate.get(selectedCalendarDate) ?? [], [meetingsByDate, selectedCalendarDate]);
+
   const memberCalendarCells = useMemo(
     () => calendarDates(memberCalendarMonth),
     [memberCalendarMonth]
@@ -1148,6 +1162,16 @@ export default function Home() {
   );
 
   const completedCostMeetings = monthMeetings.length - costMissingMeetings.length;
+
+  const operationsStats = useMemo(() => {
+    const active = members.filter(m => m.active && !m.is_guest);
+    const joinedThisMonth = active.filter(m => m.join_date.startsWith(selectedMonth));
+    const joinedWithAttendance = joinedThisMonth.filter(m => meetings.some(meeting => meeting.attendeeIds.includes(m.id)));
+    const participationRate = active.length ? Math.round((uniqueMonthParticipants / active.length) * 100) : 0;
+    const settleRate = monthMeetings.length ? Math.round((completedCostMeetings / monthMeetings.length) * 100) : 0;
+    return { joined: joinedThisMonth.length, settled: joinedWithAttendance.length, participationRate, settleRate };
+  }, [members, meetings, selectedMonth, uniqueMonthParticipants, monthMeetings.length, completedCostMeetings]);
+
 
   const averageMeetingAttendance = useMemo(
     () =>
@@ -1618,6 +1642,8 @@ async function setAttendanceMembers(memberIds: string[]) {
       meetings,
       adjustments,
       prepayments,
+      activityLogs,
+      note: "profiles/auth/PET credentials are intentionally excluded",
     };
 
     downloadTextFile(
@@ -1625,6 +1651,42 @@ async function setAttendanceMembers(memberIds: string[]) {
       JSON.stringify(data, null, 2),
       "application/json;charset=utf-8"
     );
+  }
+
+  async function restoreBackupJson(file: File) {
+    if (!isAdmin) {
+      setNotice("백업 복원은 관리자 이상만 사용할 수 있습니다.");
+      return;
+    }
+    try {
+      const parsed = JSON.parse(await file.text());
+      if (!parsed || !Array.isArray(parsed.members) || !Array.isArray(parsed.meetings)) {
+        throw new Error("지원하지 않는 백업 파일입니다.");
+      }
+      if (!window.confirm(`백업 ${parsed.exportedAt ?? "파일"}을 현재 데이터에 병합 복원할까요?\n기존 로그인/PET 계정은 변경하지 않습니다.`)) return;
+      setSaving(true);
+      const memberRows = parsed.members.map((m: any) => ({
+        id:m.id, name:m.name, active:m.active, join_date:m.join_date, birthday:m.birthday ?? null,
+        withdrawn_at:m.withdrawn_at ?? null, created_at:m.created_at, is_guest:m.is_guest ?? false,
+      }));
+      const meetingRows = parsed.meetings.map((m: any) => ({id:m.id,date:m.date,title:m.title,cost:m.cost,created_at:m.created_at}));
+      const attendanceRows = parsed.meetings.flatMap((m: any) => (m.attendeeIds ?? []).map((member_id:string) => ({meeting_id:m.id,member_id})));
+      const guestRows = parsed.meetings.flatMap((m:any) => (m.guests ?? []).map((g:any) => ({id:g.id,meeting_id:m.id,name:g.name,fixed_amount:g.fixed_amount ?? null,created_at:g.created_at})));
+      const adjustmentRows = Array.isArray(parsed.adjustments) ? parsed.adjustments : [];
+      const prepaymentRows = Array.isArray(parsed.prepayments) ? parsed.prepayments : [];
+      for (const [table, rows] of [["members",memberRows],["meetings",meetingRows],["attendance",attendanceRows],["meeting_guests",guestRows],["settlement_adjustments",adjustmentRows],["meeting_prepayments",prepaymentRows]] as const) {
+        if (!rows.length) continue;
+        const { error } = await supabase.from(table).upsert(rows as any);
+        if (error) throw new Error(`${table}: ${error.message}`);
+      }
+      await loadAll();
+      setNotice("백업을 병합 복원했습니다. 로그인/PET 계정은 유지됩니다.");
+    } catch (error:any) {
+      setNotice(`백업 복원 실패: ${error?.message ?? "파일을 확인해주세요."}`);
+    } finally {
+      setSaving(false);
+      if (backupRestoreInputRef.current) backupRestoreInputRef.current.value = "";
+    }
   }
 
   function buildSettlementShareText(meeting: Meeting) {
@@ -3467,6 +3529,11 @@ async function setAttendanceMembers(memberIds: string[]) {
               )}
             </div>
           </section>
+
+          <section className="dashboardInsightsGrid">
+            <div className="panel dashboardInsightPanel"><div className="panelHead compactHead"><div><h2>📊 운영 통계</h2><p>{selectedMonth} 활동 흐름</p></div></div><div className="insightMetricGrid"><div><span>활동회원 참여율</span><strong>{operationsStats.participationRate}%</strong></div><div><span>비용 입력 완료율</span><strong>{operationsStats.settleRate}%</strong></div><div><span>신규회원</span><strong>{operationsStats.joined}명</strong></div><div><span>신규 첫참석</span><strong>{operationsStats.settled}명</strong></div></div></div>
+            {isAdmin && <div className="panel dashboardInsightPanel adminWorkCenter"><div className="panelHead compactHead"><div><h2>🛠 관리자 작업센터</h2><p>지금 확인할 운영 항목</p></div></div><button onClick={() => {setMemberFilter("warning");setMainTab("members");}}><span>경고 회원</span><strong>{warningMembers.length}명</strong></button><button onClick={() => setMainTab("meetings")}><span>비용 미입력 벙</span><strong>{costMissingMeetings.length}건</strong></button><button onClick={() => setMainTab("history")}><span>최근 변경 이력</span><strong>{activityLogs.length}건</strong></button><div className="backupActionRow"><button className="smallButton" onClick={exportBackupJson}>JSON 백업</button><button className="smallButton ghost" onClick={() => backupRestoreInputRef.current?.click()} disabled={saving}>백업 복원</button><input ref={backupRestoreInputRef} type="file" accept="application/json,.json" hidden onChange={(e) => {const file=e.target.files?.[0]; if(file) void restoreBackupJson(file);}} /></div><small className="backupHint">복원은 운영 데이터만 병합하며 로그인·PET 계정은 건드리지 않습니다.</small></div>}
+          </section>
         </>
       )}
 
@@ -3534,8 +3601,9 @@ async function setAttendanceMembers(memberIds: string[]) {
                 const dayMeetings = meetingsByDate.get(cell.date) ?? [];
                 return (
                   <div
-                    className={`calendarDay ${cell.inMonth ? "" : "outside"} ${cell.date === today ? "today" : ""}`}
+                    className={`calendarDay ${cell.inMonth ? "" : "outside"} ${cell.date === today ? "today" : ""} ${cell.date === selectedCalendarDate ? "selectedDate" : ""}`}
                     key={cell.date}
+                    onClick={() => setSelectedCalendarDate(cell.date)}
                   >
                     <div className="calendarDayNumber">
                       <span>{cell.day}</span>
@@ -3574,6 +3642,11 @@ async function setAttendanceMembers(memberIds: string[]) {
                   </div>
                 );
               })}
+            </div>
+            <div className="mobileCalendarDayList">
+              <div className="modalSectionHead"><strong>{selectedCalendarDate} 벙</strong><span>{selectedCalendarMeetings.length}건</span></div>
+              {selectedCalendarMeetings.map(meeting => <button key={meeting.id} onClick={() => setDetailMeetingId(meeting.id)}><div><strong>{meeting.title}</strong><span>{meeting.attendeeIds.length + meeting.guests.length}명 참석</span></div><em>›</em></button>)}
+              {selectedCalendarMeetings.length === 0 && <div className="empty">선택한 날짜에 등록된 벙이 없습니다.</div>}
             </div>
           </section>
 
@@ -5125,10 +5198,17 @@ async function setAttendanceMembers(memberIds: string[]) {
 
             <div className="modalSummaryGrid">
               <div><span>이번 달 참석</span><strong>{myMonthSummary.attendance}회</strong></div>
-              <div><span>벙비 합계</span><strong>{won(myMonthSummary.burden)}</strong></div>
+              <div><span>벙비 합계</span><strong>{showDashboardCosts ? won(myMonthSummary.burden) : "••••••원"}</strong></div>
               <div><span>입장일</span><strong>{currentMember.join_date}</strong></div>
               <div><span>최근 참석</span><strong>{lastAttendanceByMember[currentMember.id] ?? "-"}</strong></div>
             </div>
+
+            <div className="myActivityQuickGrid">
+              <div><span>누적 참석</span><strong>{myAllMeetings.length}회</strong></div>
+              <div><span>다음 예정</span><strong>{myUpcomingMeetings[0]?.date ?? "없음"}</strong></div>
+              <div><span>상태</span><strong>{warningByMember[currentMember.id]?.warning ? "경고" : "활동중"}</strong></div>
+            </div>
+            {myUpcomingMeetings.length > 0 && <div className="modalSection"><div className="modalSectionHead"><strong>다음 참석 예정</strong><span>{myUpcomingMeetings.length}건</span></div><div className="myActivityList">{myUpcomingMeetings.map(meeting => <button key={meeting.id} onClick={() => {setShowMyActivity(false);setDetailMeetingId(meeting.id);}}><div><strong>{meeting.title}</strong><span>{meeting.date}</span></div><strong>›</strong></button>)}</div></div>}
 
             <div className="modalSection">
               <div className="modalSectionHead">
@@ -5335,6 +5415,7 @@ async function setAttendanceMembers(memberIds: string[]) {
               <div><span>총 참석</span><strong>{memberDetailMeetings.length}회</strong></div>
               <div><span>최근 참석</span><strong>{lastAttendanceByMember[memberDetail.id] ?? "-"}</strong></div>
             </div>
+            <div className="memberProfileSnapshot"><div><span>로그인</span><strong>{memberDetailProfile ? "연결됨" : "미가입"}</strong></div><div><span>권한</span><strong>{memberDetailProfile?.role === "owner" ? "제작자" : memberDetailProfile?.role === "admin" ? "관리자" : "회원"}</strong></div><div><span>활동점수</span><strong>{pointsByMember[memberDetail.id]?.exp?.toLocaleString("ko-KR") ?? "-"}</strong></div><div><span>최근 상태</span><strong>{warningByMember[memberDetail.id]?.text ?? "-"}</strong></div></div>
 
             {isAdmin && (
               <div className="modalSection memberAccountAdminSection">
@@ -5572,6 +5653,10 @@ async function setAttendanceMembers(memberIds: string[]) {
               <div>
                 <span>게스트</span>
                 <strong>{detailMeeting.guests.length}명</strong>
+              </div>
+              <div>
+                <span>정산 상태</span>
+                <strong>{detailMeeting.cost == null ? "비용 입력 필요" : "정산 가능"}</strong>
               </div>
             </div>
 
