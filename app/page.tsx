@@ -4616,6 +4616,29 @@ async function setAttendanceMembers(memberIds: string[]) {
               <div>
                 <h2>월별 참석 현황</h2>
                 <p>{selectedMonth} 기준 참석 및 비용 현황입니다.</p>
+                {/* 조회 월 바꾸기 (머리말의 조회 월과 같이 바뀐다) */}
+                <div className="monthStepper">
+                  <button className="tinyButton ghost" onClick={() => setSelectedMonth(shiftMonth(selectedMonth, -1))} aria-label="이전 달">
+                    ◀
+                  </button>
+                  <label className="monthStepperLabel">
+                    <strong>
+                      {selectedMonth.slice(0, 4)}년 {Number(selectedMonth.slice(5, 7))}월
+                    </strong>
+                    <input
+                      type="month"
+                      value={selectedMonth}
+                      onChange={(event) => event.target.value && setSelectedMonth(event.target.value)}
+                      aria-label="조회 월 선택"
+                    />
+                  </label>
+                  <button className="tinyButton ghost" onClick={() => setSelectedMonth(shiftMonth(selectedMonth, 1))} aria-label="다음 달">
+                    ▶
+                  </button>
+                  {selectedMonth !== currentMonth && (
+                    <button className="tinyButton ghost" onClick={() => setSelectedMonth(currentMonth)}>이번 달</button>
+                  )}
+                </div>
               </div>
               <div className="exportActions">
                 <button className="tinyButton ghost" onClick={exportMonthlyCsv}>

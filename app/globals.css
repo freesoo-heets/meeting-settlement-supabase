@@ -5558,3 +5558,10 @@ button.meetingMetricCard {
 }
 .guestRow > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .guestRow span { font-size: 12px; color: #7a6f63; }
+
+/* 월별 참석 현황: 조회 월 이동 */
+.monthStepper { display: flex; align-items: center; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.monthStepperLabel { position: relative; display: inline-flex; align-items: center; padding: 6px 12px; border: 1px solid #e7dfd7; border-radius: 10px; background: #fff; cursor: pointer; }
+.monthStepperLabel strong { font-size: 15px; font-variant-numeric: tabular-nums; }
+/* 글자를 누르면 달력이 열리도록 입력칸을 투명하게 겹친다 */
+.monthStepperLabel input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
