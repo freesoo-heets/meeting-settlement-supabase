@@ -271,20 +271,31 @@ export async function POST(request: Request) {
 
   if (!inRoom) return fail("방에 들어가 있지 않습니다.");
 
-  if (action === "leave") {
-    const players = room.players.filter((player) => player.id !== memberId);
+  // ── 나가기 · 접속이 끊긴 사람 내보내기 ──
+  //   leave        : 내가 나간다
+  //   remove_absent: 창을 닫거나 연결이 끊긴 지 10초 넘은 사람들을 같은 방 사람이 내보낸다 (점수 없는 게임이라 화면 판단을 믿는다)
+  if (action === "leave" || action === "remove_absent") {
+    const removeIds =
+      action === "leave"
+        ? [memberId]
+        : (Array.isArray(body?.ids) ? (body?.ids as unknown[]) : [])
+            .map(String)
+            .filter((id) => id !== memberId && room.players.some((player) => player.id === id));
+    if (removeIds.length === 0) return NextResponse.json({ ok: true });
+    if (room.status !== "waiting" && room.status !== "playing") return NextResponse.json({ ok: true });
+
+    const players = room.players.filter((player) => !removeIds.includes(player.id));
     if (players.length === 0) {
       await updateIfUnchanged(admin, TABLE, room, { status: "cancelled", players });
       return NextResponse.json({ ok: true });
     }
-    const hostFields =
-      room.host_member === memberId ? { host_member: players[0].id, host_name: players[0].name } : {};
+    const hostFields = removeIds.includes(room.host_member) ? { host_member: players[0].id, host_name: players[0].name } : {};
 
-    if (room.status === "playing" && players.length < 2) {
+    if (room.status === "playing" && players.length < (room.is_test ? 1 : 2)) {
       await updateIfUnchanged(admin, TABLE, room, { ...hostFields, status: "finished", players, phase: null });
       return NextResponse.json({ ok: true });
     }
-    if (room.status === "playing" && room.drawer_member === memberId && room.phase === "drawing") {
+    if (room.status === "playing" && room.drawer_member && removeIds.includes(room.drawer_member) && room.phase === "drawing") {
       // 출제자가 나가면 이번 문제는 정답 공개 후 다음으로
       await reveal(admin, room, { ...hostFields, players, last_winner: null });
       return NextResponse.json({ ok: true });

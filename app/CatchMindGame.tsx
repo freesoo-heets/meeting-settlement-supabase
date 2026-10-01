@@ -53,6 +53,7 @@ const CANVAS_W = 800;
 const CANVAS_H = 560;
 const COLORS = ["#111111", "#e11d48", "#f97316", "#eab308", "#16a34a", "#2563eb", "#7c3aed", "#8b5a2b", "#ffffff"];
 const SIZES = [4, 10, 22];
+const ABSENT_KICK_MS = 10_000; // 창을 닫거나 연결이 끊긴 뒤 이만큼 지나면 자동으로 내보낸다
 
 async function callCatch(payload: Record<string, unknown>) {
   const { data } = await supabase.auth.getSession();
@@ -272,6 +273,11 @@ function CatchRoomView({
   const pendingRef = useRef<Array<[number, number]>>([]);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const lastTick = useRef(0);
+  const presentRef = useRef<Set<string>>(new Set());
+  const presenceReadyRef = useRef(false);
+  const joinedRef = useRef(false);
+  const absentSince = useRef<Record<string, number>>({});
+  const kicking = useRef(false);
   const turnKey = `${room.turn_no}:${room.drawer_member ?? ""}`;
   const turnKeyRef = useRef(turnKey);
   const isDrawerRef = useRef(isDrawer);
@@ -346,7 +352,12 @@ function CatchRoomView({
   // ── 실시간 채널 (그림 · 채팅) ──
   useEffect(() => {
     const channel = supabase
-      .channel(`catch-${room.id}`, { config: { broadcast: { self: false } } })
+      .channel(`catch-${room.id}`, { config: { broadcast: { self: false }, presence: { key: me ?? "watcher" } } })
+      // 접속 상태: 창을 닫거나 연결이 끊긴 사람을 알아내는 데 쓴다
+      .on("presence", { event: "sync" }, () => {
+        presentRef.current = new Set(Object.keys(channel.presenceState()));
+        presenceReadyRef.current = true;
+      })
       .on("broadcast", { event: "stroke" }, ({ payload }) => {
         const data = payload as { turn?: string; sid?: string; color?: string; size?: number; pts?: Array<[number, number]> };
         if (data.turn !== turnKeyRef.current || !data.sid || !Array.isArray(data.pts)) return;
@@ -390,7 +401,9 @@ function CatchRoomView({
         () => void onReload(),
       )
       .subscribe((state) => {
-        if (state === "SUBSCRIBED") void channel.send({ type: "broadcast", event: "sync-req", payload: {} });
+        if (state !== "SUBSCRIBED") return;
+        void channel.send({ type: "broadcast", event: "sync-req", payload: {} });
+        if (joinedRef.current && me) void channel.track({ at: Date.now() });
       });
     channelRef.current = channel;
     return () => {
@@ -398,6 +411,42 @@ function CatchRoomView({
       void supabase.removeChannel(channel);
     };
   }, [room.id, addChat, paintStroke, redraw, onReload]);
+
+  // 참가하면 접속 표시를 시작한다 (관전만 할 때는 표시하지 않음)
+  useEffect(() => {
+    joinedRef.current = joined;
+    if (joined && me) void channelRef.current?.track({ at: Date.now() });
+    else void channelRef.current?.untrack();
+  }, [joined, me]);
+
+  // ★ 창을 닫거나 연결이 끊긴 지 10초가 지난 참가자는 자동으로 내보낸다
+  //   남아 있는 사람 중 명단 맨 앞사람의 화면 한 곳에서만 서버에 요청한다
+  useEffect(() => {
+    if (room.status !== "waiting" && room.status !== "playing") return;
+    const timer = window.setInterval(() => {
+      if (!presenceReadyRef.current || !joinedRef.current || !me) return;
+      const present = presentRef.current;
+      const now = Date.now();
+      const gone: string[] = [];
+      for (const player of room.players) {
+        if (player.id === me || present.has(player.id)) {
+          delete absentSince.current[player.id];
+          continue;
+        }
+        absentSince.current[player.id] ??= now;
+        if (now - absentSince.current[player.id] >= ABSENT_KICK_MS) gone.push(player.id);
+      }
+      const leader = room.players.find((player) => player.id === me || present.has(player.id));
+      if (gone.length === 0 || leader?.id !== me || kicking.current) return;
+      kicking.current = true;
+      void callCatch({ action: "remove_absent", roomId: room.id, ids: gone }).then(() => {
+        gone.forEach((id) => delete absentSince.current[id]);
+        kicking.current = false;
+        void onReload();
+      });
+    }, 2000);
+    return () => window.clearInterval(timer);
+  }, [room.status, room.players, room.id, me, onReload]);
 
   // 문제가 끝나면(정답 공개) 출제자 화면이 그림을 저장한다 → 최근 그림 갤러리
   const savedDrawing = useRef("");
