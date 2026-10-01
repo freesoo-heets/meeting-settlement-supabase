@@ -3769,9 +3769,6 @@ setSaving(false);
                             onChange={() => void toggleAttendance(member.id)}
                           />
                           <span>{member.name}</span>
-                          {attendeeSort === "count_desc" && (
-                            <em className="chipCount">{attendanceCountByMember[member.id] ?? 0}회</em>
-                          )}
                         </label>
                       );
                     })}

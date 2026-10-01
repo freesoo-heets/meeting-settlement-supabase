@@ -5499,4 +5499,3 @@ button.meetingMetricCard {
 @keyframes cmIdlePulse { 50% { transform: translateX(-50%) scale(1.05); } }
 @media (prefers-reduced-motion: reduce) { .cmIdleWarn { animation: none; } }
 
-.chipCount { font-style: normal; font-size: 11px; opacity: .7; margin-left: 2px; }
