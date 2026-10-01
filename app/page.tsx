@@ -13,6 +13,7 @@ type Member = {
   birthday: string | null;
   withdrawn_at: string | null;
   created_at: string;
+  is_guest?: boolean; // 카톡방 명단에 없이 가입한 사람 (회원현황에서 따로 보여준다)
 };
 
 // 카톡 봇 점수판 스냅샷 (봇이 1분마다 bot_points 에 올린다)
@@ -297,11 +298,19 @@ export default function Home() {
       profileResult,
       activityLogResult,
     ] = await Promise.all([
-      supabase
-        .from("members")
-        .select("id,name,active,join_date,birthday,withdrawn_at,created_at")
-        .order("active", { ascending: false })
-        .order("join_date", { ascending: true }),
+      (async () => {
+        const query = (columns: string) =>
+          supabase
+            .from("members")
+            .select(columns)
+            .order("active", { ascending: false })
+            .order("join_date", { ascending: true });
+        const withGuest = await query("id,name,active,join_date,birthday,withdrawn_at,created_at,is_guest");
+        // 게스트 칸(is_guest)이 DB 에 아직 없으면 빼고 다시 불러온다
+        return withGuest.error?.code === "42703"
+          ? await query("id,name,active,join_date,birthday,withdrawn_at,created_at")
+          : withGuest;
+      })(),
       supabase
         .from("meetings")
         .select("id,date,title,cost,created_at")
@@ -343,7 +352,7 @@ export default function Home() {
       return;
     }
 
-    const memberRows = (memberResult.data ?? []) as Member[];
+    const memberRows = (memberResult.data ?? []) as unknown as Member[];
     const meetingRows = (meetingResult.data ?? []) as MeetingRow[];
     const attendanceRows = (attendanceResult.data ?? []) as AttendanceRow[];
     const guestRows = (guestResult.data ?? []) as MeetingGuest[];
@@ -704,12 +713,24 @@ export default function Home() {
   }, [members, lastAttendanceByMember, today]);
 
   const warningMembers = useMemo(
-    () => activeMembers.filter((member) => warningByMember[member.id]?.warning),
+    () => activeMembers.filter((member) => !member.is_guest && warningByMember[member.id]?.warning),
     [activeMembers, warningByMember]
   );
 
+  const guestMembers = useMemo(
+    () => members.filter((member) => member.is_guest && member.active).sort((a, b) => b.join_date.localeCompare(a.join_date)),
+    [members],
+  );
+
+  async function promoteGuest(member: Member) {
+    if (!window.confirm(`${member.name}님을 정회원으로 바꿀까요?`)) return;
+    const { error } = await supabase.from("members").update({ is_guest: false }).eq("id", member.id);
+    if (error) setNotice(`정회원 전환 실패: ${error.message}`);
+    else await loadAll();
+  }
+
   const memberStatusCounts = useMemo(() => {
-    const activeTotal = members.filter((member) => member.active).length;
+    const activeTotal = members.filter((member) => member.active && !member.is_guest).length;
     const warning = warningMembers.length;
     const active = Math.max(0, activeTotal - warning);
 
@@ -717,7 +738,7 @@ export default function Home() {
       all: activeTotal,
       active,
       warning,
-      withdrawn: members.filter((member) => !member.active).length,
+      withdrawn: members.filter((member) => !member.active && !member.is_guest).length,
     };
   }, [members, warningMembers]);
 
@@ -726,6 +747,7 @@ export default function Home() {
     const q = memberSearch.trim().toLowerCase();
 
     const rows = members.filter((member) => {
+      if (member.is_guest) return false; // 게스트는 아래 '게스트 현황'에 따로
       if (q && !member.name.toLowerCase().includes(q)) return false;
       if (memberFilter === "active") {
         return member.active && !warningByMember[member.id]?.warning;
@@ -1782,6 +1804,9 @@ async function setAttendanceMembers(memberIds: string[]) {
       setSignupBirthday("");
       setSignupPassword("");
       setSignupPasswordConfirm("");
+      if (body.guest) {
+        setNotice("카톡방 명단에서 닉네임을 찾지 못해 게스트로 가입되었어요. 방에 규칙 닉네임으로 들어오면 회원으로 바뀝니다.");
+      }
     } catch {
       setLoginNotice("가입 처리 중 오류가 발생했습니다.");
     } finally {
@@ -4502,6 +4527,40 @@ async function setAttendanceMembers(memberIds: string[]) {
               );
             })}
           </section>
+
+          {guestMembers.length > 0 && (
+            <section className="panel standalonePanel guestPanel">
+              <div className="guestPanelHead">
+                <div>
+                  <h3>🙋 게스트 현황</h3>
+                  <p>카톡방 명단에 없는 닉네임으로 가입한 사람들입니다. 방에 규칙 닉네임으로 들어오면 자동으로 회원이 됩니다.</p>
+                </div>
+                <span className="guestCount">{guestMembers.length}명</span>
+              </div>
+              <div className="guestList">
+                {guestMembers.map((member) => {
+                  const last = lastAttendanceByMember[member.id];
+                  const hasAccount = profiles.some((item) => item.member_id === member.id);
+                  return (
+                    <div className="guestRow" key={member.id}>
+                      <div>
+                        <strong>{member.name}</strong>
+                        <span>
+                          가입 {member.join_date} · 최근 참석 {last ?? "없음"}
+                          {hasAccount ? " · 로그인 계정 있음" : ""}
+                        </span>
+                      </div>
+                      {isAdmin && (
+                        <button className="smallButton ghost" onClick={() => void promoteGuest(member)}>
+                          정회원 전환
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
         </>
       )}
 

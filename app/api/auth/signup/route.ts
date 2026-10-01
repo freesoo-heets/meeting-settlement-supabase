@@ -102,6 +102,17 @@ export async function POST(request: Request) {
       member.birthday = cleanBirthday;
     }
 
+    // ★ 명단에 없는 닉네임: 카톡방 인원 명단(봇이 올림)과 대조해, 방에 없는 사람이면 '게스트'로 등록한다
+    //   봇 명단이 아직 없으면(비어 있거나 표가 없으면) 예전처럼 정회원으로 등록한다
+    let isGuest = false;
+    if (!member) {
+      const normalize = (value: string) => value.split(" ").join("").toLowerCase();
+      const { data: roster, error: rosterError } = await admin.from("room_roster").select("name");
+      if (!rosterError && roster && roster.length > 0) {
+        isGuest = !roster.some((row) => normalize(String(row.name)) === normalize(cleanNickname));
+      }
+    }
+
     if (!member) {
       const { data: createdMember, error: createMemberError } = await admin
         .from("members")
@@ -111,6 +122,7 @@ export async function POST(request: Request) {
           join_date: today,
           birthday: cleanBirthday,
           withdrawn_at: null,
+          ...(isGuest ? { is_guest: true } : {}),
         })
         .select("id,name,active,birthday")
         .single();
@@ -183,6 +195,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       email: authEmail,
+      guest: isGuest,
     });
   } catch (error) {
     return NextResponse.json(

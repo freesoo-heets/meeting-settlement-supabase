@@ -5538,3 +5538,23 @@ button.meetingMetricCard {
 }
 
 
+
+/* 회원현황: 게스트 현황 */
+.guestPanel { margin-top: 14px; display: flex; flex-direction: column; gap: 10px; }
+.guestPanelHead { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.guestPanelHead h3 { margin: 0; font-size: 17px; }
+.guestPanelHead p { margin: 2px 0 0; font-size: 12px; color: #7a6f63; }
+.guestCount { padding: 3px 10px; border-radius: 999px; background: #f3e8ff; color: #6b21a8; font-weight: 800; font-size: 13px; white-space: nowrap; }
+.guestList { display: flex; flex-direction: column; gap: 6px; }
+.guestRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px dashed #d8b4fe;
+  border-radius: 12px;
+  background: #faf5ff;
+}
+.guestRow > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.guestRow span { font-size: 12px; color: #7a6f63; }
