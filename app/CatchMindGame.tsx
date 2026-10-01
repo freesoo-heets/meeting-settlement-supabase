@@ -303,6 +303,8 @@ function CatchRoomView({
   const turnKeyRef = useRef(turnKey);
   const isDrawerRef = useRef(isDrawer);
   const [typing, setTyping] = useState(false);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const blurTimer = useRef(0);
   isDrawerRef.current = isDrawer;
 
   useEffect(() => {
@@ -391,11 +393,14 @@ function CatchRoomView({
         }
         stroke.pts.push(...data.pts.slice(0, 200));
         paintStroke(stroke, from);
+        // 내가 출제자인데 그림이 들어온다 = 같은 계정의 다른 기기(PC·카톡)에서 그리는 중 → 무입력 아님
+        if (isDrawerRef.current) drawerTurn.current.touched = true;
       })
       .on("broadcast", { event: "clear" }, ({ payload }) => {
         if ((payload as { turn?: string }).turn !== turnKeyRef.current) return;
         strokesRef.current = [];
         redraw();
+        if (isDrawerRef.current) drawerTurn.current.touched = true;
       })
       .on("broadcast", { event: "sync-req" }, () => {
         if (!isDrawerRef.current) return;
@@ -578,6 +583,7 @@ function CatchRoomView({
     const value = text.trim();
     if (!value || !joined) return;
     setText("");
+    inputRef.current?.focus(); // 연달아 입력할 수 있게 포커스 유지
     if (room.status === "playing" && room.phase === "drawing" && !chatLocked) {
       const result = await callCatch({ action: "guess", roomId: room.id, text: value });
       if (result.ok && result.correct) {
@@ -827,15 +833,19 @@ function CatchRoomView({
                 }}
               >
                 <input
+                  ref={inputRef}
                   value={text}
                   onChange={(event) => setText(event.target.value)}
-                  onFocus={(event) => {
-                    // 키보드가 올라오면 그림판을 줄이고 입력칸이 보이게
+                  onFocus={() => {
+                    // 키보드가 올라오면 그림판을 줄여 입력칸과 함께 보이게
+                    window.clearTimeout(blurTimer.current);
                     setTyping(true);
-                    const input = event.currentTarget;
-                    window.setTimeout(() => input.scrollIntoView({ block: "nearest", behavior: "smooth" }), 250);
                   }}
-                  onBlur={() => setTyping(false)}
+                  onBlur={() => {
+                    // 잠깐 포커스가 빠졌다 돌아오는 경우(전송 등)에 화면이 출렁이지 않게 조금 늦게 푼다
+                    window.clearTimeout(blurTimer.current);
+                    blurTimer.current = window.setTimeout(() => setTyping(false), 200);
+                  }}
                   enterKeyHint="send"
                   autoComplete="off"
                   placeholder={chatLocked ? "그리는 중에는 입력할 수 없어요" : room.phase === "drawing" ? "정답 입력" : "채팅"}
@@ -843,7 +853,16 @@ function CatchRoomView({
                   maxLength={40}
                   aria-label="채팅 입력"
                 />
-                <button type="submit" disabled={chatLocked} aria-label="보내기">↑</button>
+                <button
+                  type="submit"
+                  disabled={chatLocked}
+                  aria-label="보내기"
+                  // 누를 때 입력칸 포커스를 빼앗지 않는다 → 키보드·작은 그림판 화면이 그대로 유지된다
+                  onPointerDown={(event) => event.preventDefault()}
+                  onMouseDown={(event) => event.preventDefault()}
+                >
+                  ↑
+                </button>
               </form>
             )}
           </div>
