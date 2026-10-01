@@ -389,25 +389,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  // ── 다시하기: 끝난 방을 같은 멤버로 바로 새로 시작 ──
+  // ── 다시하기: 누른 사람만 새 판에 참가한다 ──
+  //   처음 누른 사람이 방장이 되어 방을 대기 상태로 되돌린다 (예전엔 전원을 데리고 바로 시작해서
+  //   '게임 종료'를 누른 사람도 끌려 들어갔다). 다른 사람은 '참가하기'로 들어온다.
   if (action === "restart") {
-    if (room.status !== "finished") return fail("게임이 끝난 뒤에 다시 할 수 있습니다.");
-    // 그사이 다른 방에 들어간 사람은 빼고 시작한다
-    const players: Member[] = [];
-    for (const player of room.players) {
-      const other = await inOtherRoom(admin, player.id);
-      if (!other || other === room.id) players.push(player);
-    }
-    const hostStays = players.some((player) => player.id === room.host_member);
-    const hostFields = hostStays || players.length === 0 ? {} : { host_member: players[0].id, host_name: players[0].name };
-    const scores = Object.fromEntries(players.map((player) => [player.id, 0]));
-    const reset = {
-      ...hostFields,
-      players,
-      scores,
+    if (room.status !== "finished") return fail("이미 다시하기가 시작됐어요. '참가하기'를 눌러 주세요.", 409);
+    const me = room.players.find((player) => player.id === memberId);
+    if (!me) return fail("방에 들어가 있지 않습니다.");
+    const other = await inOtherRoom(admin, memberId);
+    if (other && other !== room.id) return fail("이미 다른 캐치마인드 방에 들어가 있습니다.");
+    const ok = await updateIfUnchanged(admin, TABLE, room, {
+      status: "waiting",
+      host_member: me.id,
+      host_name: me.name,
+      players: [me],
+      scores: {},
       turn_no: 0,
+      turn_total: 0,
       play_no: (room.play_no ?? 0) + 1, // 몇 번째 판인지 (그림 기록이 이전 판과 겹치지 않게)
-      turn_total: players.length * ROUNDS,
       drawer_member: null,
       drawer_name: null,
       phase: null,
@@ -415,30 +414,8 @@ export async function POST(request: Request) {
       hint: null,
       reveal_word: null,
       last_winner: null,
-    };
-
-    // 인원이 모자라면 대기실로만 되돌린다
-    if (players.length < (room.is_test ? 1 : 2)) {
-      const ok = await updateIfUnchanged(admin, TABLE, room, { ...reset, status: "waiting" });
-      if (!ok) return fail("이미 다시 시작했습니다.", 409);
-      return NextResponse.json({ ok: true, waiting: true });
-    }
-
-    const { data } = await admin
-      .from(TABLE)
-      .update({ ...reset, updated_at: new Date().toISOString() })
-      .eq("id", room.id)
-      .eq("status", "finished")
-      .eq("updated_at", room.updated_at)
-      .select("updated_at")
-      .single();
-    if (!data) return fail("이미 다시 시작했습니다.", 409);
-    await startTurn(
-      admin,
-      { ...room, ...reset, status: "finished", updated_at: data.updated_at as string } as Room,
-      0,
-      players,
-    );
+    });
+    if (!ok) return fail("이미 다시하기가 시작됐어요. '참가하기'를 눌러 주세요.", 409);
     return NextResponse.json({ ok: true });
   }
 

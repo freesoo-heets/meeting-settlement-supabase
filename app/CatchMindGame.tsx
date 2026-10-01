@@ -180,7 +180,12 @@ export default function CatchMindGame({ onClose, onBack, initialRoomId, currentM
             onJoin={() => run({ action: "join", roomId: room.id })}
             onLeave={() => run({ action: "leave", roomId: room.id }, () => setRoomId(""))}
             onStart={() => run({ action: "start", roomId: room.id })}
-            onRestart={() => run({ action: "restart", roomId: room.id })}
+            onRestart={async () => {
+              // 다른 사람이 먼저 다시하기를 눌렀으면 그 방에 참가한다
+              const first = await callCatch({ action: "restart", roomId: room.id });
+              if (first.ok) await load();
+              else await run({ action: "join", roomId: room.id });
+            }}
             onRecruit={() => {
               if (!window.confirm("카톡방에 참가자 모집 알림을 보낼까요?")) return;
               void run({ action: "recruit", roomId: room.id }, () =>
@@ -874,7 +879,7 @@ function CatchRoomView({
         <div className="cmActionsMain">
           {!joined && (room.status === "waiting" || room.status === "playing") && (
             <button className="primaryButton" disabled={busy || seatsLeft <= 0} onClick={onJoin}>
-              {seatsLeft <= 0 ? "방이 가득 찼어요" : "참가하기"}
+              {seatsLeft <= 0 ? "방이 가득 찼어요" : (room.play_no ?? 0) > 0 ? "🔁 다시하기 참가" : "참가하기"}
             </button>
           )}
           {joined && room.status === "finished" && (
