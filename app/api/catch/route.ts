@@ -237,9 +237,6 @@ export async function POST(request: Request) {
         max_players: MAX_PLAYERS,
         rounds: ROUNDS,
         is_test: test,
-        // 테스트 방이 아니면 만들자마자 카톡방에 모집 알림 (봇이 올린다)
-        recruit_at: test ? null : new Date().toISOString(),
-        recruit_no: test ? 0 : 1,
       })
       .select("id")
       .single();

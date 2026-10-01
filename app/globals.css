@@ -5476,3 +5476,5 @@ button.meetingMetricCard {
 
 .cmResultActions { display: flex; gap: 8px; margin-top: 10px; }
 .catchOverlay.result { background: rgba(255, 255, 255, .94); animation: gameResultFade .25s ease; }
+
+.inviteButton { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }

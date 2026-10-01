@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerAdmin } from "../../../lib/server-admin";
 import { CENTER, TURN_SECONDS, checkMove, type Move } from "../../../lib/omok";
-import { isAdminMember, loadMember } from "../../../lib/gameServer";
+import { isAdminMember, loadMember, requestInvite } from "../../../lib/gameServer";
 
 /*
  * 오목 대국 API (모든 쓰기는 여기서만 한다)
@@ -279,6 +279,16 @@ export async function POST(request: Request) {
   }
 
   // ── 도전 거절 ──
+  // ── 카톡방 초대 메시지 보내기 (방장이 직접 누른다) ──
+  if (action === "invite") {
+    if (game.host_member !== me.memberId) return fail("방장만 초대 메시지를 보낼 수 있습니다.");
+    if (game.status !== "open" && game.status !== "challenge") return fail("대기 중인 대국만 초대할 수 있습니다.");
+    if (game.is_test) return fail("테스트 대국은 초대 메시지를 보내지 않습니다.");
+    const result = await requestInvite(admin, "omok", game.id, me.memberId);
+    if (!result.ok) return fail(result.error, 429);
+    return NextResponse.json({ ok: true });
+  }
+
   if (action === "decline") {
     if (game.status !== "challenge" || game.target_member !== me.memberId) return fail("거절할 수 없는 대국입니다.");
     await updateGame(admin, game, { status: "cancelled", end_reason: "declined", finished_at: new Date().toISOString() });

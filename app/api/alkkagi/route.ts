@@ -4,6 +4,7 @@ import {
   fail,
   hasActiveStakeGame,
   isAdminMember,
+  requestInvite,
   loadMember,
   loadPlayer,
   requireMemberId,
@@ -225,6 +226,16 @@ export async function POST(request: Request) {
         : { status: "escrow", escrow_state: "requested" }),
     });
     if (!ok) return fail("다른 사람이 먼저 입장했습니다.", 409);
+    return NextResponse.json({ ok: true });
+  }
+
+  // ── 카톡방 초대 메시지 보내기 (방장이 직접 누른다) ──
+  if (action === "invite") {
+    if (game.host_member !== memberId) return fail("방장만 초대 메시지를 보낼 수 있습니다.");
+    if (game.status !== "open" && game.status !== "challenge") return fail("대기 중인 대국만 초대할 수 있습니다.");
+    if (game.is_test) return fail("테스트 대국은 초대 메시지를 보내지 않습니다.");
+    const result = await requestInvite(admin, "alkkagi", game.id, memberId);
+    if (!result.ok) return fail(result.error, 429);
     return NextResponse.json({ ok: true });
   }
 

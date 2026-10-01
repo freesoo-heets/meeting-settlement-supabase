@@ -82,3 +82,20 @@ export async function isAdminMember(admin: Admin, memberId: string) {
     .limit(1);
   return (data ?? []).length > 0;
 }
+
+// 카톡방 초대 메시지 요청 (봇이 bot_announcements 를 보고 올린다). 같은 대국은 1분에 한 번
+export const INVITE_COOLDOWN_MS = 60 * 1000;
+export async function requestInvite(admin: Admin, kind: "omok" | "alkkagi", refId: string, memberId: string) {
+  const { data: last } = await admin
+    .from("bot_announcements")
+    .select("created_at")
+    .eq("ref_id", refId)
+    .order("created_at", { ascending: false })
+    .limit(1);
+  const lastAt = last?.[0]?.created_at ? new Date(last[0].created_at as string).getTime() : 0;
+  const wait = Math.ceil((lastAt + INVITE_COOLDOWN_MS - Date.now()) / 1000);
+  if (wait > 0) return { ok: false as const, error: `방금 보냈어요. ${wait}초 뒤에 다시 보낼 수 있습니다.` };
+  const { error } = await admin.from("bot_announcements").insert({ kind, ref_id: refId, requested_by: memberId });
+  if (error) return { ok: false as const, error: `요청 실패: ${error.message}` };
+  return { ok: true as const };
+}

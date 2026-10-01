@@ -221,6 +221,13 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
   const [target, setTarget] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [info, setInfo] = useState("");
+
+  // 카톡방 초대 메시지 (자동으로 보내지 않고 방장이 직접 누른다)
+  function sendInvite(gameId: string) {
+    if (!window.confirm("카톡방에 초대 메시지를 보낼까요?")) return;
+    void run({ action: "invite", gameId }, () => setInfo("📣 카톡방에 초대 메시지를 보냈어요. (봇이 몇 초 안에 올립니다)"));
+  }
   const [pending, setPending] = useState<Move | null>(null);
   const [now, setNow] = useState(Date.now());
   const lastTick = useRef(0);
@@ -406,6 +413,7 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
   async function run(payload: Record<string, unknown>, after?: (id?: string) => void) {
     setBusy(true);
     setMessage("");
+    setInfo("");
     const result = await callOmok(payload);
     setBusy(false);
     if (!result.ok) {
@@ -445,6 +453,7 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
         </div>
 
         {message && <div className="omokMessage">{message}</div>}
+        {info && !message && <div className="omokMessage info">{info}</div>}
         {missing && viewId === initialGameId && !viewing && (
           <div className="omokMessage">대국신청을 찾지 못했습니다. 주소를 확인해 주세요.</div>
         )}
@@ -468,6 +477,9 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
                 <span className="muted">내가 만든 대국입니다. 상대를 기다리는 중…</span>
                 <div className="omokControls">
                   <button className="smallButton ghost" onClick={() => setViewId("")}>← 대기실</button>
+                  <button className="smallButton inviteButton" disabled={busy} onClick={() => sendInvite(viewing.id)}>
+                    📣 카톡방에 초대하기
+                  </button>
                   <button className="smallButton ghost" disabled={busy} onClick={() => run({ action: "cancel", gameId: viewing.id }, () => setViewId(""))}>
                     취소
                   </button>
@@ -544,6 +556,11 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
                 <div className="omokCardActions">
                   {(myActive.status === "escrow" || myActive.status === "playing") && (
                     <button className="smallButton" onClick={() => setViewId(myActive.id)}>판 보기</button>
+                  )}
+                  {(myActive.status === "open" || myActive.status === "challenge") && !myActive.is_test && (
+                    <button className="smallButton inviteButton" disabled={busy} onClick={() => sendInvite(myActive.id)}>
+                      📣 초대
+                    </button>
                   )}
                   {(myActive.status === "open" || myActive.status === "challenge") && (
                     <button className="smallButton ghost" disabled={busy} onClick={() => run({ action: "cancel", gameId: myActive.id })}>
