@@ -619,6 +619,12 @@ function CatchRoomView({
                     </li>
                   ))}
                 </ol>
+                {joined && (
+                  <div className="cmResultActions">
+                    <button className="smallButton ghost" onClick={onBack}>게임 종료</button>
+                    <button className="primaryButton" disabled={busy} onClick={onRestart}>🔁 다시하기</button>
+                  </div>
+                )}
               </div>
             )}
           </div>

@@ -15,6 +15,7 @@ import {
   spotStyle,
   type EmoteKind,
 } from "./OmokEmotes";
+import { GameResultPopup, RematchOfferPopup } from "./GameResult";
 
 type OmokRow = {
   id: string;
@@ -270,6 +271,45 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
   }, [myActive]);
 
   const viewing = games.find((game) => game.id === viewId) ?? null;
+
+  // ── 종료 팝업 · 재경기 ──
+  const [resultFor, setResultFor] = useState<string | null>(null);
+  const [rematchOffer, setRematchOffer] = useState<{ id: string; from: string; stake: number; friendly: boolean } | null>(null);
+  const seenStatus = useRef<Record<string, string>>({});
+  useEffect(() => {
+    if (!viewing) return;
+    const prev = seenStatus.current[viewing.id];
+    seenStatus.current[viewing.id] = viewing.status;
+    if (viewing.status !== "finished") return;
+    // 보고 있는 중에 끝났거나, 방금(30초 안에) 끝난 판을 열었을 때만 팝업
+    const fresh = !!viewing.finished_at && Date.now() - new Date(viewing.finished_at).getTime() < 30000;
+    if ((prev && prev !== "finished") || (!prev && fresh)) setResultFor(viewing.id);
+  }, [viewing?.id, viewing?.status]);
+
+  function seatOf(game: { host_member: string; guest_member: string | null }): "host" | "guest" | null {
+    if (game.host_member === currentMemberId) return "host";
+    if (game.guest_member === currentMemberId) return "guest";
+    return null;
+  }
+
+  async function requestRematch(game: OmokRow) {
+    setResultFor(null);
+    if (game.is_test) {
+      await run({ action: "create_test" }, (id) => id && setViewId(id));
+      return;
+    }
+    const opponent = game.host_member === currentMemberId ? game.guest_member : game.host_member;
+    await run({ action: "create", friendly: !!game.is_friendly, stake: game.stake, targetMemberId: opponent }, (id) => {
+      if (!id) return;
+      // 상대 화면에 바로 재경기 신청 팝업을 띄운다 (창을 닫았으면 대기실·카톡 링크로 받는다)
+      void channelRef.current?.send({
+        type: "broadcast",
+        event: "rematch",
+        payload: { id, from: myName, to: opponent, stake: game.stake, friendly: !!game.is_friendly },
+      });
+      setViewId(id);
+    });
+  }
   const live = viewing && (viewing.status === "playing" || viewing.status === "escrow");
 
   useEffect(() => {
@@ -300,6 +340,11 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
     if (!viewId) return;
     const channel = supabase
       .channel(`omok-${viewId}`, { config: { broadcast: { self: false } } })
+      .on("broadcast", { event: "rematch" }, ({ payload }) => {
+        const data = payload as { id?: string; from?: string; to?: string; stake?: number; friendly?: boolean };
+        if (!data.id || data.to !== currentMemberId) return;
+        setRematchOffer({ id: data.id, from: String(data.from ?? "").slice(0, 10), stake: Number(data.stake) || 0, friendly: !!data.friendly });
+      })
       .on("broadcast", { event: "emote" }, ({ payload }) => {
         const data = payload as { kind?: unknown; spot?: unknown; name?: unknown; watcher?: unknown };
         if (!isEmoteKind(data.kind)) return;
@@ -637,6 +682,37 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
               </div>
             )}
           </div>
+        )}
+        {viewing && resultFor === viewing.id && viewing.status === "finished" && !rematchOffer && (
+          <GameResultPopup
+            game={viewing}
+            mySeat={seatOf(viewing)}
+            endText={END_TEXT}
+            busy={busy}
+            onClose={() => {
+              setResultFor(null);
+              if (seatOf(viewing)) setViewId("");
+            }}
+            onRematch={() => void requestRematch(viewing)}
+          />
+        )}
+        {rematchOffer && (
+          <RematchOfferPopup
+            from={rematchOffer.from}
+            stakeText={rematchOffer.friendly ? "🤝 친선전 · 점수·티켓 없음" : `💎 판돈 ${rematchOffer.stake.toLocaleString("ko-KR")}점 · 🎫 티켓 1장`}
+            busy={busy}
+            onAccept={() => {
+              const offer = rematchOffer;
+              setRematchOffer(null);
+              setResultFor(null);
+              void run({ action: "join", gameId: offer.id }, () => setViewId(offer.id));
+            }}
+            onDecline={() => {
+              const offer = rematchOffer;
+              setRematchOffer(null);
+              void run({ action: "decline", gameId: offer.id });
+            }}
+          />
         )}
       </section>
     </div>
