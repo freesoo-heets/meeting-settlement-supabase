@@ -688,8 +688,17 @@ function AlkkagiBoardView({
   useEffect(() => () => window.cancelAnimationFrame(frameRef.current), []);
 
   // ── 조준 (새총: 내 알을 잡고 뒤로 당겼다 놓기) ──
+  // 손가락을 움직이는 동안에는 React 상태를 바꾸지 않고 조준선·알·세기 막대만 직접 움직인다.
+  // (예전에는 움직일 때마다 판 전체를 다시 그려서 조준이 손을 늦게 따라왔다)
   const layerRef = useRef<SVGGElement | null>(null);
-  const [aim, setAim] = useState<{ id: string; px: number; py: number; x: number; y: number } | null>(null);
+  const aimRef = useRef<{ id: string; px: number; py: number; x: number; y: number } | null>(null);
+  const [aimId, setAimId] = useState<string | null>(null);
+  const pieceEls = useRef(new Map<string, SVGGElement>());
+  const pullEl = useRef<SVGLineElement | null>(null);
+  const shotEl = useRef<SVGLineElement | null>(null);
+  const headEl = useRef<SVGCircleElement | null>(null);
+  const powerEl = useRef<HTMLDivElement | null>(null);
+  const aimFrame = useRef(0);
 
   function toBoard(event: React.PointerEvent) {
     const layer = layerRef.current;
@@ -703,24 +712,83 @@ function AlkkagiBoardView({
     return { x: local.x, y: local.y };
   }
 
-  const aimVector = aim
-    ? (() => {
-        // 새총: 끈 방향의 반대로 날아간다
-        const dx = aim.x - aim.px;
-        const dy = aim.y - aim.py;
-        const length = Math.hypot(dx, dy);
-        const power = Math.min(length, PULL_MAX) / PULL_MAX;
-        return length > 0 ? { nx: dx / length, ny: dy / length, power } : { nx: 0, ny: 0, power: 0 };
-      })()
-    : null;
+  function aimVector() {
+    const aim = aimRef.current;
+    if (!aim) return null;
+    // 새총: 끈 방향의 반대로 날아간다
+    const dx = aim.x - aim.px;
+    const dy = aim.y - aim.py;
+    const length = Math.hypot(dx, dy);
+    const power = Math.min(length, PULL_MAX) / PULL_MAX;
+    return length > 0 ? { nx: dx / length, ny: dy / length, power } : { nx: 0, ny: 0, power: 0 };
+  }
+
+  function drawAim() {
+    aimFrame.current = 0;
+    const aim = aimRef.current;
+    const v = aimVector();
+    if (!aim || !v) return;
+    const color = v.power < 0.4 ? "#22c55e" : v.power < 0.75 ? "#f59e0b" : "#ef4444";
+    // 알이 당기는 쪽으로 살짝 딸려 온다 (최대 9)
+    const pull = v.power * 9;
+    const ax = aim.x - v.nx * pull;
+    const ay = aim.y - v.ny * pull;
+    pieceEls.current.get(aim.id)?.setAttribute("transform", `translate(${ax.toFixed(2)} ${ay.toFixed(2)})`);
+    const pullLine = pullEl.current;
+    if (pullLine) {
+      pullLine.setAttribute("x1", ax.toFixed(2));
+      pullLine.setAttribute("y1", ay.toFixed(2));
+      pullLine.setAttribute("x2", aim.px.toFixed(2));
+      pullLine.setAttribute("y2", aim.py.toFixed(2));
+      pullLine.style.stroke = color;
+      pullLine.style.opacity = v.power > 0 ? "1" : "0";
+    }
+    const tx = ax + v.nx * AIM_GUIDE;
+    const ty = ay + v.ny * AIM_GUIDE;
+    if (shotEl.current) {
+      shotEl.current.setAttribute("x1", ax.toFixed(2));
+      shotEl.current.setAttribute("y1", ay.toFixed(2));
+      shotEl.current.setAttribute("x2", tx.toFixed(2));
+      shotEl.current.setAttribute("y2", ty.toFixed(2));
+      shotEl.current.style.stroke = color;
+      shotEl.current.style.opacity = v.power > 0.06 ? "1" : "0";
+    }
+    if (headEl.current) {
+      headEl.current.setAttribute("cx", tx.toFixed(2));
+      headEl.current.setAttribute("cy", ty.toFixed(2));
+      headEl.current.style.fill = color;
+      headEl.current.style.opacity = v.power > 0.06 ? "1" : "0";
+    }
+    if (powerEl.current) {
+      powerEl.current.style.width = `${Math.round(v.power * 100)}%`;
+      powerEl.current.style.background = color;
+    }
+  }
+
+  function scheduleAim() {
+    if (!aimFrame.current) aimFrame.current = window.requestAnimationFrame(drawAim);
+  }
+
+  useEffect(() => {
+    if (aimId) drawAim();
+  }, [aimId]);
+
+  function resetAimPiece() {
+    const aim = aimRef.current;
+    if (aim) pieceEls.current.get(aim.id)?.setAttribute("transform", `translate(${aim.x} ${aim.y})`);
+  }
 
   async function release() {
-    if (!aim || !aimVector) return;
-    const current = aim;
-    setAim(null);
-    if (aimVector.power < 0.06) return;
-    const vx = aimVector.nx * aimVector.power * VMAX;
-    const vy = aimVector.ny * aimVector.power * VMAX;
+    const current = aimRef.current;
+    const v = aimVector();
+    window.cancelAnimationFrame(aimFrame.current);
+    aimFrame.current = 0;
+    resetAimPiece();
+    aimRef.current = null;
+    setAimId(null);
+    if (!current || !v || v.power < 0.06) return;
+    const vx = v.nx * v.power * VMAX;
+    const vy = v.ny * v.power * VMAX;
     // 응답을 기다리지 않고 바로 재생한다
     animatedNo.current = game.shot_no + 1;
     play(game.pieces, { id: current.id, vx, vy }, null);
@@ -808,12 +876,20 @@ function AlkkagiBoardView({
           role="img"
           aria-label="알까기 판"
           onPointerMove={(event) => {
+            const aim = aimRef.current;
             if (!aim) return;
             const point = toBoard(event);
-            if (point) setAim({ ...aim, px: point.x, py: point.y });
+            if (!point) return;
+            aim.px = point.x;
+            aim.py = point.y;
+            scheduleAim();
           }}
           onPointerUp={() => void release()}
-          onPointerCancel={() => setAim(null)}
+          onPointerCancel={() => {
+            resetAimPiece();
+            aimRef.current = null;
+            setAimId(null);
+          }}
         >
           <g ref={layerRef} transform={flipped ? `rotate(180 ${BOARD_W / 2} ${BOARD_H / 2})` : undefined}>
             <rect x="0" y="0" width={BOARD_W} height={BOARD_H} rx="12" className="alkBoardBg" />
@@ -835,10 +911,14 @@ function AlkkagiBoardView({
               .map((piece) => {
                 const r = RADIUS[piece.kind];
                 const mine = myTurn && !animating && !busy && piece.side === myColor;
-                const selected = aim?.id === piece.id;
+                const selected = aimId === piece.id;
                 return (
                   <g
                     key={piece.id}
+                    ref={(el) => {
+                      if (el) pieceEls.current.set(piece.id, el);
+                      else pieceEls.current.delete(piece.id);
+                    }}
                     transform={`translate(${piece.x} ${piece.y})`}
                     className={`alkPiece ${piece.side} ${mine ? "mine" : ""} ${selected ? "selected" : ""}`}
                     onPointerDown={(event) => {
@@ -846,7 +926,8 @@ function AlkkagiBoardView({
                       event.preventDefault();
                       (event.currentTarget.ownerSVGElement as SVGSVGElement | null)?.setPointerCapture(event.pointerId);
                       const point = toBoard(event);
-                      setAim({ id: piece.id, x: piece.x, y: piece.y, px: point?.x ?? piece.x, py: point?.y ?? piece.y });
+                      aimRef.current = { id: piece.id, x: piece.x, y: piece.y, px: point?.x ?? piece.x, py: point?.y ?? piece.y };
+                      setAimId(piece.id);
                     }}
                   >
                     <polygon
@@ -866,31 +947,21 @@ function AlkkagiBoardView({
                 );
               })}
 
-            {aim && aimVector && aimVector.power > 0 && (
+            {aimId && (
               <g className="alkAim" pointerEvents="none">
-                <line x1={aim.x} y1={aim.y} x2={aim.px} y2={aim.py} className="alkPull" />
+                {/* 새총 줄 (세기에 따라 초록 → 주황 → 빨강) */}
+                <line ref={pullEl} className="alkPull" />
                 {/* 방향만 짧게 보여준다 (얼마나 멀리 갈지는 감으로) */}
-                <line
-                  x1={aim.x}
-                  y1={aim.y}
-                  x2={aim.x + aimVector.nx * AIM_GUIDE}
-                  y2={aim.y + aimVector.ny * AIM_GUIDE}
-                  className="alkShot"
-                />
-                <circle
-                  cx={aim.x + aimVector.nx * AIM_GUIDE}
-                  cy={aim.y + aimVector.ny * AIM_GUIDE}
-                  r="4"
-                  className="alkShotHead"
-                />
+                <line ref={shotEl} className="alkShot" />
+                <circle ref={headEl} r="4" className="alkShotHead" />
               </g>
             )}
           </g>
         </svg>
         <canvas ref={animCanvas} className="alkAnim" aria-hidden="true" />
-        {aim && aimVector && (
+        {aimId && (
           <div className="alkPower">
-            <div style={{ width: `${Math.round(aimVector.power * 100)}%` }} />
+            <div ref={powerEl} style={{ width: "0%" }} />
           </div>
         )}
       </div>

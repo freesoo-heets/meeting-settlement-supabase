@@ -5421,3 +5421,7 @@ button.meetingMetricCard {
 
 /* 감정표현 6개 — 좁은 화면에서 한 줄에 들어가게 */
 @media (max-width: 420px) { .omokEmoteBar { gap: 6px; } .omokEmoteButton { width: 40px; height: 40px; padding: 4px; } }
+
+/* 알까기 조준: 새총 줄은 굵게, 세기 막대는 색으로 */
+.alkPull { stroke-width: 4; stroke-linecap: round; stroke-dasharray: none; }
+.alkPower div { transition: background .12s ease; }

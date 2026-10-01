@@ -37,8 +37,8 @@ export const POWER: Record<Kind, number> = {
   po: 1,
   ma: 1,
   sang: 1,
-  sa: 0.55,
-  jol: 0.55,
+  sa: 0.65,
+  jol: 0.65,
 };
 
 export const RADIUS: Record<Kind, number> = {
