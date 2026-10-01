@@ -1,6 +1,6 @@
 "use client";
 
-import { isKakaoInApp, openInExternalBrowser, useGameViewport } from "./useGameViewport";
+import { useGameViewport } from "./useGameViewport";
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import OmokGame, { type Opponent } from "./OmokGame";
@@ -239,12 +239,6 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
           <button className="modalCloseButton" onClick={onClose}>×</button>
         </div>
 
-        {isKakaoInApp() && (
-          <div className="kakaoNotice">
-            <span>카카오톡 브라우저에서는 그릴 때 화면이 흔들릴 수 있어요.</span>
-            <button className="smallButton" onClick={openInExternalBrowser}>기본 브라우저로 열기</button>
-          </div>
-        )}
         {testError && <div className="omokMessage">{testError}</div>}
         {cleanNote && <div className="omokMessage info">{cleanNote}</div>}
         <div className="gameHubGrid">
