@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { matchesHangul } from "../lib/hangulSearch";
 import GameHub, { type GameKind } from "./GameHub";
@@ -2448,73 +2448,69 @@ async function setAttendanceMembers(memberIds: string[]) {
     setSaving(false);
   }
 
+  // 참석 체크: 누르는 즉시 화면에 반영하고 저장은 뒤에서 한다 (실패하면 되돌린다)
+  //   예전에는 저장 → PET 알림 → 전체 다시 불러오기를 모두 기다리고, 그동안 다른 체크도 막혀서 느렸다.
+  const attendancePending = useRef<Set<string>>(new Set());
+
   async function toggleAttendance(memberId: string) {
-    if (!selectedMeeting || saving) return;
-    setSaving(true);
+    if (!selectedMeeting) return;
+    const meetingId = selectedMeeting.id;
+    const key = `${meetingId}:${memberId}`;
+    if (attendancePending.current.has(key)) return; // 같은 칸을 연달아 누른 경우만 무시
+    attendancePending.current.add(key);
     setNotice("");
 
     const checked = selectedMeeting.attendeeIds.includes(memberId);
+    const setChecked = (on: boolean) =>
+      setMeetings((current) =>
+        current.map((meeting) =>
+          meeting.id !== meetingId
+            ? meeting
+            : {
+                ...meeting,
+                attendeeIds: on
+                  ? meeting.attendeeIds.includes(memberId)
+                    ? meeting.attendeeIds
+                    : [...meeting.attendeeIds, memberId]
+                  : meeting.attendeeIds.filter((id) => id !== memberId),
+              },
+        ),
+      );
+    setChecked(!checked);
 
+    let failed: string | null = null;
     if (checked) {
-      await Promise.all([
-        supabase
-          .from("settlement_adjustments")
-          .delete()
-          .eq("meeting_id", selectedMeeting.id)
-          .eq("member_id", memberId),
-        supabase
-          .from("meeting_prepayments")
-          .delete()
-          .eq("meeting_id", selectedMeeting.id)
-          .eq("member_id", memberId),
+      // 참석 해제: 그 사람의 정산 조정·선결제도 함께 지운다 (기존과 같음)
+      const [, , removed] = await Promise.all([
+        supabase.from("settlement_adjustments").delete().eq("meeting_id", meetingId).eq("member_id", memberId),
+        supabase.from("meeting_prepayments").delete().eq("meeting_id", meetingId).eq("member_id", memberId),
+        supabase.from("attendance").delete().eq("meeting_id", meetingId).eq("member_id", memberId),
       ]);
+      if (removed.error) failed = removed.error.message;
+      else {
+        setAdjustments((current) => current.filter((item) => !(item.meeting_id === meetingId && item.member_id === memberId)));
+        setPrepayments((current) => current.filter((item) => !(item.meeting_id === meetingId && item.member_id === memberId)));
+      }
+    } else {
+      const { data: createdAttendance, error } = await supabase
+        .from("attendance")
+        .insert({ meeting_id: meetingId, member_id: memberId })
+        .select("member_id, created_at")
+        .single();
+      if (error || !createdAttendance) {
+        failed = error?.message ?? "참석 저장 결과를 확인할 수 없습니다.";
+      } else {
+        // PET 연동은 기다리지 않는다 (실패해도 참석 저장은 그대로)
+        void notifyPetAttendances(meetingId, [createdAttendance]);
+      }
     }
 
-if (checked) {
-  const { error } = await supabase
-    .from("attendance")
-    .delete()
-    .eq("meeting_id", selectedMeeting.id)
-    .eq("member_id", memberId);
-
-  if (error) {
-    setNotice(`참석 변경 실패: ${error.message}`);
-  } else {
-    await loadAll();
+    attendancePending.current.delete(key);
+    if (failed) {
+      setChecked(checked); // 되돌리기
+      setNotice(`참석 변경 실패: ${failed}`);
+    }
   }
-} else {
-  const { data: createdAttendance, error } = await supabase
-    .from("attendance")
-    .insert({
-      meeting_id: selectedMeeting.id,
-      member_id: memberId,
-    })
-    .select("member_id, created_at")
-    .single();
-
-  if (error || !createdAttendance) {
-    setNotice(
-      `참석 변경 실패: ${
-        error?.message ?? "참석 저장 결과를 확인할 수 없습니다."
-      }`
-    );
-  } else {
-    /*
-     * 참석 저장은 이미 성공한 상태다.
-     * PET 연동 실패가 기존 참석 저장을 실패시키지 않도록
-     * 별도 알림으로 처리한다.
-     */
-    await notifyPetAttendances(
-      selectedMeeting.id,
-      [createdAttendance]
-    );
-
-    await loadAll();
-  }
-}
-
-setSaving(false);
-}
 
   async function saveCost(meetingId: string) {
     const value = Number(editingCost);
