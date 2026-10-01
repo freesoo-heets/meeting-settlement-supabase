@@ -53,6 +53,8 @@ const CANVAS_W = 800;
 const CANVAS_H = 560;
 const COLORS = ["#111111", "#e11d48", "#f97316", "#eab308", "#16a34a", "#2563eb", "#7c3aed", "#8b5a2b", "#ffffff"];
 const SIZES = [4, 10, 22];
+const DRAWER_WARN_MS = 10_000; // 출제자가 이만큼 그리지 않으면 경고
+const DRAWER_KICK_MS = 20_000; // 이만큼 그리지 않으면 자동으로 나간다
 const ABSENT_KICK_MS = 10_000; // 창을 닫거나 연결이 끊긴 뒤 이만큼 지나면 자동으로 내보낸다
 
 async function callCatch(payload: Record<string, unknown>) {
@@ -278,6 +280,12 @@ function CatchRoomView({
   const joinedRef = useRef(false);
   const absentSince = useRef<Record<string, number>>({});
   const kicking = useRef(false);
+  // 출제자 무입력 감시 (그리기·색·굵기·지우기를 입력으로 본다)
+  const lastInputRef = useRef(Date.now());
+  const idleKicked = useRef(false);
+  const touchInput = () => {
+    lastInputRef.current = Date.now();
+  };
   const turnKey = `${room.turn_no}:${room.drawer_member ?? ""}`;
   const turnKeyRef = useRef(turnKey);
   const isDrawerRef = useRef(isDrawer);
@@ -411,6 +419,21 @@ function CatchRoomView({
       void supabase.removeChannel(channel);
     };
   }, [room.id, addChat, paintStroke, redraw, onReload]);
+
+  useEffect(() => {
+    if (isDrawer) {
+      lastInputRef.current = Date.now();
+      idleKicked.current = false;
+    }
+  }, [isDrawer, turnKey]);
+
+  // 테스트 방은 혼자 확인하는 곳이라 무입력으로 내보내지 않는다
+  const drawerIdle = isDrawer && !room.is_test ? now - lastInputRef.current : 0;
+  useEffect(() => {
+    if (!isDrawer || idleKicked.current || drawerIdle < DRAWER_KICK_MS) return;
+    idleKicked.current = true;
+    onLeave(); // 출제자가 나가면 이번 문제는 정답 공개 후 다음 사람 차례
+  }, [isDrawer, drawerIdle, onLeave]);
 
   // 참가하면 접속 표시를 시작한다 (관전만 할 때는 표시하지 않음)
   useEffect(() => {
@@ -612,6 +635,7 @@ function CatchRoomView({
               height={CANVAS_H}
               onPointerDown={(event) => {
                 if (!isDrawer) return;
+                touchInput();
                 event.currentTarget.setPointerCapture(event.pointerId);
                 const p = point(event);
                 const stroke: Stroke = { sid: `${Date.now()}${Math.random().toString(36).slice(2, 6)}`, color, size, pts: [p] };
@@ -623,6 +647,7 @@ function CatchRoomView({
               onPointerMove={(event) => {
                 const stroke = drawingRef.current;
                 if (!isDrawer || !stroke) return;
+                touchInput();
                 const p = point(event);
                 const from = stroke.pts.length;
                 stroke.pts.push(p);
@@ -638,6 +663,11 @@ function CatchRoomView({
                 drawingRef.current = null;
               }}
             />
+            {isDrawer && drawerIdle >= DRAWER_WARN_MS && (
+              <div className="cmIdleWarn" role="alert">
+                ⏳ {Math.max(1, Math.ceil((DRAWER_KICK_MS - drawerIdle) / 1000))}초간 입력이 없으면 내보내집니다
+              </div>
+            )}
             {room.status === "waiting" && (
               <div className="catchOverlay">
                 <span className="cmOverlayIcon">🎨</span>
@@ -688,7 +718,10 @@ function CatchRoomView({
                     style={{ background: item }}
                     aria-label={item === "#ffffff" ? "지우개" : `색 ${item}`}
                     title={item === "#ffffff" ? "지우개" : undefined}
-                    onClick={() => setColor(item)}
+                    onClick={() => {
+                      setColor(item);
+                      touchInput();
+                    }}
                   >
                     {item === "#ffffff" ? "⌫" : ""}
                   </button>
@@ -700,7 +733,10 @@ function CatchRoomView({
                     key={item}
                     className={`catchSize ${size === item ? "active" : ""}`}
                     aria-label={`굵기 ${item}`}
-                    onClick={() => setSize(item)}
+                    onClick={() => {
+                      setSize(item);
+                      touchInput();
+                    }}
                   >
                     <i style={{ width: Math.max(4, item / 2), height: Math.max(4, item / 2) }} />
                   </button>
@@ -708,6 +744,7 @@ function CatchRoomView({
                 <button
                   className="cmClear"
                   onClick={() => {
+                    touchInput();
                     strokesRef.current = [];
                     redraw();
                     void channelRef.current?.send({ type: "broadcast", event: "clear", payload: { turn: turnKeyRef.current } });

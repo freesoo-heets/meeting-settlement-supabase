@@ -5478,3 +5478,23 @@ button.meetingMetricCard {
 .catchOverlay.result { background: rgba(255, 255, 255, .94); animation: gameResultFade .25s ease; }
 
 .inviteButton { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
+
+/* 캐치마인드: 출제자 무입력 경고 */
+.cmIdleWarn {
+  position: absolute;
+  left: 50%;
+  top: 12px;
+  z-index: 3;
+  transform: translateX(-50%);
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+  white-space: nowrap;
+  box-shadow: 0 8px 20px rgba(220, 38, 38, .35);
+  animation: cmIdlePulse 1s ease-in-out infinite;
+}
+@keyframes cmIdlePulse { 50% { transform: translateX(-50%) scale(1.05); } }
+@media (prefers-reduced-motion: reduce) { .cmIdleWarn { animation: none; } }
