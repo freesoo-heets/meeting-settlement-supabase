@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
+import { matchesHangul } from "../lib/hangulSearch";
 import GameHub, { type GameKind } from "./GameHub";
 
 type Member = {
@@ -72,7 +73,7 @@ type MemberFilter = "all" | "active" | "warning" | "withdrawn";
 type MemberSort = "nickname_asc" | "nickname_desc" | "join_desc" | "join_asc" | "last_desc" | "last_asc" | "points_desc";
 type MonthlySortKey = "member" | "status" | "join" | "attendance" | "last" | "burden" | "warning";
 type SortDirection = "asc" | "desc";
-type AttendeeSort = "selected_first" | "nickname_asc" | "nickname_desc" | "join_desc" | "join_asc" | "last_desc" | "last_asc";
+type AttendeeSort = "selected_first" | "nickname_asc" | "nickname_desc" | "join_desc" | "join_asc" | "last_desc" | "last_asc" | "count_desc";
 type GuestSort = "nickname_asc" | "nickname_desc" | "added_desc" | "added_asc";
 type AppRole = "owner" | "admin" | "user";
 
@@ -594,13 +595,27 @@ export default function Home() {
     return map;
   }, [members, meetings]);
 
+  // 회원별 참석 횟수 (오늘까지 열린 모든 벙)
+  const attendanceCountByMember = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const meeting of meetings) {
+      if (meeting.date > today) continue;
+      for (const memberId of meeting.attendeeIds) {
+        map[memberId] = (map[memberId] ?? 0) + 1;
+      }
+    }
+    return map;
+  }, [meetings, today]);
+
   const filteredAttendanceMembers = useMemo(() => {
-    const query = attendeeSearch.trim().toLowerCase();
-    const rows = activeMembers.filter((member) =>
-      !query || member.name.toLowerCase().includes(query)
-    );
+    // 초성 검색 가능: 'ㅍ' → 푸들·퐁당, 'ㅍㄷ' → 푸들
+    const query = attendeeSearch.trim();
+    const rows = activeMembers.filter((member) => !query || matchesHangul(member.name, query));
 
     return [...rows].sort((a, b) => {
+      if (attendeeSort === "count_desc") {
+        return (attendanceCountByMember[b.id] ?? 0) - (attendanceCountByMember[a.id] ?? 0) || a.name.localeCompare(b.name, "ko");
+      }
       if (attendeeSort === "selected_first") {
         const aSelected = selectedMeeting?.attendeeIds.includes(a.id) ? 1 : 0;
         const bSelected = selectedMeeting?.attendeeIds.includes(b.id) ? 1 : 0;
@@ -640,6 +655,7 @@ export default function Home() {
     attendeeSort,
     selectedMeeting,
     lastAttendanceByMember,
+    attendanceCountByMember,
   ]);
 
   const sortedSelectedGuests = useMemo(() => {
@@ -3716,7 +3732,7 @@ setSaving(false);
                   <div className="attendeeSearchBar attendeeSearchSortBar">
                     <input
                       type="search"
-                      placeholder="참석자 닉네임 빠른 검색"
+                      placeholder="참석자 닉네임 빠른 검색 (초성 가능)"
                       value={attendeeSearch}
                       onChange={(event) => setAttendeeSearch(event.target.value)}
                     />
@@ -3734,6 +3750,7 @@ setSaving(false);
                         <option value="join_asc">입장일 오래된순</option>
                         <option value="last_desc">최근 참석일 최신순</option>
                         <option value="last_asc">최근 참석일 오래된순</option>
+                        <option value="count_desc">참석 많은순</option>
                       </select>
                     </label>
                     <span className="attendeeCount">
@@ -3752,6 +3769,9 @@ setSaving(false);
                             onChange={() => void toggleAttendance(member.id)}
                           />
                           <span>{member.name}</span>
+                          {attendeeSort === "count_desc" && (
+                            <em className="chipCount">{attendanceCountByMember[member.id] ?? 0}회</em>
+                          )}
                         </label>
                       );
                     })}
