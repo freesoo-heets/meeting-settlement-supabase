@@ -55,7 +55,7 @@ async function cleanupStale(admin: Admin, force = false) {
   const now = Date.now();
   const stamp = new Date().toISOString();
 
-  // 혼자 남은 대기방: 10분 동안 변화가 없으면 (force 면 바로) 닫는다
+  // 혼자 남은 대기방: 30분 동안 변화가 없으면 (force 면 바로) 닫는다
   const { data: waiting } = await admin
     .from(TABLE)
     .select("id,players,updated_at")
@@ -63,7 +63,7 @@ async function cleanupStale(admin: Admin, force = false) {
     .limit(200);
   const lonely = (waiting ?? [])
     .filter((room) => ((room.players as Member[] | null) ?? []).length <= 1)
-    .filter((room) => force || new Date(room.updated_at as string).getTime() < now - 10 * 60 * 1000)
+    .filter((room) => force || new Date(room.updated_at as string).getTime() < now - 30 * 60 * 1000)  // 혼자 기다리는 방은 30분
     .map((room) => room.id as string);
   if (lonely.length > 0) {
     await admin.from(TABLE).update({ status: "cancelled", updated_at: stamp }).in("id", lonely);
@@ -301,6 +301,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
     await updateIfUnchanged(admin, TABLE, room, { ...hostFields, players });
+    return NextResponse.json({ ok: true });
+  }
+
+  // ── 방장 넘겨받기: 대기 중 방장이 자리를 비웠을 때 (점수 없는 게임이라 화면 판단을 믿는다) ──
+  if (action === "take_host") {
+    if (room.status !== "waiting") return fail("대기 중일 때만 방장을 바꿀 수 있습니다.");
+    if (room.host_member === memberId) return NextResponse.json({ ok: true });
+    const me = room.players.find((player) => player.id === memberId);
+    if (!me) return fail("방에 들어가 있지 않습니다.");
+    const ok = await updateIfUnchanged(admin, TABLE, room, { host_member: me.id, host_name: me.name });
+    if (!ok) return fail("잠시 후 다시 시도해 주세요.", 409);
     return NextResponse.json({ ok: true });
   }
 

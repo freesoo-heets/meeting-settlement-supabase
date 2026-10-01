@@ -56,7 +56,7 @@ const COLORS = ["#111111", "#e11d48", "#f97316", "#eab308", "#16a34a", "#2563eb"
 const SIZES = [4, 10, 22];
 const DRAWER_WARN_MS = 10_000; // 출제자가 이만큼 그리지 않으면 경고
 const DRAWER_KICK_MS = 20_000; // 이만큼 그리지 않으면 자동으로 나간다
-const ABSENT_KICK_MS = 10_000; // 창을 닫거나 연결이 끊긴 뒤 이만큼 지나면 자동으로 내보낸다
+const HOST_HANDOFF_MS = 30_000; // 대기 중 방장이 이만큼 자리를 비우면 방장을 넘긴다
 
 async function callCatch(payload: Record<string, unknown>) {
   const { data } = await supabase.auth.getSession();
@@ -468,34 +468,34 @@ function CatchRoomView({
     else void channelRef.current?.untrack();
   }, [joined, me]);
 
-  // ★ 창을 닫거나 연결이 끊긴 지 10초가 지난 참가자는 자동으로 내보낸다
-  //   남아 있는 사람 중 명단 맨 앞사람의 화면 한 곳에서만 서버에 요청한다
+  // ★ 접속이 끊겼다고 내보내지 않는다.
+  //   (휴대폰은 카톡으로 사람 부르러 가거나 화면이 꺼지면 연결이 끊긴다 → 예전엔 그때 방장이 쫓겨났다)
+  //   대기 중에 방장이 30초 넘게 자리를 비우면, 남아 있는 사람에게 방장만 넘긴다 (시작을 못 하는 일만 막는다)
   useEffect(() => {
-    if (room.status !== "waiting" && room.status !== "playing") return;
+    if (room.status !== "waiting") return;
     const timer = window.setInterval(() => {
       if (!presenceReadyRef.current || !joinedRef.current || !me) return;
       const present = presentRef.current;
-      const now = Date.now();
-      const gone: string[] = [];
-      for (const player of room.players) {
-        if (player.id === me || present.has(player.id)) {
-          delete absentSince.current[player.id];
-          continue;
-        }
-        absentSince.current[player.id] ??= now;
-        if (now - absentSince.current[player.id] >= ABSENT_KICK_MS) gone.push(player.id);
+      const host = room.host_member;
+      if (host === me || present.has(host)) {
+        delete absentSince.current[host];
+        return;
       }
-      const leader = room.players.find((player) => player.id === me || present.has(player.id));
-      if (gone.length === 0 || leader?.id !== me || kicking.current) return;
+      const now = Date.now();
+      absentSince.current[host] ??= now;
+      if (now - absentSince.current[host] < HOST_HANDOFF_MS) return;
+      // 남아 있는 사람 중 명단 맨 앞사람이 방장을 받는다
+      const next = room.players.find((player) => player.id === me || present.has(player.id));
+      if (next?.id !== me || kicking.current) return;
       kicking.current = true;
-      void callCatch({ action: "remove_absent", roomId: room.id, ids: gone }).then(() => {
-        gone.forEach((id) => delete absentSince.current[id]);
+      void callCatch({ action: "take_host", roomId: room.id }).then(() => {
+        delete absentSince.current[host];
         kicking.current = false;
         void onReload();
       });
     }, 2000);
     return () => window.clearInterval(timer);
-  }, [room.status, room.players, room.id, me, onReload]);
+  }, [room.status, room.host_member, room.players, room.id, me, onReload]);
 
   // 문제가 끝나면(정답 공개) 출제자 화면이 그림을 저장한다 → 최근 그림 갤러리
   const savedDrawing = useRef("");
