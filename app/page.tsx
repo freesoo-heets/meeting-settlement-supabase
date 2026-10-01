@@ -166,6 +166,7 @@ export default function Home() {
   const currentMonth = today.slice(0, 7);
 
   const [mainTab, setMainTab] = useState<MainTab>("dashboard");
+  const [showDashboardCosts, setShowDashboardCosts] = useState(false);
   const [meetingCalendarMonth, setMeetingCalendarMonth] = useState(currentMonth);
   const [memberCalendarMonth, setMemberCalendarMonth] = useState(currentMonth);
   const [members, setMembers] = useState<Member[]>([]);
@@ -3227,7 +3228,7 @@ async function setAttendanceMembers(memberIds: string[]) {
         </div>
         <div className="myStatusItem">
           <span>벙비 합계</span>
-          <strong>{won(myMonthSummary.burden)}</strong>
+          <strong>{mainTab === "dashboard" && !showDashboardCosts ? "••••••원" : won(myMonthSummary.burden)}</strong>
         </div>
       </section>
 
@@ -3240,12 +3241,22 @@ async function setAttendanceMembers(memberIds: string[]) {
                 <h2>이번 달 모임 한눈에 보기</h2>
                 <p>핵심 수치와 인기 모임·참석 랭킹을 한 화면에서 확인합니다.</p>
               </div>
-              <button
-                className="dashboardManageButton"
-                onClick={() => setMainTab("meetings")}
-              >
-                모임 관리 열기
-              </button>
+              <div className="dashboardTitleActions" style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                <button
+                  className="dashboardManageButton"
+                  type="button"
+                  aria-pressed={showDashboardCosts}
+                  onClick={() => setShowDashboardCosts((visible) => !visible)}
+                >
+                  {showDashboardCosts ? "🙈 금액 숨기기" : "👁 금액 보기"}
+                </button>
+                <button
+                  className="dashboardManageButton"
+                  onClick={() => setMainTab("meetings")}
+                >
+                  모임 관리 열기
+                </button>
+              </div>
             </div>
 
             <div className="meetingMetricGrid">
@@ -3269,8 +3280,12 @@ async function setAttendanceMembers(memberIds: string[]) {
 
               <div className="meetingMetricCard">
                 <span>총 벙비</span>
-                <strong>{won(monthTotalCost)}</strong>
-                <small>평균 {won(averageMeetingCost)} / 비용 입력 모임</small>
+                <strong>{showDashboardCosts ? won(monthTotalCost) : "••••••원"}</strong>
+                <small>
+                  {showDashboardCosts
+                    ? `평균 ${won(averageMeetingCost)} / 비용 입력 모임`
+                    : "금액 보기를 눌러 확인"}
+                </small>
               </div>
             </div>
           </section>

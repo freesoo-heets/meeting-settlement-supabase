@@ -1,5 +1,8 @@
-모바일 하단 네비게이션 오류 수정
+Dashboard cost privacy patch
 
-원인: 홈/모임/회원 버튼이 공통 map 안에서 setShowAccountPanel(true)를 실행하도록 PET 연동 작업 중 잘못 변경됨.
-수정: 홈/모임/회원 버튼은 setMainTab(value)로 정상 탭 전환. 내 계정 버튼의 PET 연동 로직은 유지.
-DB/SQL/환경변수 변경 없음.
+- Dashboard 벙비 합계: 기본 숨김
+- Dashboard 총 벙비 및 평균 금액: 기본 숨김
+- 👁 금액 보기 / 🙈 금액 숨기기 버튼 추가
+- 저장하지 않는 화면 상태이므로 새로고침/재접속 시 다시 숨김
+- 모임 관리 화면의 운영용 금액은 기존대로 유지
+- DB/SQL/환경변수 변경 없음
