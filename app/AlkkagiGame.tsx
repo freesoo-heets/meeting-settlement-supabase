@@ -969,6 +969,7 @@ function AlkkagiBoardView({
         )}
         <svg
           className={`alkBoard ${animating ? "animating" : ""}`}
+          data-lock-scroll="true"
           viewBox={`0 0 ${BOARD_W} ${BOARD_H}`}
           role="img"
           aria-label="알까기 판"

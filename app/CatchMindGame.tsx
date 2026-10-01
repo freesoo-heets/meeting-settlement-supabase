@@ -649,6 +649,7 @@ function CatchRoomView({
             <canvas
               ref={canvasRef}
               className={`catchCanvas ${isDrawer ? "drawing" : ""}`}
+              data-lock-scroll={isDrawer ? "true" : undefined}
               width={CANVAS_W}
               height={CANVAS_H}
               onPointerDown={(event) => {

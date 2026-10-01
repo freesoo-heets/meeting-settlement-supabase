@@ -5536,3 +5536,19 @@ button.meetingMetricCard {
   .cmRoom.typing .catchCanvas { max-height: calc(var(--vvh, 100dvh) * 0.38); width: auto; margin: 0 auto; }
   .cmRoom.typing .cmChat .catchChatLog { height: 72px; }
 }
+
+/* 카톡 브라우저 안내 */
+.kakaoNotice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #fef9c3;
+  color: #713f12;
+  font-size: 13px;
+}
+.kakaoNotice .smallButton { background: #3c1e1e; color: #fee500; }
