@@ -5499,3 +5499,40 @@ button.meetingMetricCard {
 @keyframes cmIdlePulse { 50% { transform: translateX(-50%) scale(1.05); } }
 @media (prefers-reduced-motion: reduce) { .cmIdleWarn { animation: none; } }
 
+
+/* ───────── 게임 창: 휴대폰 사용감 ───────── */
+.gameModal {
+  touch-action: manipulation;      /* 두 번 탭 확대 방지 */
+  overscroll-behavior: contain;    /* 끝까지 스크롤해도 뒤 페이지가 따라 움직이지 않게 */
+  -webkit-tap-highlight-color: transparent;
+}
+/* 아이폰은 16px 보다 작은 입력칸을 누르면 화면을 확대한다 */
+.gameModal input, .gameModal select, .gameModal textarea { font-size: 16px; }
+.catchCanvas, .alkBoard { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+
+@media (max-width: 760px) {
+  /* 휴대폰에서는 게임 창을 화면 전체로, 키보드가 올라오면 보이는 영역 높이에 맞춘다 */
+  .meetingModalBackdrop.gameBackdrop {
+    top: var(--vvtop, 0px);
+    bottom: auto;
+    height: var(--vvh, 100dvh);
+    padding: 0;
+    place-items: stretch;
+  }
+  .gameModal {
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+    padding: 12px 12px calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+  /* 캐치마인드: 입력 중에는 그림판을 줄여 그림과 입력칸이 한 화면에 */
+  .cmRoom.typing .cmTop { padding: 6px 10px; }
+  .cmRoom.typing .cmPlayers,
+  .cmRoom.typing .cmActions,
+  .cmRoom.typing .cmTools { display: none; }
+  .cmRoom.typing .catchCanvas { max-height: calc(var(--vvh, 100dvh) * 0.38); width: auto; margin: 0 auto; }
+  .cmRoom.typing .cmChat .catchChatLog { height: 72px; }
+}

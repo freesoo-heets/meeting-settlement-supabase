@@ -1,5 +1,6 @@
 "use client";
 
+import { useGameViewport } from "./useGameViewport";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
@@ -143,6 +144,7 @@ export default function AlkkagiGame({
   opponents,
   isAdmin,
 }: Props) {
+  useGameViewport(); // 휴대폰: 뒤 페이지 스크롤 막기 · 키보드 높이에 맞추기
   const [games, setGames] = useState<AlkRow[]>([]);
   const [viewId, setViewId] = useState(initialGameId ?? "");
   const [stake, setStake] = useState("100");
@@ -333,13 +335,13 @@ export default function AlkkagiGame({
 
   return (
     <div
-      className="meetingModalBackdrop"
+      className="meetingModalBackdrop gameBackdrop"
       role="presentation"
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <section className="meetingModal omokModal" role="dialog" aria-modal="true">
+      <section className="meetingModal omokModal gameModal" role="dialog" aria-modal="true">
         <div className="meetingModalHeader">
           <div>
             <span>장기알 · 한 턴 {TURN_SECONDS}초 · 티켓 1장씩</span>

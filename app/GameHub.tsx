@@ -1,5 +1,6 @@
 "use client";
 
+import { useGameViewport } from "./useGameViewport";
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import OmokGame, { type Opponent } from "./OmokGame";
@@ -68,6 +69,7 @@ async function callCatchCleanup(force: boolean) {
 }
 
 export default function GameHub({ onClose, initial, currentMemberId, myName, myPoints, myTickets, opponents, isAdmin }: Props) {
+  useGameViewport(); // 휴대폰: 뒤 페이지 스크롤 막기 · 키보드 높이에 맞추기
   const [active, setActive] = useState<{ kind: GameKind; id: string } | null>(initial ?? null);
   const [omok, setOmok] = useState<StakeRow[]>([]);
   const [alkkagi, setAlkkagi] = useState<StakeRow[]>([]);
@@ -222,13 +224,13 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
 
   return (
     <div
-      className="meetingModalBackdrop"
+      className="meetingModalBackdrop gameBackdrop"
       role="presentation"
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <section className="meetingModal gameHubModal" role="dialog" aria-modal="true">
+      <section className="meetingModal gameHubModal gameModal" role="dialog" aria-modal="true">
         <div className="meetingModalHeader">
           <div>
             <span>내 점수 💎 {myPoints !== null ? myPoints.toLocaleString("ko-KR") : "-"} · 티켓 🎫 {myTickets ?? "-"}</span>

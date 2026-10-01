@@ -1,5 +1,6 @@
 "use client";
 
+import { useGameViewport } from "./useGameViewport";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
@@ -76,6 +77,7 @@ async function callCatch(payload: Record<string, unknown>) {
 }
 
 export default function CatchMindGame({ onClose, onBack, initialRoomId, currentMemberId, myName, isAdmin }: Props) {
+  useGameViewport(); // 휴대폰: 뒤 페이지 스크롤 막기 · 키보드 높이에 맞추기
   const [rooms, setRooms] = useState<Room[]>([]);
   const [roomId, setRoomId] = useState(initialRoomId ?? "");
   const [busy, setBusy] = useState(false);
@@ -146,13 +148,13 @@ export default function CatchMindGame({ onClose, onBack, initialRoomId, currentM
 
   return (
     <div
-      className="meetingModalBackdrop"
+      className="meetingModalBackdrop gameBackdrop"
       role="presentation"
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <section className="meetingModal catchModal" role="dialog" aria-modal="true">
+      <section className="meetingModal catchModal gameModal" role="dialog" aria-modal="true">
         <div className="meetingModalHeader">
           <div>
             <span>최대 6명 · 한 사람당 2번 출제 · {DRAW_SECONDS}초</span>
@@ -289,6 +291,7 @@ function CatchRoomView({
   const turnKey = `${room.turn_no}:${room.drawer_member ?? ""}`;
   const turnKeyRef = useRef(turnKey);
   const isDrawerRef = useRef(isDrawer);
+  const [typing, setTyping] = useState(false);
   isDrawerRef.current = isDrawer;
 
   useEffect(() => {
@@ -434,6 +437,21 @@ function CatchRoomView({
     idleKicked.current = true;
     onLeave(); // 출제자가 나가면 이번 문제는 정답 공개 후 다음 사람 차례
   }, [isDrawer, drawerIdle, onLeave]);
+
+  // ★ 아이폰 등은 touch-action 만으로 스크롤이 안 막혀서, 그림판 위 손가락 움직임을 직접 막는다
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const stop = (event: TouchEvent) => {
+      if (isDrawerRef.current) event.preventDefault();
+    };
+    canvas.addEventListener("touchstart", stop, { passive: false });
+    canvas.addEventListener("touchmove", stop, { passive: false });
+    return () => {
+      canvas.removeEventListener("touchstart", stop);
+      canvas.removeEventListener("touchmove", stop);
+    };
+  }, []);
 
   // 참가하면 접속 표시를 시작한다 (관전만 할 때는 표시하지 않음)
   useEffect(() => {
@@ -582,7 +600,7 @@ function CatchRoomView({
           : "닫힌 방";
 
   return (
-    <div className="cmRoom">
+    <div className={`cmRoom ${typing ? "typing" : ""}`}>
       <div className="cmTop">
         <span className={`cmPill ${room.status}`}>{room.is_test ? "🧪 " : ""}{statusLabel}</span>
         <div className="cmWord">
@@ -801,6 +819,15 @@ function CatchRoomView({
                 <input
                   value={text}
                   onChange={(event) => setText(event.target.value)}
+                  onFocus={(event) => {
+                    // 키보드가 올라오면 그림판을 줄이고 입력칸이 보이게
+                    setTyping(true);
+                    const input = event.currentTarget;
+                    window.setTimeout(() => input.scrollIntoView({ block: "nearest", behavior: "smooth" }), 250);
+                  }}
+                  onBlur={() => setTyping(false)}
+                  enterKeyHint="send"
+                  autoComplete="off"
                   placeholder={chatLocked ? "그리는 중에는 입력할 수 없어요" : room.phase === "drawing" ? "정답 입력" : "채팅"}
                   disabled={chatLocked}
                   maxLength={40}

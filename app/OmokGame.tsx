@@ -1,5 +1,6 @@
 "use client";
 
+import { useGameViewport } from "./useGameViewport";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { BOARD_SIZE, TURN_SECONDS, boardFromMoves, forbiddenPoints, type Board, type Move } from "../lib/omok";
@@ -214,6 +215,7 @@ function nameOf(game: OmokRow, side: "host" | "guest" | null) {
 }
 
 export default function OmokGame({ onClose, onBack, initialGameId, currentMemberId, myPoints, myTickets, myName, isAdmin, opponents }: Props) {
+  useGameViewport(); // 휴대폰: 뒤 페이지 스크롤 막기 · 키보드 높이에 맞추기
   const [games, setGames] = useState<OmokRow[]>([]);
   const [viewId, setViewId] = useState<string>(initialGameId ?? "");
   const [missing, setMissing] = useState(false);
@@ -434,13 +436,13 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
 
   return (
     <div
-      className="meetingModalBackdrop"
+      className="meetingModalBackdrop gameBackdrop"
       role="presentation"
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <section className="meetingModal omokModal" role="dialog" aria-modal="true">
+      <section className="meetingModal omokModal gameModal" role="dialog" aria-modal="true">
         <div className="meetingModalHeader">
           <div>
             <span>렌주룰 · 한 수 {TURN_SECONDS}초 · 티켓 1장씩</span>
