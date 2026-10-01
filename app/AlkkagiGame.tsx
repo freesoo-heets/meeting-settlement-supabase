@@ -80,7 +80,7 @@ type Props = {
 const COLUMNS =
   "id,status,stake,host_member,host_name,guest_member,guest_name,target_member,cho,turn,pieces,last_shot,shot_no,strikes,turn_deadline,winner,end_reason,escrow_state,escrow_note,settle_state,is_test,is_friendly,created_at,started_at,finished_at";
 const STAKE_PRESETS = [100, 300, 500, 1000];
-const PULL_MAX = 140; // 이만큼 당기면 최대 세기
+const PULL_MAX = 90; // 이만큼 당기면 최대 세기 (140에서 줄임)
 const AIM_GUIDE = 34; // 방향 표시 길이 (세기와 무관하게 고정)
 const SIM_FPS = 60;
 const FADE_FRAMES = 18; // 떨어진 알이 사라지는 시간 (0.3초) // 물리 계산 단위 (lib/alkkagi.ts 의 DT = 1/60)
@@ -814,8 +814,10 @@ function AlkkagiBoardView({
     if (pullLine) {
       pullLine.setAttribute("x1", ax.toFixed(2));
       pullLine.setAttribute("y1", ay.toFixed(2));
-      pullLine.setAttribute("x2", aim.px.toFixed(2));
-      pullLine.setAttribute("y2", aim.py.toFixed(2));
+      // 줄은 최대 세기 길이까지만 늘어난다 (손을 더 멀리 끌어도 판을 가로지르지 않게)
+      const reach = v.power * PULL_MAX;
+      pullLine.setAttribute("x2", (aim.x - v.nx * reach).toFixed(2));
+      pullLine.setAttribute("y2", (aim.y - v.ny * reach).toFixed(2));
       pullLine.style.stroke = color;
       pullLine.style.opacity = v.power > 0 ? "1" : "0";
     }
