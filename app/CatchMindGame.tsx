@@ -282,13 +282,24 @@ function CatchRoomView({
   const joinedRef = useRef(false);
   const absentSince = useRef<Record<string, number>>({});
   const kicking = useRef(false);
-  // 출제자 무입력 감시 (그리기·색·굵기·지우기를 입력으로 본다)
-  const lastInputRef = useRef(Date.now());
-  const idleKicked = useRef(false);
-  const touchInput = () => {
-    lastInputRef.current = Date.now();
-  };
+  // 출제자 무입력 감시 — 방을 제대로 안 나가고 방치된 경우를 대비한다
+  //   · 출제 차례가 '시작된 시각'부터 센다 (예전엔 이전 시각이 남아 차례가 오자마자 튕겼다)
+  //   · 그 차례에 한 번이라도 입력(그리기·색·굵기·지우기)하면 시간 제한을 없앤다
   const turnKey = `${room.turn_no}:${room.drawer_member ?? ""}`;
+  const drawerTurn = useRef<{ key: string; startedAt: number; touched: boolean; kicked: boolean }>({
+    key: "",
+    startedAt: 0,
+    touched: false,
+    kicked: false,
+  });
+  // 다시하기로 새 판이 시작돼도 이전 판 기록과 섞이지 않게 판 번호까지 붙인다
+  const drawerSlot = `${room.play_no ?? 0}:${turnKey}`;
+  if (isDrawer && drawerTurn.current.key !== drawerSlot) {
+    drawerTurn.current = { key: drawerSlot, startedAt: Date.now(), touched: false, kicked: false };
+  }
+  const touchInput = () => {
+    drawerTurn.current.touched = true;
+  };
   const turnKeyRef = useRef(turnKey);
   const isDrawerRef = useRef(isDrawer);
   const [typing, setTyping] = useState(false);
@@ -423,20 +434,17 @@ function CatchRoomView({
     };
   }, [room.id, addChat, paintStroke, redraw, onReload]);
 
-  useEffect(() => {
-    if (isDrawer) {
-      lastInputRef.current = Date.now();
-      idleKicked.current = false;
-    }
-  }, [isDrawer, turnKey]);
-
   // 테스트 방은 혼자 확인하는 곳이라 무입력으로 내보내지 않는다
-  const drawerIdle = isDrawer && !room.is_test ? now - lastInputRef.current : 0;
+  const watchIdle = isDrawer && !room.is_test && !drawerTurn.current.touched && drawerTurn.current.key === drawerSlot;
+  const drawerIdle = watchIdle ? Math.max(0, now - drawerTurn.current.startedAt) : 0;
   useEffect(() => {
-    if (!isDrawer || idleKicked.current || drawerIdle < DRAWER_KICK_MS) return;
-    idleKicked.current = true;
+    if (!watchIdle || drawerTurn.current.kicked || drawerIdle < DRAWER_KICK_MS) return;
+    // 내보내기 직전에 지금 시각으로 한 번 더 확인
+    const turn = drawerTurn.current;
+    if (turn.touched || turn.key !== drawerSlot || Date.now() - turn.startedAt < DRAWER_KICK_MS) return;
+    turn.kicked = true;
     onLeave(); // 출제자가 나가면 이번 문제는 정답 공개 후 다음 사람 차례
-  }, [isDrawer, drawerIdle, onLeave]);
+  }, [watchIdle, drawerIdle, drawerSlot, onLeave]);
 
   // ★ 아이폰 등은 touch-action 만으로 스크롤이 안 막혀서, 그림판 위 손가락 움직임을 직접 막는다
   useEffect(() => {
@@ -583,9 +591,11 @@ function CatchRoomView({
   }
 
   const ranking = [...room.players].sort((a, b) => (room.scores[b.id] ?? 0) - (room.scores[a.id] ?? 0));
-  const chatEndRef = useRef<HTMLDivElement | null>(null);
+  const chatLogRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ block: "nearest" });
+    // ★ scrollIntoView 는 게임 창까지 움직여서, 그리는 중에 채팅이 오면 화면이 돌아갔다
+    const log = chatLogRef.current;
+    if (log) log.scrollTop = log.scrollHeight;
   }, [chat]);
 
   const seatsLeft = room.max_players - room.players.length;
@@ -682,7 +692,7 @@ function CatchRoomView({
                 drawingRef.current = null;
               }}
             />
-            {isDrawer && drawerIdle >= DRAWER_WARN_MS && (
+            {watchIdle && drawerIdle >= DRAWER_WARN_MS && (
               <div className="cmIdleWarn" role="alert">
                 ⏳ {Math.max(1, Math.ceil((DRAWER_KICK_MS - drawerIdle) / 1000))}초간 입력이 없으면 내보내집니다
               </div>
@@ -800,14 +810,13 @@ function CatchRoomView({
           </ul>
 
           <div className="cmChat">
-            <div className="catchChatLog">
+            <div className="catchChatLog" ref={chatLogRef}>
               {chat.length === 0 && <span className="muted">정답은 여기에 입력하세요.</span>}
               {chat.map((line) => (
                 <div key={line.key} className={`catchChatLine ${line.kind ?? ""}`}>
                   {line.name && <b>{line.name}</b>} {line.text}
                 </div>
               ))}
-              <div ref={chatEndRef} />
             </div>
             {joined && (
               <form
