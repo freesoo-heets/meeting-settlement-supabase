@@ -707,6 +707,7 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
             game={viewing}
             mySeat={seatOf(viewing)}
             endText={END_TEXT}
+            ratingKind="omok"
             busy={busy}
             onClose={() => {
               setResultFor(null);

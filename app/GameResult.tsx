@@ -1,10 +1,13 @@
 "use client";
 
+import { useRatingChange } from "./RatingBoard";
+
 // 오목·알까기 종료 팝업 (화면 가운데에 결과 + 게임 종료 / 재경기 요청)
 
 type Seat = "host" | "guest";
 
 export type ResultGame = {
+  id?: string;
   host_name: string;
   guest_name: string | null;
   winner: Seat | "draw" | null;
@@ -21,7 +24,9 @@ export function GameResultPopup({
   busy,
   onClose,
   onRematch,
+  ratingKind,
 }: {
+  ratingKind?: "omok" | "alkkagi";
   game: ResultGame;
   mySeat: Seat | null;
   endText: Record<string, string>;
@@ -29,6 +34,7 @@ export function GameResultPopup({
   onClose: () => void;
   onRematch?: () => void;
 }) {
+  const rating = useRatingChange(ratingKind ?? "omok", game.id ?? null, Boolean(ratingKind && game.id && !game.is_test));
   const nameOf = (seat: Seat | null) => (seat === "host" ? game.host_name : seat === "guest" ? game.guest_name ?? "?" : "?");
   const reason = endText[game.end_reason ?? ""] ?? "";
   const draw = game.winner === "draw";
@@ -61,6 +67,17 @@ export function GameResultPopup({
         <strong className="gameResultTitle">{title}</strong>
         <span className="gameResultSub">{subtitle}</span>
         <span className="gameResultMoney">{money}</span>
+        {rating && (
+          <span className="gameResultRating">
+            {mySeat
+              ? (() => {
+                  const delta = mySeat === "host" ? rating.host : rating.guest;
+                  const after = mySeat === "host" ? rating.hostAfter : rating.guestAfter;
+                  return `🏆 레이팅 ${after} (${delta >= 0 ? "+" : ""}${delta})`;
+                })()
+              : `🏆 ${game.host_name} ${rating.hostAfter} (${rating.host >= 0 ? "+" : ""}${rating.host}) · ${game.guest_name ?? "?"} ${rating.guestAfter} (${rating.guest >= 0 ? "+" : ""}${rating.guest})`}
+          </span>
+        )}
         <div className="gameResultActions">
           <button className="smallButton ghost" onClick={onClose}>
             {mySeat ? "게임 종료" : "닫기"}

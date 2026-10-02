@@ -6,6 +6,7 @@ import { supabase } from "../lib/supabase";
 import OmokGame, { type Opponent } from "./OmokGame";
 import AlkkagiGame from "./AlkkagiGame";
 import CatchMindGame from "./CatchMindGame";
+import RatingBoard from "./RatingBoard";
 
 export type GameKind = "omok" | "alkkagi" | "catch";
 
@@ -74,6 +75,7 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
   const [omok, setOmok] = useState<StakeRow[]>([]);
   const [alkkagi, setAlkkagi] = useState<StakeRow[]>([]);
   const [catchRooms, setCatchRooms] = useState<CatchRow[]>([]);
+  const [showRating, setShowRating] = useState(false);
 
   const load = useCallback(async () => {
     const [o, a, c] = await Promise.all([
@@ -236,8 +238,10 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
             <span>내 점수 💎 {myPoints !== null ? myPoints.toLocaleString("ko-KR") : "-"} · 티켓 🎫 {myTickets ?? "-"}</span>
             <h2>🎮 게임</h2>
           </div>
+          <button className="smallButton ratingOpenButton" onClick={() => setShowRating(true)}>🏆 랭킹</button>
           <button className="modalCloseButton" onClick={onClose}>×</button>
         </div>
+        {showRating && <RatingBoard onClose={() => setShowRating(false)} />}
 
         {testError && <div className="omokMessage">{testError}</div>}
         {cleanNote && <div className="omokMessage info">{cleanNote}</div>}

@@ -598,6 +598,7 @@ export default function AlkkagiGame({
             game={viewing}
             mySeat={seatOf(viewing)}
             endText={END_TEXT}
+            ratingKind="alkkagi"
             busy={busy}
             onClose={() => {
               setResultFor(null);
