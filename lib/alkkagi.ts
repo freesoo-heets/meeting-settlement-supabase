@@ -32,13 +32,13 @@ export type Shot = { id: string; vx: number; vy: number };
 
 // 알마다 낼 수 있는 최고 세기 (작은 사·졸은 약하게)
 export const POWER: Record<Kind, number> = {
-  gung: 1,
-  cha: 1,
-  po: 1,
-  ma: 1,
-  sang: 1,
+  gung: 0.6, // 가장 무거워서 세게 치면 상대 궁이 바로 나갔다 → 크게 낮춤
+  cha: 0.9,
+  po: 0.9,
+  ma: 0.9,
+  sang: 0.9,
   sa: 0.65,
-  jol: 0.65,
+  jol: 0.7,
 };
 
 export const RADIUS: Record<Kind, number> = {
