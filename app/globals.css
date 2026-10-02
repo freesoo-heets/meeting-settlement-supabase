@@ -5621,3 +5621,13 @@ button.meetingMetricCard {
 .ratingEmpty { text-align: center; padding: 24px 0; }
 .ratingNote { font-size: 12px; margin-top: 12px; }
 .gameResultRating { font-size: 13px; font-weight: 700; color: #7c3aed; }
+
+/* 알까기: 마지막 1알 불꽃 (세기 +50%) */
+.alkFire { pointer-events: none; }
+.alkFireOuter { fill: rgba(249, 115, 22, .35); filter: blur(4px); animation: alkFlame .5s ease-in-out infinite alternate; }
+.alkFireInner { fill: none; stroke: #f97316; stroke-width: 4; filter: drop-shadow(0 0 4px #facc15); animation: alkFlameRing .35s ease-in-out infinite alternate; }
+@keyframes alkFlame { from { transform: scale(.9); fill: rgba(239, 68, 68, .35); } to { transform: scale(1.12); fill: rgba(250, 204, 21, .45); } }
+@keyframes alkFlameRing { from { stroke: #ef4444; } to { stroke: #facc15; } }
+.alkPiece.fire .alkPieceBody { stroke: #dc2626; stroke-width: 3; }
+.alkLastStand { display: block; text-align: center; font-weight: 800; color: #ea580c; margin-top: 4px; }
+@media (prefers-reduced-motion: reduce) { .alkFireOuter, .alkFireInner { animation: none; } }

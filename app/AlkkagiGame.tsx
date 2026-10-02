@@ -15,6 +15,7 @@ import {
   TURN_SECONDS,
   VMAX,
   alive,
+  isLastStand,
   simulate,
   type Piece,
   type Side,
@@ -1050,6 +1051,7 @@ function AlkkagiBoardView({
                 const r = RADIUS[piece.kind];
                 const mine = myTurn && !animating && !busy && piece.side === myColor;
                 const selected = aimId === piece.id || (!aimId && pickedId === piece.id && myTurn);
+                const fire = isLastStand(shown, piece.side);
                 return (
                   <g
                     key={piece.id}
@@ -1058,7 +1060,7 @@ function AlkkagiBoardView({
                       else pieceEls.current.delete(piece.id);
                     }}
                     transform={`translate(${piece.x} ${piece.y})`}
-                    className={`alkPiece ${piece.side} ${mine ? "mine" : ""} ${selected ? "selected" : ""}`}
+                    className={`alkPiece ${piece.side} ${mine ? "mine" : ""} ${selected ? "selected" : ""} ${fire ? "fire" : ""}`}
                     onPointerDown={(event) => {
                       if (!mine) return;
                       event.preventDefault();
@@ -1071,6 +1073,12 @@ function AlkkagiBoardView({
                       setAimId(piece.id);
                     }}
                   >
+                    {fire && (
+                      <g className="alkFire" aria-hidden="true">
+                        <circle r={r + 12} className="alkFireOuter" />
+                        <circle r={r + 6} className="alkFireInner" />
+                      </g>
+                    )}
                     {selected && <circle r={r + 7} className="alkPickRing" />}
                     <polygon
                       points={octagon(r)}
@@ -1137,6 +1145,9 @@ function AlkkagiBoardView({
           <button className="smallButton ghost" disabled={busy} onClick={onCancel}>취소</button>
         )}
       </div>
+      {myTurn && myColor && isLastStand(shown, myColor) && (
+        <small className="alkLastStand">🔥 마지막 알! 세기 50% 증가</small>
+      )}
       {myTurn && (
         <small className="muted omokHint">
           {pickedId
