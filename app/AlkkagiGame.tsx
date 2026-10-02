@@ -27,6 +27,7 @@ import {
   EMOTE_SHOW_MS,
   EMOTE_SPOTS,
   EmoteIcon,
+  freeEmoteSpot,
   isEmoteKind,
   mirrorSpot,
   pickEmoteSpotFromPoints,
@@ -165,7 +166,7 @@ export default function AlkkagiGame({
   const lastTick = useRef(0);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const lastEmoteAt = useRef(0);
-  const [emote, setEmote] = useState<ShownEmote | null>(null);
+  const [emotes, setEmotes] = useState<ShownEmote[]>([]);
   const [emoteCooldownUntil, setEmoteCooldownUntil] = useState(0);
 
   const load = useCallback(async () => {
@@ -256,8 +257,8 @@ export default function AlkkagiGame({
 
   function showEmote(next: Omit<ShownEmote, "key">) {
     const key = Date.now() + Math.random();
-    setEmote({ ...next, key });
-    window.setTimeout(() => setEmote((current) => (current?.key === key ? null : current)), EMOTE_SHOW_MS);
+    setEmotes((list) => [...list.slice(-5), { ...next, spot: freeEmoteSpot(next.spot, list.map((item) => item.spot)), key }]);
+    window.setTimeout(() => setEmotes((list) => list.filter((item) => item.key !== key)), EMOTE_SHOW_MS);
   }
 
   // 위치(spot)는 '판 기준'으로 주고받고, 판을 뒤집어 보는 사람은 화면에서 뒤집는다
@@ -422,7 +423,7 @@ export default function AlkkagiGame({
               if (window.confirm("기권하면 판돈을 잃습니다. 기권할까요?")) void run({ action: "resign", gameId: viewing.id });
             }}
             onCancel={() => run({ action: "cancel", gameId: viewing.id }, () => setViewId(""))}
-            emote={emote}
+            emotes={emotes}
             emoteReadyIn={Math.max(0, emoteCooldownUntil - now)}
             onEmote={sendEmote}
           />
@@ -640,7 +641,7 @@ function AlkkagiBoardView({
   onShoot,
   onResign,
   onCancel,
-  emote,
+  emotes,
   emoteReadyIn,
   onEmote,
 }: {
@@ -652,7 +653,7 @@ function AlkkagiBoardView({
   onShoot: (pieceId: string, vx: number, vy: number) => Promise<boolean>;
   onResign: () => void;
   onCancel: () => void;
-  emote: ShownEmote | null;
+  emotes: ShownEmote[];
   emoteReadyIn: number;
   onEmote: (kind: EmoteKind, pieces: Piece[], watcher: boolean) => void;
 }) {
@@ -957,7 +958,6 @@ function AlkkagiBoardView({
     status = game.escrow_note ? `취소됨 · ${game.escrow_note}` : "취소된 대국입니다.";
   }
 
-  const shownSpot = emote ? (flipped ? mirrorSpot(emote.spot) : emote.spot) : 0;
 
   return (
     <div className="omokGame">
@@ -990,12 +990,12 @@ function AlkkagiBoardView({
       )}
 
       <div className="omokStage alkStage">
-        {emote && (
-          <div className="omokEmotePop" key={emote.key} style={spotStyle(shownSpot)}>
+        {emotes.map((emote) => (
+          <div className="omokEmotePop" key={emote.key} style={spotStyle(flipped ? mirrorSpot(emote.spot) : emote.spot)}>
             <EmoteIcon kind={emote.kind} />
             {emote.name && <span className={emote.watcher ? "watcher" : ""}>{emote.watcher ? `👀 ${emote.name}` : emote.name}</span>}
           </div>
-        )}
+        ))}
         <svg
           className={`alkBoard ${animating ? "animating" : ""}`}
           data-lock-scroll="true"

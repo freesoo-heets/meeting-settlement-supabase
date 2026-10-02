@@ -11,6 +11,7 @@ import {
   EMOTE_SHOW_MS,
   EMOTE_SPOTS,
   EmoteIcon,
+  freeEmoteSpot,
   isEmoteKind,
   pickEmoteSpot,
   spotStyle,
@@ -235,7 +236,7 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
   const lastTick = useRef(0);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const lastEmoteAt = useRef(0);
-  const [emote, setEmote] = useState<ShownEmote | null>(null);
+  const [emotes, setEmotes] = useState<ShownEmote[]>([]);
   const [emoteCooldownUntil, setEmoteCooldownUntil] = useState(0);
 
   const load = useCallback(async () => {
@@ -330,8 +331,8 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
   // 감정표현: 서버를 거치지 않고 실시간 채널로 주고받는다
   function showEmote(next: { kind: EmoteKind; spot: number; name: string; watcher: boolean }) {
     const key = Date.now() + Math.random();
-    setEmote({ ...next, key });
-    window.setTimeout(() => setEmote((current) => (current?.key === key ? null : current)), EMOTE_SHOW_MS);
+    setEmotes((list) => [...list.slice(-5), { ...next, spot: freeEmoteSpot(next.spot, list.map((item) => item.spot)), key }]);
+    window.setTimeout(() => setEmotes((list) => list.filter((item) => item.key !== key)), EMOTE_SHOW_MS);
   }
 
   function sendEmote(kind: EmoteKind, board: Board, watcher: boolean) {
@@ -530,7 +531,7 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
             onCancel={() => run({ action: "cancel", gameId: viewing.id }, () => setViewId(""))}
             onUndoRequest={() => run({ action: "undo_request", gameId: viewing.id })}
             onUndoAnswer={(accept) => run({ action: "undo_answer", gameId: viewing.id, accept })}
-            emote={emote}
+            emotes={emotes}
             emoteReadyIn={Math.max(0, emoteCooldownUntil - now)}
             onEmote={sendEmote}
           />
@@ -752,7 +753,7 @@ function OmokBoardView({
   onCancel,
   onUndoRequest,
   onUndoAnswer,
-  emote,
+  emotes,
   emoteReadyIn,
   onEmote,
 }: {
@@ -768,7 +769,7 @@ function OmokBoardView({
   onCancel: () => void;
   onUndoRequest: () => void;
   onUndoAnswer: (accept: boolean) => void;
-  emote: ShownEmote | null;
+  emotes: ShownEmote[];
   emoteReadyIn: number;
   onEmote: (kind: EmoteKind, board: Board, watcher: boolean) => void;
 }) {
@@ -871,12 +872,12 @@ function OmokBoardView({
       <p className={`omokStatus ${myTurn ? "mine" : ""}`}>{status}</p>
 
       <div className="omokStage">
-      {emote && (
+      {emotes.map((emote) => (
         <div className="omokEmotePop" key={emote.key} style={spotStyle(emote.spot)}>
           <EmoteIcon kind={emote.kind} />
           {emote.name && <span className={emote.watcher ? "watcher" : ""}>{emote.watcher ? `👀 ${emote.name}` : emote.name}</span>}
         </div>
-      )}
+      ))}
       <svg className="omokBoard" viewBox={`0 0 ${VIEW} ${VIEW}`} role="img" aria-label="오목판">
         <rect x="0" y="0" width={VIEW} height={VIEW} rx="10" className="omokBoardBg" />
         {Array.from({ length: BOARD_SIZE }, (_, i) => (
