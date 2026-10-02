@@ -786,7 +786,10 @@ function AlkkagiBoardView({
   // 손가락을 움직이는 동안에는 React 상태를 바꾸지 않고 조준선·알·세기 막대만 직접 움직인다.
   // (예전에는 움직일 때마다 판 전체를 다시 그려서 조준이 손을 늦게 따라왔다)
   const layerRef = useRef<SVGGElement | null>(null);
-  const aimRef = useRef<{ id: string; px: number; py: number; x: number; y: number } | null>(null);
+  // x,y: 알 위치 / sx,sy: 손가락을 처음 댄 곳 / px,py: 지금 손가락 위치
+  const aimRef = useRef<{ id: string; px: number; py: number; x: number; y: number; sx: number; sy: number } | null>(null);
+  // ★ 휴대폰 베젤 대응: 알을 톡 눌러 고른 뒤, 판 아무 곳에서나 당겨 조준할 수 있다
+  const [pickedId, setPickedId] = useState<string | null>(null);
   const [aimId, setAimId] = useState<string | null>(null);
   const pieceEls = useRef(new Map<string, SVGGElement>());
   const pullEl = useRef<SVGLineElement | null>(null);
@@ -811,8 +814,8 @@ function AlkkagiBoardView({
     const aim = aimRef.current;
     if (!aim) return null;
     // 새총: 끈 방향의 반대로 날아간다
-    const dx = aim.x - aim.px;
-    const dy = aim.y - aim.py;
+    const dx = aim.sx - aim.px;
+    const dy = aim.sy - aim.py;
     const length = Math.hypot(dx, dy);
     const power = Math.min(length, PULL_MAX) / PULL_MAX;
     return length > 0 ? { nx: dx / length, ny: dy / length, power } : { nx: 0, ny: 0, power: 0 };
@@ -875,6 +878,10 @@ function AlkkagiBoardView({
     if (aim) pieceEls.current.get(aim.id)?.setAttribute("transform", `translate(${aim.x} ${aim.y})`);
   }
 
+  useEffect(() => {
+    if (!myTurn) setPickedId(null);
+  }, [myTurn]);
+
   async function release() {
     const current = aimRef.current;
     const v = aimVector();
@@ -883,7 +890,12 @@ function AlkkagiBoardView({
     resetAimPiece();
     aimRef.current = null;
     setAimId(null);
-    if (!current || !v || v.power < 0.06) return;
+    if (current && (!v || v.power < 0.06)) {
+      setPickedId(current.id); // 톡 눌렀다 뗌 → 이 알을 골라 둔다 (판 아무 데서나 당길 수 있게)
+      return;
+    }
+    if (!current || !v) return;
+    setPickedId(null);
     const vx = v.nx * v.power * VMAX;
     const vy = v.ny * v.power * VMAX;
     // 응답을 기다리지 않고 바로 재생한다
@@ -973,6 +985,18 @@ function AlkkagiBoardView({
           viewBox={`0 0 ${BOARD_W} ${BOARD_H}`}
           role="img"
           aria-label="알까기 판"
+          onPointerDown={(event) => {
+            // 알이 아닌 곳을 눌렀을 때: 골라 둔 내 알이 있으면 그 알로 조준 시작
+            if (aimRef.current || !pickedId || !myTurn || animating || busy) return;
+            const piece = shown.find((item) => item.id === pickedId && !item.out && item.side === myColor);
+            if (!piece) return;
+            event.preventDefault();
+            event.currentTarget.setPointerCapture(event.pointerId);
+            const point = toBoard(event);
+            if (!point) return;
+            aimRef.current = { id: piece.id, x: piece.x, y: piece.y, sx: point.x, sy: point.y, px: point.x, py: point.y };
+            setAimId(piece.id);
+          }}
           onPointerMove={(event) => {
             const aim = aimRef.current;
             if (!aim) return;
@@ -1009,7 +1033,7 @@ function AlkkagiBoardView({
               .map((piece) => {
                 const r = RADIUS[piece.kind];
                 const mine = myTurn && !animating && !busy && piece.side === myColor;
-                const selected = aimId === piece.id;
+                const selected = aimId === piece.id || (!aimId && pickedId === piece.id && myTurn);
                 return (
                   <g
                     key={piece.id}
@@ -1022,9 +1046,12 @@ function AlkkagiBoardView({
                     onPointerDown={(event) => {
                       if (!mine) return;
                       event.preventDefault();
+                      event.stopPropagation(); // 판 빈 곳 조준과 겹치지 않게
                       (event.currentTarget.ownerSVGElement as SVGSVGElement | null)?.setPointerCapture(event.pointerId);
                       const point = toBoard(event);
-                      aimRef.current = { id: piece.id, x: piece.x, y: piece.y, px: point?.x ?? piece.x, py: point?.y ?? piece.y };
+                      const sx = point?.x ?? piece.x;
+                      const sy = point?.y ?? piece.y;
+                      aimRef.current = { id: piece.id, x: piece.x, y: piece.y, sx, sy, px: sx, py: sy };
                       setAimId(piece.id);
                     }}
                   >
@@ -1091,7 +1118,13 @@ function AlkkagiBoardView({
           <button className="smallButton ghost" disabled={busy} onClick={onCancel}>취소</button>
         )}
       </div>
-      {myTurn && <small className="muted omokHint">새총처럼 내 알을 누른 채 뒤로 당겼다 놓으세요. 당긴 반대쪽으로 날아가고, 많이 당길수록 세게 나갑니다.</small>}
+      {myTurn && (
+        <small className="muted omokHint">
+          {pickedId
+            ? "고른 알: 판 아무 곳이나 누른 채 뒤로 당겼다 놓으세요 (화면 끝까지 안 가도 돼요)."
+            : "내 알을 누른 채 뒤로 당겼다 놓으세요. 화면 끝이 가까우면 알을 톡 눌러 고른 뒤, 판 아무 곳에서나 당겨도 됩니다."}
+        </small>
+      )}
     </div>
   );
 }
