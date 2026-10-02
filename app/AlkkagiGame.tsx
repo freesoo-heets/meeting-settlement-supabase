@@ -83,6 +83,8 @@ const COLUMNS =
 const STAKE_PRESETS = [100, 300, 500, 1000];
 const PULL_MAX = 90; // 이만큼 당기면 최대 세기 (140에서 줄임)
 const AIM_GUIDE = 34; // 방향 표시 길이 (세기와 무관하게 고정)
+const CANCEL_POWER = 0.18; // 이보다 덜 당긴 채 놓으면 취소 (처음 댄 자리 근처로 돌아오면 취소)
+const KIND_NAME: Record<string, string> = { gung: "궁", cha: "차", po: "포", ma: "마", sang: "상", sa: "사", jol: "졸" };
 const SIM_FPS = 60;
 const FADE_FRAMES = 18; // 떨어진 알이 사라지는 시간 (0.3초) // 물리 계산 단위 (lib/alkkagi.ts 의 DT = 1/60)
 const END_TEXT: Record<string, string> = {
@@ -796,6 +798,8 @@ function AlkkagiBoardView({
   const shotEl = useRef<SVGLineElement | null>(null);
   const headEl = useRef<SVGCircleElement | null>(null);
   const powerEl = useRef<HTMLDivElement | null>(null);
+  const powerLabelEl = useRef<HTMLSpanElement | null>(null);
+  const cancelEl = useRef<SVGCircleElement | null>(null);
   const aimFrame = useRef(0);
 
   function toBoard(event: React.PointerEvent) {
@@ -826,7 +830,18 @@ function AlkkagiBoardView({
     const aim = aimRef.current;
     const v = aimVector();
     if (!aim || !v) return;
-    const color = v.power < 0.4 ? "#22c55e" : v.power < 0.75 ? "#f59e0b" : "#ef4444";
+    const cancel = v.power < CANCEL_POWER;
+    const color = cancel ? "#94a3b8" : v.power < 0.4 ? "#22c55e" : v.power < 0.75 ? "#f59e0b" : "#ef4444";
+    // 처음 댄 자리의 '취소' 원 (이 안으로 돌아오면 취소)
+    if (cancelEl.current) {
+      cancelEl.current.setAttribute("cx", aim.sx.toFixed(2));
+      cancelEl.current.setAttribute("cy", aim.sy.toFixed(2));
+      cancelEl.current.setAttribute("r", (CANCEL_POWER * PULL_MAX).toFixed(1));
+      cancelEl.current.classList.toggle("active", cancel);
+    }
+    if (powerLabelEl.current) {
+      powerLabelEl.current.textContent = cancel ? "놓으면 취소" : `세기 ${Math.round(v.power * 100)}%`;
+    }
     // 알이 당기는 쪽으로 살짝 딸려 온다 (최대 9)
     const pull = v.power * 9;
     const ax = aim.x - v.nx * pull;
@@ -851,13 +866,13 @@ function AlkkagiBoardView({
       shotEl.current.setAttribute("x2", tx.toFixed(2));
       shotEl.current.setAttribute("y2", ty.toFixed(2));
       shotEl.current.style.stroke = color;
-      shotEl.current.style.opacity = v.power > 0.06 ? "1" : "0";
+      shotEl.current.style.opacity = cancel ? "0" : "1";
     }
     if (headEl.current) {
       headEl.current.setAttribute("cx", tx.toFixed(2));
       headEl.current.setAttribute("cy", ty.toFixed(2));
       headEl.current.style.fill = color;
-      headEl.current.style.opacity = v.power > 0.06 ? "1" : "0";
+      headEl.current.style.opacity = cancel ? "0" : "1";
     }
     if (powerEl.current) {
       powerEl.current.style.width = `${Math.round(v.power * 100)}%`;
@@ -890,7 +905,7 @@ function AlkkagiBoardView({
     resetAimPiece();
     aimRef.current = null;
     setAimId(null);
-    if (current && (!v || v.power < 0.06)) {
+    if (current && (!v || v.power < CANCEL_POWER)) {
       setPickedId(current.id); // 톡 눌렀다 뗌 → 이 알을 골라 둔다 (판 아무 데서나 당길 수 있게)
       return;
     }
@@ -1055,6 +1070,7 @@ function AlkkagiBoardView({
                       setAimId(piece.id);
                     }}
                   >
+                    {selected && <circle r={r + 7} className="alkPickRing" />}
                     <polygon
                       points={octagon(r)}
                       className="alkPieceBody"
@@ -1075,6 +1091,7 @@ function AlkkagiBoardView({
             {aimId && (
               <g className="alkAim" pointerEvents="none">
                 {/* 새총 줄 (세기에 따라 초록 → 주황 → 빨강) */}
+                <circle ref={cancelEl} className="alkCancelRing" r="0" />
                 <line ref={pullEl} className="alkPull" />
                 {/* 방향만 짧게 보여준다 (얼마나 멀리 갈지는 감으로) */}
                 <line ref={shotEl} className="alkShot" />
@@ -1087,6 +1104,7 @@ function AlkkagiBoardView({
         {aimId && (
           <div className="alkPower">
             <div ref={powerEl} style={{ width: "0%" }} />
+            <span ref={powerLabelEl} className="alkPowerLabel">놓으면 취소</span>
           </div>
         )}
       </div>
@@ -1121,8 +1139,11 @@ function AlkkagiBoardView({
       {myTurn && (
         <small className="muted omokHint">
           {pickedId
-            ? "고른 알: 판 아무 곳이나 누른 채 뒤로 당겼다 놓으세요 (화면 끝까지 안 가도 돼요)."
-            : "내 알을 누른 채 뒤로 당겼다 놓으세요. 화면 끝이 가까우면 알을 톡 눌러 고른 뒤, 판 아무 곳에서나 당겨도 됩니다."}
+            ? `선택: ${(() => {
+                const picked = shown.find((piece) => piece.id === pickedId);
+                return picked ? `${LABEL[picked.side][picked.kind]} (${KIND_NAME[picked.kind]})` : "";
+              })()} — 판 아무 곳이나 누른 채 뒤로 당겼다 놓으세요. 처음 자리로 돌아와 놓으면 취소.`
+            : "내 알을 누른 채 뒤로 당겼다 놓으세요. 처음 자리로 돌아와 놓으면 취소. 화면 끝이 가까우면 알을 톡 눌러 고른 뒤 판 아무 곳에서나 당겨도 됩니다."}
         </small>
       )}
     </div>
