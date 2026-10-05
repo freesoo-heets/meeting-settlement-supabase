@@ -5570,64 +5570,18 @@ button.meetingMetricCard {
 .dashboardInsightsGrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}.dashboardInsightPanel{padding:16px}.insightMetricGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.insightMetricGrid>div,.memberProfileSnapshot>div,.myActivityQuickGrid>div{border:1px solid var(--line,#e8e2dc);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:3px}.insightMetricGrid span,.memberProfileSnapshot span,.myActivityQuickGrid span{font-size:11px;color:#80756d}.insightMetricGrid strong,.memberProfileSnapshot strong,.myActivityQuickGrid strong{font-size:15px}.adminWorkCenter>button{width:100%;display:flex;justify-content:space-between;align-items:center;border:0;border-bottom:1px solid #eee7e1;background:transparent;padding:11px 4px;text-align:left}.backupActionRow{display:flex;gap:8px;margin-top:12px}.backupHint{display:block;margin-top:8px;color:#8a7f77}.memberProfileSnapshot,.myActivityQuickGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:10px 0 14px}.myActivityQuickGrid{grid-template-columns:repeat(3,minmax(0,1fr))}.calendarDay.selectedDate{outline:2px solid rgba(97,73,57,.35);outline-offset:-2px}.mobileCalendarDayList{display:none;margin-top:10px}.mobileCalendarDayList>button{width:100%;display:flex;justify-content:space-between;align-items:center;padding:10px;border:1px solid #ece5df;border-radius:12px;background:#fff;margin-top:6px;text-align:left}.mobileCalendarDayList>button div{display:flex;flex-direction:column;gap:2px}.mobileCalendarDayList>button span{font-size:11px;color:#857970}
 @media(max-width:720px){.dashboardInsightsGrid{grid-template-columns:1fr}.memberProfileSnapshot{grid-template-columns:repeat(2,minmax(0,1fr))}.myActivityQuickGrid{grid-template-columns:1fr 1fr 1fr}.meetingCalendarPanel .calendarGrid{min-width:0!important}.meetingCalendarPanel .calendarDay{min-height:52px!important;height:52px!important;padding:3px!important;cursor:pointer}.meetingCalendarPanel .calendarEvents{display:none}.meetingCalendarPanel .calendarDayNumber{justify-content:center!important}.meetingCalendarPanel .calendarDayNumber em{font-size:9px}.mobileCalendarDayList{display:block}.meetingCalendarPanel{overflow:visible!important}.meetingCalendarPanel .calendarWeekdays{min-width:0!important}.insightMetricGrid{grid-template-columns:1fr 1fr}}
 
-/* 알까기: 고른 알 · 취소 표시 */
-.alkPickRing {
-  fill: none;
-  stroke: #f97316;
-  stroke-width: 4;
-  stroke-dasharray: 6 4;
-  pointer-events: none;
-  animation: alkPick 1s ease-in-out infinite;
+/* STEP 42: TOP5 카드 항목 크기 통일 */
+.popularMeetingCard,
+.dashboardAttendanceCard {
+  min-height: 59px;
+  padding: 9px 11px;
+  border-radius: 13px;
 }
-@keyframes alkPick { 50% { stroke: #fde047; opacity: .55; } }
-.alkCancelRing { fill: rgba(148, 163, 184, .12); stroke: #94a3b8; stroke-width: 2; stroke-dasharray: 4 3; pointer-events: none; }
-.alkCancelRing.active { fill: rgba(148, 163, 184, .35); stroke: #475569; }
-.alkPower { position: relative; height: 18px; }
-.alkPowerLabel {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 800;
-  color: #0f172a;
-  text-shadow: 0 0 3px #fff;
+
+@media (max-width: 760px) {
+  .popularMeetingCard,
+  .dashboardAttendanceCard {
+    min-height: 56px;
+    padding: 9px 10px;
+  }
 }
-@media (prefers-reduced-motion: reduce) { .alkPickRing { animation: none; } }
-
-/* 🏆 레이팅 랭킹 */
-.ratingOpenButton { margin-left: auto; margin-right: 8px; white-space: nowrap; }
-.ratingModal { max-width: 560px; width: calc(100% - 32px); max-height: 88vh; overflow-y: auto; }
-.ratingTabs { display: flex; gap: 6px; margin: 8px 0; }
-.ratingTabs button { flex: 1; padding: 8px 0; border-radius: 10px; border: 1px solid #e2e8f0; background: #f8fafc; font-weight: 700; color: #475569; }
-.ratingTabs button.active { background: #0f172a; color: #fff; border-color: #0f172a; }
-.ratingTabs.small button { padding: 5px 0; font-size: 13px; }
-.ratingTable { width: 100%; border-collapse: collapse; font-size: 14px; }
-.ratingTable th { font-size: 12px; color: #64748b; font-weight: 600; text-align: left; padding: 6px 4px; border-bottom: 1px solid #e2e8f0; }
-.ratingTable td { padding: 8px 4px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
-.ratingTable tr.me td { background: #fef9c3; font-weight: 700; }
-.ratingTable .rank { width: 36px; text-align: center; }
-.ratingTable .name { word-break: keep-all; }
-.ratingTable .rating { font-weight: 800; font-variant-numeric: tabular-nums; }
-.ratingTable .record { font-size: 12px; white-space: nowrap; }
-.ratingTable .record small { display: block; color: #64748b; }
-.ratingTable .recent { white-space: nowrap; font-size: 12px; letter-spacing: 1px; }
-.ratingTable .recent .W { color: #2563eb; font-style: normal; }
-.ratingTable .recent .L { color: #ef4444; font-style: normal; }
-.ratingTable .recent .D { color: #94a3b8; font-style: normal; }
-.ratingTable.placing td { color: #64748b; }
-.ratingSub { font-size: 13px; margin: 14px 0 4px; color: #64748b; }
-.ratingEmpty { text-align: center; padding: 24px 0; }
-.ratingNote { font-size: 12px; margin-top: 12px; }
-.gameResultRating { font-size: 13px; font-weight: 700; color: #7c3aed; }
-
-/* 알까기: 마지막 1알 불꽃 (세기 +50%) */
-.alkFire { pointer-events: none; }
-.alkFireOuter { fill: rgba(249, 115, 22, .35); filter: blur(4px); animation: alkFlame .5s ease-in-out infinite alternate; }
-.alkFireInner { fill: none; stroke: #f97316; stroke-width: 4; filter: drop-shadow(0 0 4px #facc15); animation: alkFlameRing .35s ease-in-out infinite alternate; }
-@keyframes alkFlame { from { transform: scale(.9); fill: rgba(239, 68, 68, .35); } to { transform: scale(1.12); fill: rgba(250, 204, 21, .45); } }
-@keyframes alkFlameRing { from { stroke: #ef4444; } to { stroke: #facc15; } }
-.alkPiece.fire .alkPieceBody { stroke: #dc2626; stroke-width: 3; }
-.alkLastStand { display: block; text-align: center; font-weight: 800; color: #ea580c; margin-top: 4px; }
-@media (prefers-reduced-motion: reduce) { .alkFireOuter, .alkFireInner { animation: none; } }

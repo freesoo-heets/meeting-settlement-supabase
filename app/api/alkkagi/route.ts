@@ -169,15 +169,6 @@ export async function POST(request: Request) {
     if (targetId) {
       const { data: target } = await admin.from("members").select("id,active").eq("id", targetId).maybeSingle();
       if (!target?.active) return fail("상대 회원을 찾지 못했습니다.");
-      // ★ 점수 내기면 상대의 점수·티켓도 미리 확인 (모자라면 신청 자체를 막는다, 친선은 확인 안 함)
-      if (!friendly) {
-        const opponent = await loadPlayer(admin, targetId);
-        if ("error" in opponent) return fail("상대를 카톡 점수판에서 찾지 못해 대국신청을 보낼 수 없습니다. (친선전은 가능)");
-        if (opponent.tickets < 1) return fail(`${opponent.name}님이 티켓이 없어서 대국신청을 보낼 수 없습니다. (친선전은 가능)`);
-        if (opponent.exp < stake) {
-          return fail(`${opponent.name}님의 점수가 판돈보다 적습니다. (보유 ${opponent.exp.toLocaleString("ko-KR")}점)`);
-        }
-      }
     }
 
     const { data, error } = await admin

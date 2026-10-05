@@ -15,7 +15,6 @@ import {
   TURN_SECONDS,
   VMAX,
   alive,
-  isLastStand,
   simulate,
   type Piece,
   type Side,
@@ -27,7 +26,6 @@ import {
   EMOTE_SHOW_MS,
   EMOTE_SPOTS,
   EmoteIcon,
-  freeEmoteSpot,
   isEmoteKind,
   mirrorSpot,
   pickEmoteSpotFromPoints,
@@ -85,8 +83,6 @@ const COLUMNS =
 const STAKE_PRESETS = [100, 300, 500, 1000];
 const PULL_MAX = 90; // 이만큼 당기면 최대 세기 (140에서 줄임)
 const AIM_GUIDE = 34; // 방향 표시 길이 (세기와 무관하게 고정)
-const CANCEL_POWER = 0.18; // 이보다 덜 당긴 채 놓으면 취소 (처음 댄 자리 근처로 돌아오면 취소)
-const KIND_NAME: Record<string, string> = { gung: "궁", cha: "차", po: "포", ma: "마", sang: "상", sa: "사", jol: "졸" };
 const SIM_FPS = 60;
 const FADE_FRAMES = 18; // 떨어진 알이 사라지는 시간 (0.3초) // 물리 계산 단위 (lib/alkkagi.ts 의 DT = 1/60)
 const END_TEXT: Record<string, string> = {
@@ -166,7 +162,7 @@ export default function AlkkagiGame({
   const lastTick = useRef(0);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const lastEmoteAt = useRef(0);
-  const [emotes, setEmotes] = useState<ShownEmote[]>([]);
+  const [emote, setEmote] = useState<ShownEmote | null>(null);
   const [emoteCooldownUntil, setEmoteCooldownUntil] = useState(0);
 
   const load = useCallback(async () => {
@@ -257,8 +253,8 @@ export default function AlkkagiGame({
 
   function showEmote(next: Omit<ShownEmote, "key">) {
     const key = Date.now() + Math.random();
-    setEmotes((list) => [...list.slice(-5), { ...next, spot: freeEmoteSpot(next.spot, list.map((item) => item.spot)), key }]);
-    window.setTimeout(() => setEmotes((list) => list.filter((item) => item.key !== key)), EMOTE_SHOW_MS);
+    setEmote({ ...next, key });
+    window.setTimeout(() => setEmote((current) => (current?.key === key ? null : current)), EMOTE_SHOW_MS);
   }
 
   // 위치(spot)는 '판 기준'으로 주고받고, 판을 뒤집어 보는 사람은 화면에서 뒤집는다
@@ -423,7 +419,7 @@ export default function AlkkagiGame({
               if (window.confirm("기권하면 판돈을 잃습니다. 기권할까요?")) void run({ action: "resign", gameId: viewing.id });
             }}
             onCancel={() => run({ action: "cancel", gameId: viewing.id }, () => setViewId(""))}
-            emotes={emotes}
+            emote={emote}
             emoteReadyIn={Math.max(0, emoteCooldownUntil - now)}
             onEmote={sendEmote}
           />
@@ -600,7 +596,6 @@ export default function AlkkagiGame({
             game={viewing}
             mySeat={seatOf(viewing)}
             endText={END_TEXT}
-            ratingKind="alkkagi"
             busy={busy}
             onClose={() => {
               setResultFor(null);
@@ -641,7 +636,7 @@ function AlkkagiBoardView({
   onShoot,
   onResign,
   onCancel,
-  emotes,
+  emote,
   emoteReadyIn,
   onEmote,
 }: {
@@ -653,7 +648,7 @@ function AlkkagiBoardView({
   onShoot: (pieceId: string, vx: number, vy: number) => Promise<boolean>;
   onResign: () => void;
   onCancel: () => void;
-  emotes: ShownEmote[];
+  emote: ShownEmote | null;
   emoteReadyIn: number;
   onEmote: (kind: EmoteKind, pieces: Piece[], watcher: boolean) => void;
 }) {
@@ -791,18 +786,13 @@ function AlkkagiBoardView({
   // 손가락을 움직이는 동안에는 React 상태를 바꾸지 않고 조준선·알·세기 막대만 직접 움직인다.
   // (예전에는 움직일 때마다 판 전체를 다시 그려서 조준이 손을 늦게 따라왔다)
   const layerRef = useRef<SVGGElement | null>(null);
-  // x,y: 알 위치 / sx,sy: 손가락을 처음 댄 곳 / px,py: 지금 손가락 위치
-  const aimRef = useRef<{ id: string; px: number; py: number; x: number; y: number; sx: number; sy: number } | null>(null);
-  // ★ 휴대폰 베젤 대응: 알을 톡 눌러 고른 뒤, 판 아무 곳에서나 당겨 조준할 수 있다
-  const [pickedId, setPickedId] = useState<string | null>(null);
+  const aimRef = useRef<{ id: string; px: number; py: number; x: number; y: number } | null>(null);
   const [aimId, setAimId] = useState<string | null>(null);
   const pieceEls = useRef(new Map<string, SVGGElement>());
   const pullEl = useRef<SVGLineElement | null>(null);
   const shotEl = useRef<SVGLineElement | null>(null);
   const headEl = useRef<SVGCircleElement | null>(null);
   const powerEl = useRef<HTMLDivElement | null>(null);
-  const powerLabelEl = useRef<HTMLSpanElement | null>(null);
-  const cancelEl = useRef<SVGCircleElement | null>(null);
   const aimFrame = useRef(0);
 
   function toBoard(event: React.PointerEvent) {
@@ -821,8 +811,8 @@ function AlkkagiBoardView({
     const aim = aimRef.current;
     if (!aim) return null;
     // 새총: 끈 방향의 반대로 날아간다
-    const dx = aim.sx - aim.px;
-    const dy = aim.sy - aim.py;
+    const dx = aim.x - aim.px;
+    const dy = aim.y - aim.py;
     const length = Math.hypot(dx, dy);
     const power = Math.min(length, PULL_MAX) / PULL_MAX;
     return length > 0 ? { nx: dx / length, ny: dy / length, power } : { nx: 0, ny: 0, power: 0 };
@@ -833,18 +823,7 @@ function AlkkagiBoardView({
     const aim = aimRef.current;
     const v = aimVector();
     if (!aim || !v) return;
-    const cancel = v.power < CANCEL_POWER;
-    const color = cancel ? "#94a3b8" : v.power < 0.4 ? "#22c55e" : v.power < 0.75 ? "#f59e0b" : "#ef4444";
-    // 처음 댄 자리의 '취소' 원 (이 안으로 돌아오면 취소)
-    if (cancelEl.current) {
-      cancelEl.current.setAttribute("cx", aim.sx.toFixed(2));
-      cancelEl.current.setAttribute("cy", aim.sy.toFixed(2));
-      cancelEl.current.setAttribute("r", (CANCEL_POWER * PULL_MAX).toFixed(1));
-      cancelEl.current.classList.toggle("active", cancel);
-    }
-    if (powerLabelEl.current) {
-      powerLabelEl.current.textContent = cancel ? "놓으면 취소" : `세기 ${Math.round(v.power * 100)}%`;
-    }
+    const color = v.power < 0.4 ? "#22c55e" : v.power < 0.75 ? "#f59e0b" : "#ef4444";
     // 알이 당기는 쪽으로 살짝 딸려 온다 (최대 9)
     const pull = v.power * 9;
     const ax = aim.x - v.nx * pull;
@@ -869,13 +848,13 @@ function AlkkagiBoardView({
       shotEl.current.setAttribute("x2", tx.toFixed(2));
       shotEl.current.setAttribute("y2", ty.toFixed(2));
       shotEl.current.style.stroke = color;
-      shotEl.current.style.opacity = cancel ? "0" : "1";
+      shotEl.current.style.opacity = v.power > 0.06 ? "1" : "0";
     }
     if (headEl.current) {
       headEl.current.setAttribute("cx", tx.toFixed(2));
       headEl.current.setAttribute("cy", ty.toFixed(2));
       headEl.current.style.fill = color;
-      headEl.current.style.opacity = cancel ? "0" : "1";
+      headEl.current.style.opacity = v.power > 0.06 ? "1" : "0";
     }
     if (powerEl.current) {
       powerEl.current.style.width = `${Math.round(v.power * 100)}%`;
@@ -896,10 +875,6 @@ function AlkkagiBoardView({
     if (aim) pieceEls.current.get(aim.id)?.setAttribute("transform", `translate(${aim.x} ${aim.y})`);
   }
 
-  useEffect(() => {
-    if (!myTurn) setPickedId(null);
-  }, [myTurn]);
-
   async function release() {
     const current = aimRef.current;
     const v = aimVector();
@@ -908,12 +883,7 @@ function AlkkagiBoardView({
     resetAimPiece();
     aimRef.current = null;
     setAimId(null);
-    if (current && (!v || v.power < CANCEL_POWER)) {
-      setPickedId(current.id); // 톡 눌렀다 뗌 → 이 알을 골라 둔다 (판 아무 데서나 당길 수 있게)
-      return;
-    }
-    if (!current || !v) return;
-    setPickedId(null);
+    if (!current || !v || v.power < 0.06) return;
     const vx = v.nx * v.power * VMAX;
     const vy = v.ny * v.power * VMAX;
     // 응답을 기다리지 않고 바로 재생한다
@@ -958,6 +928,7 @@ function AlkkagiBoardView({
     status = game.escrow_note ? `취소됨 · ${game.escrow_note}` : "취소된 대국입니다.";
   }
 
+  const shownSpot = emote ? (flipped ? mirrorSpot(emote.spot) : emote.spot) : 0;
 
   return (
     <div className="omokGame">
@@ -990,30 +961,18 @@ function AlkkagiBoardView({
       )}
 
       <div className="omokStage alkStage">
-        {emotes.map((emote) => (
-          <div className="omokEmotePop" key={emote.key} style={spotStyle(flipped ? mirrorSpot(emote.spot) : emote.spot)}>
+        {emote && (
+          <div className="omokEmotePop" key={emote.key} style={spotStyle(shownSpot)}>
             <EmoteIcon kind={emote.kind} />
             {emote.name && <span className={emote.watcher ? "watcher" : ""}>{emote.watcher ? `👀 ${emote.name}` : emote.name}</span>}
           </div>
-        ))}
+        )}
         <svg
           className={`alkBoard ${animating ? "animating" : ""}`}
           data-lock-scroll="true"
           viewBox={`0 0 ${BOARD_W} ${BOARD_H}`}
           role="img"
           aria-label="알까기 판"
-          onPointerDown={(event) => {
-            // 알이 아닌 곳을 눌렀을 때: 골라 둔 내 알이 있으면 그 알로 조준 시작
-            if (aimRef.current || !pickedId || !myTurn || animating || busy) return;
-            const piece = shown.find((item) => item.id === pickedId && !item.out && item.side === myColor);
-            if (!piece) return;
-            event.preventDefault();
-            event.currentTarget.setPointerCapture(event.pointerId);
-            const point = toBoard(event);
-            if (!point) return;
-            aimRef.current = { id: piece.id, x: piece.x, y: piece.y, sx: point.x, sy: point.y, px: point.x, py: point.y };
-            setAimId(piece.id);
-          }}
           onPointerMove={(event) => {
             const aim = aimRef.current;
             if (!aim) return;
@@ -1050,8 +1009,7 @@ function AlkkagiBoardView({
               .map((piece) => {
                 const r = RADIUS[piece.kind];
                 const mine = myTurn && !animating && !busy && piece.side === myColor;
-                const selected = aimId === piece.id || (!aimId && pickedId === piece.id && myTurn);
-                const fire = isLastStand(shown, piece.side);
+                const selected = aimId === piece.id;
                 return (
                   <g
                     key={piece.id}
@@ -1060,26 +1018,16 @@ function AlkkagiBoardView({
                       else pieceEls.current.delete(piece.id);
                     }}
                     transform={`translate(${piece.x} ${piece.y})`}
-                    className={`alkPiece ${piece.side} ${mine ? "mine" : ""} ${selected ? "selected" : ""} ${fire ? "fire" : ""}`}
+                    className={`alkPiece ${piece.side} ${mine ? "mine" : ""} ${selected ? "selected" : ""}`}
                     onPointerDown={(event) => {
                       if (!mine) return;
                       event.preventDefault();
-                      event.stopPropagation(); // 판 빈 곳 조준과 겹치지 않게
                       (event.currentTarget.ownerSVGElement as SVGSVGElement | null)?.setPointerCapture(event.pointerId);
                       const point = toBoard(event);
-                      const sx = point?.x ?? piece.x;
-                      const sy = point?.y ?? piece.y;
-                      aimRef.current = { id: piece.id, x: piece.x, y: piece.y, sx, sy, px: sx, py: sy };
+                      aimRef.current = { id: piece.id, x: piece.x, y: piece.y, px: point?.x ?? piece.x, py: point?.y ?? piece.y };
                       setAimId(piece.id);
                     }}
                   >
-                    {fire && (
-                      <g className="alkFire" aria-hidden="true">
-                        <circle r={r + 12} className="alkFireOuter" />
-                        <circle r={r + 6} className="alkFireInner" />
-                      </g>
-                    )}
-                    {selected && <circle r={r + 7} className="alkPickRing" />}
                     <polygon
                       points={octagon(r)}
                       className="alkPieceBody"
@@ -1100,7 +1048,6 @@ function AlkkagiBoardView({
             {aimId && (
               <g className="alkAim" pointerEvents="none">
                 {/* 새총 줄 (세기에 따라 초록 → 주황 → 빨강) */}
-                <circle ref={cancelEl} className="alkCancelRing" r="0" />
                 <line ref={pullEl} className="alkPull" />
                 {/* 방향만 짧게 보여준다 (얼마나 멀리 갈지는 감으로) */}
                 <line ref={shotEl} className="alkShot" />
@@ -1113,7 +1060,6 @@ function AlkkagiBoardView({
         {aimId && (
           <div className="alkPower">
             <div ref={powerEl} style={{ width: "0%" }} />
-            <span ref={powerLabelEl} className="alkPowerLabel">놓으면 취소</span>
           </div>
         )}
       </div>
@@ -1145,19 +1091,7 @@ function AlkkagiBoardView({
           <button className="smallButton ghost" disabled={busy} onClick={onCancel}>취소</button>
         )}
       </div>
-      {myTurn && myColor && isLastStand(shown, myColor) && (
-        <small className="alkLastStand">🔥 마지막 알! 세기 50% 증가</small>
-      )}
-      {myTurn && (
-        <small className="muted omokHint">
-          {pickedId
-            ? `선택: ${(() => {
-                const picked = shown.find((piece) => piece.id === pickedId);
-                return picked ? `${LABEL[picked.side][picked.kind]} (${KIND_NAME[picked.kind]})` : "";
-              })()} — 판 아무 곳이나 누른 채 뒤로 당겼다 놓으세요. 처음 자리로 돌아와 놓으면 취소.`
-            : "내 알을 누른 채 뒤로 당겼다 놓으세요. 처음 자리로 돌아와 놓으면 취소. 화면 끝이 가까우면 알을 톡 눌러 고른 뒤 판 아무 곳에서나 당겨도 됩니다."}
-        </small>
-      )}
+      {myTurn && <small className="muted omokHint">새총처럼 내 알을 누른 채 뒤로 당겼다 놓으세요. 당긴 반대쪽으로 날아가고, 많이 당길수록 세게 나갑니다.</small>}
     </div>
   );
 }

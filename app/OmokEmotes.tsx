@@ -167,19 +167,6 @@ export function pickEmoteSpotFromPoints(points: Array<[number, number]>): number
   return best[Math.floor(Math.random() * best.length)];
 }
 
-// 이미 다른 감정표현이 떠 있는 칸이면 비어 있는 다른 칸으로 옮긴다 (앞의 것은 그대로 둔다)
-export function freeEmoteSpot(spot: number, taken: number[]): number {
-  if (!taken.includes(spot)) return spot;
-  const free = EMOTE_SPOTS.map((_, index) => index).filter((index) => !taken.includes(index));
-  if (free.length === 0) return spot;
-  // 원래 칸과 가까운 빈 칸
-  const [col, row] = EMOTE_SPOTS[spot] ?? EMOTE_SPOTS[0];
-  const dist = (index: number) => Math.abs(EMOTE_SPOTS[index][0] - col) + Math.abs(EMOTE_SPOTS[index][1] - row);
-  const best = Math.min(...free.map(dist));
-  const near = free.filter((index) => dist(index) === best);
-  return near[Math.floor(Math.random() * near.length)];
-}
-
 // 판을 180도 돌려 보는 사람에게 맞는 칸
 export function mirrorSpot(spot: number): number {
   const [col, row] = EMOTE_SPOTS[spot] ?? EMOTE_SPOTS[0];
