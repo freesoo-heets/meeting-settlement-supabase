@@ -3364,8 +3364,8 @@ async function setAttendanceMembers(memberIds: string[]) {
             <div className="panel dashboardRankingPanel popularMeetingPanel">
               <div className="panelHead compactHead">
                 <div>
-                  <h2>🔥 벙 참석 TOP 5</h2>
-                  <p>모임별 참석인원 기준 · 게스트 포함</p>
+                  <h2>🔥 인기 모임 TOP 5</h2>
+                  <p>참여 인원이 많았던 모임</p>
                 </div>
                 <span className="dashboardPanelBadge">{popularMeetings.length}건</span>
               </div>
@@ -3409,8 +3409,8 @@ async function setAttendanceMembers(memberIds: string[]) {
             <div className="panel dashboardRankingPanel attendanceTopPanel">
               <div className="panelHead compactHead">
                 <div>
-                  <h2>🏅 이번 달 참석 TOP 5</h2>
-                  <p>회원별 모임 참석 횟수 기준</p>
+                  <h2>🏆 이달의 벙신 TOP 5</h2>
+                  <p>이번 달 모임에 가장 많이 참여한 회원</p>
                 </div>
                 <button
                   className="linkButton"
