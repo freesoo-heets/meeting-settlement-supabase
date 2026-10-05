@@ -1209,11 +1209,11 @@ export default function Home() {
         })
         .sort(
           (a, b) =>
-            b.attendanceRate - a.attendanceRate ||
             b.totalAttendees - a.totalAttendees ||
+            b.memberAttendees - a.memberAttendees ||
             b.meeting.date.localeCompare(a.meeting.date)
         )
-        .slice(0, 3),
+        .slice(0, 5),
     [monthMeetings, activeMembers]
   );
 
@@ -3356,8 +3356,8 @@ async function setAttendanceMembers(memberIds: string[]) {
             <div className="panel dashboardRankingPanel popularMeetingPanel">
               <div className="panelHead compactHead">
                 <div>
-                  <h2>🔥 인기벙 TOP 3</h2>
-                  <p>활동중 회원 대비 참석률 기준 · 게스트는 참석인원에 포함</p>
+                  <h2>🔥 벙 참석 TOP 5</h2>
+                  <p>모임별 참석인원 기준 · 게스트 포함</p>
                 </div>
                 <span className="dashboardPanelBadge">{popularMeetings.length}건</span>
               </div>
