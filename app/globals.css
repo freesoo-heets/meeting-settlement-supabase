@@ -5585,3 +5585,13 @@ button.meetingMetricCard {
     padding: 9px 10px;
   }
 }
+
+
+/* STEP 43: medal badges + shared competition ranks */
+.rank1 .dashboardRankNumber,
+.rank2 .dashboardRankNumber,
+.rank3 .dashboardRankNumber {
+  background: transparent;
+  font-size: 22px;
+  line-height: 1;
+}

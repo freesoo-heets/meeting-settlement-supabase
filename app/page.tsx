@@ -1147,14 +1147,18 @@ export default function Home() {
     return ids.size;
   }, [monthMeetings]);
 
-  const topAttendance = useMemo(
-    () =>
-      [...monthStats]
-        .filter((item) => item.attendanceCount > 0)
-        .sort((a, b) => b.attendanceCount - a.attendanceCount || a.member.name.localeCompare(b.member.name))
-        .slice(0, 5),
-    [monthStats]
-  );
+  const topAttendance = useMemo(() => {
+    const sorted = [...monthStats]
+      .filter((item) => item.attendanceCount > 0)
+      .sort((a, b) => b.attendanceCount - a.attendanceCount || a.member.name.localeCompare(b.member.name))
+      .slice(0, 5);
+
+    return sorted.map((item) => ({
+      ...item,
+      displayRank:
+        sorted.findIndex((candidate) => candidate.attendanceCount === item.attendanceCount) + 1,
+    }));
+  }, [monthStats]);
 
   const costMissingMeetings = useMemo(
     () => monthMeetings.filter((meeting) => meeting.cost == null),
@@ -1189,9 +1193,8 @@ export default function Home() {
     [completedCostMeetings, monthTotalCost]
   );
 
-  const popularMeetings = useMemo(
-    () =>
-      [...monthMeetings]
+  const popularMeetings = useMemo(() => {
+    const sorted = [...monthMeetings]
         .map((meeting) => {
           const memberAttendees = meeting.attendeeIds.length;
           const totalAttendees = memberAttendees + meeting.guests.length;
@@ -1213,9 +1216,14 @@ export default function Home() {
             b.memberAttendees - a.memberAttendees ||
             b.meeting.date.localeCompare(a.meeting.date)
         )
-        .slice(0, 5),
-    [monthMeetings, activeMembers]
-  );
+        .slice(0, 5);
+
+    return sorted.map((item) => ({
+      ...item,
+      displayRank:
+        sorted.findIndex((candidate) => candidate.totalAttendees === item.totalAttendees) + 1,
+    }));
+  }, [monthMeetings, activeMembers]);
 
   const monthBirthdays = useMemo(() => {
     const targetMonth = selectedMonth.slice(5, 7);
@@ -3363,16 +3371,16 @@ async function setAttendanceMembers(memberIds: string[]) {
               </div>
 
               <div className="popularMeetingList">
-                {popularMeetings.map(({ meeting, totalAttendees, attendanceRate }, index) => (
+                {popularMeetings.map(({ meeting, totalAttendees, attendanceRate, displayRank }) => (
                   <button
-                    className={`popularMeetingCard rank${index + 1}`}
+                    className={`popularMeetingCard rank${displayRank}`}
                     key={meeting.id}
                     onClick={() => {
                       setSelectedMeetingId(meeting.id);
                       setMainTab("meetings");
                     }}
                   >
-                    <span className="dashboardRankNumber">{index + 1}</span>
+                    <span className="dashboardRankNumber">{displayRank === 1 ? "🥇" : displayRank === 2 ? "🥈" : displayRank === 3 ? "🥉" : displayRank}</span>
                     <div className="popularMeetingMain">
                       <div className="popularMeetingTitleLine">
                         <strong>{meeting.title}</strong>
@@ -3413,13 +3421,13 @@ async function setAttendanceMembers(memberIds: string[]) {
               </div>
 
               <div className="dashboardAttendanceList">
-                {topAttendance.map((item, index) => (
+                {topAttendance.map((item) => (
                   <button
-                    className={`dashboardAttendanceCard rank${index + 1}`}
+                    className={`dashboardAttendanceCard rank${item.displayRank}`}
                     key={item.member.id}
                     onClick={() => setMemberDetailId(item.member.id)}
                   >
-                    <span className="dashboardRankNumber">{index + 1}</span>
+                    <span className="dashboardRankNumber">{item.displayRank === 1 ? "🥇" : item.displayRank === 2 ? "🥈" : item.displayRank === 3 ? "🥉" : item.displayRank}</span>
                     <div>
                       <strong>{item.member.name}</strong>
                       <small>
@@ -4683,7 +4691,7 @@ async function setAttendanceMembers(memberIds: string[]) {
               </div>
             </div>
             <div className="rankList">
-              {topAttendance.map((item, index) => (
+              {topAttendance.map((item) => (
                 <button
                   key={item.member.id}
                   onClick={() => setMemberDetailId(item.member.id)}
