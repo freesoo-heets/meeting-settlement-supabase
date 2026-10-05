@@ -1,0 +1,21 @@
+STEP 21.1 - 모바일 하단 메뉴 높이 오류 수정
+
+원인
+- 모바일에서 .mainTabs가 position: fixed로 변경됐지만,
+  데스크톱의 top: 8px 값이 그대로 남아 top + bottom이 동시에 적용됨.
+- 그 결과 카카오톡 인앱 브라우저 등에서 하단 메뉴 컨테이너가 화면 대부분 높이로 늘어남.
+
+수정
+- 모바일 .mainTabs에 top: auto 명시
+- safe-area-inset-bottom 대응
+- 메뉴 최대 높이 제한
+- 모바일 본문 하단 여백 보정
+- PWA 캐시 v3로 갱신
+
+추가 SQL 없음
+추가 환경변수 없음
+
+배포
+git add .
+git commit -m "Fix mobile bottom navigation"
+git push

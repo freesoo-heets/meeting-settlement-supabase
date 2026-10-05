@@ -1,0 +1,11 @@
+STEP 34.1 - 브라우저 탭/PWA 이름 변경
+
+브라우저 탭 제목:
+[86~02] 강서구 찐친만들기❤️
+
+PWA manifest name도 동일하게 변경
+short_name: 강서구 찐친
+PWA cache v23
+
+DB/SQL 변경 없음
+환경변수 변경 없음

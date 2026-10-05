@@ -1,0 +1,6 @@
+STEP 34.2.1 - Vercel CSS build 오류 수정
+
+- globals.css Step 34.2 구간에 문자 그대로 삽입된 \n 시퀀스를 실제 줄바꿈으로 복구
+- Step 34.2 회원 상세 UX 기능은 그대로 유지
+- PWA 캐시 v25
+- DB/환경변수 변경 없음

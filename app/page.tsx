@@ -4696,7 +4696,7 @@ async function setAttendanceMembers(memberIds: string[]) {
                   key={item.member.id}
                   onClick={() => setMemberDetailId(item.member.id)}
                 >
-                  <span>{index + 1}</span>
+                  <span>{item.displayRank === 1 ? "🥇" : item.displayRank === 2 ? "🥈" : item.displayRank === 3 ? "🥉" : item.displayRank}</span>
                   <strong>{item.member.name}</strong>
                   <em>{item.attendanceCount}회</em>
                 </button>

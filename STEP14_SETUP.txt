@@ -1,0 +1,43 @@
+STEP 14 적용 순서
+
+1. Supabase SQL Editor에서 실행
+   supabase/step14_auth_roles.sql
+
+2. 프로젝트 .env.local에 아래 2개를 추가
+   SUPABASE_SERVICE_ROLE_KEY=Supabase의 service_role key
+   CREATOR_SETUP_KEY=본인만 아는 긴 임의 문자열
+
+주의:
+- SUPABASE_SERVICE_ROLE_KEY에는 NEXT_PUBLIC_ 접두사를 절대 붙이지 마세요.
+- 이 키는 브라우저에 노출되면 안 됩니다.
+- 기존 NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY는 그대로 유지합니다.
+
+3. 아래 파일/폴더를 프로젝트에 덮어쓰기
+   app/page.tsx
+   app/globals.css
+   app/api/auth/nickname/route.ts
+   app/api/admin/member-account/route.ts
+   app/api/setup/creator/route.ts
+   lib/server-admin.ts
+
+4. 개발 서버 재시작
+   Ctrl + C
+   Remove-Item -Recurse -Force .\.next -ErrorAction SilentlyContinue
+   npm run dev
+
+5. 첫 화면에서 '제작자 최초 설정'
+   - 설정키: .env.local의 CREATOR_SETUP_KEY
+   - 닉네임: 기존 회원 닉네임 또는 새 닉네임
+   - 비밀번호: 6자 이상
+   - 최초 1회만 생성 가능
+
+6. 제작자로 로그인 후
+   - 회원 추가 시 초기 비밀번호를 함께 입력
+   - 기존 회원은 회원 카드의 '계정 설정'
+   - 제작자만 '관리자 지정/해제' 가능
+
+권한
+- owner(제작자): 모든 기능 + 관리자 지정/해제
+- admin(관리자): 회원 추가, 탈퇴/복귀, 입장일 수정, 계정 생성/비밀번호 재설정
+- user(일반회원): 회원 추가/탈퇴/입장일 수정 불가
+- 모임/참석/게스트/비용/특정값/선입금은 로그인 회원 모두 사용 가능

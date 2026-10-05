@@ -1,0 +1,17 @@
+STEP 22.1 - 정산공유 줄바꿈 수정
+
+문제
+- 정산공유 텍스트가 "\\n"을 사용해 카카오톡에서 실제 줄바꿈이 아니라 문자 \n 으로 표시됨.
+
+수정
+- simple / detail / compact 세 가지 공유 템플릿 모두 실제 개행 문자 "\n"을 사용하도록 변경
+- Web Share API 및 클립보드 복사 모두 동일하게 실제 줄바꿈 유지
+- PWA 캐시 v5로 갱신
+
+추가 SQL 없음
+추가 환경변수 없음
+
+배포
+git add .
+git commit -m "Fix settlement share line breaks"
+git push

@@ -1,0 +1,15 @@
+STEP 26.1 - 회원현황 상세 버튼 정리
+
+변경사항
+- 회원현황 카드의 별도 '상세' 버튼 제거
+- 닉네임 클릭 시 기존과 동일하게 회원 상세 팝업 열림
+- 관리자/제작자용 닉네임 수정, 입장일 수정, 삭제, 권한 관련 버튼은 그대로 유지
+
+DB 변경 없음
+환경변수 변경 없음
+PWA 캐시 v11
+
+배포
+git add .
+git commit -m "Step 26.1 remove redundant member detail button"
+git push
