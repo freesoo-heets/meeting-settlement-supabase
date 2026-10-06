@@ -972,10 +972,13 @@ function OmokBoardView({
 
       <div className="omokControls">
         <button className="smallButton ghost" onClick={onBack}>← 대기실</button>
-        {canUndo && (
-          <button className="smallButton ghost" disabled={busy} onClick={onUndoRequest}>
+        {game.status === "playing" && realSide && !game.is_test && (
+          <button className="smallButton ghost" disabled={busy || !canUndo} style={{ visibility: canUndo ? "visible" : "hidden" }} onClick={onUndoRequest}>
             ↩ 무르기{game.is_test ? "" : ` (${MAX_UNDO - undoUsed}회 남음)`}
           </button>
+        )}
+        {game.is_test && canUndo && (
+          <button className="smallButton ghost" disabled={busy} onClick={onUndoRequest}>↩ 무르기</button>
         )}
         {myTurn && pending && (
           <button className="primaryButton" disabled={busy} onClick={() => onMove(pending[0], pending[1])}>
@@ -989,7 +992,8 @@ function OmokBoardView({
           <button className="smallButton ghost" disabled={busy} onClick={onCancel}>취소</button>
         )}
       </div>
-      {myTurn && <small className="muted omokHint">칸을 누르면 미리보기, 한 번 더 누르면 착수됩니다.{iAmBlack ? " × 는 흑 금수 자리입니다." : ""}</small>}
+      {/* 차례가 바뀔 때 높이가 달라져 판이 흔들리지 않도록 항상 자리를 차지한다 */}
+      {game.status === "playing" && mySide && <small className="muted omokHint" style={{ visibility: myTurn ? "visible" : "hidden" }}>칸을 누르면 미리보기, 한 번 더 누르면 착수됩니다.{iAmBlack ? " × 는 흑 금수 자리입니다." : ""}</small>}
     </div>
   );
 }
