@@ -5688,3 +5688,8 @@ button.meetingMetricCard {
 .chatLogRow p { margin: 2px 0 0; font-size: 14px; white-space: pre-wrap; word-break: break-word; }
 .chatLogEmpty { text-align: center; padding: 20px 0; }
 .chatLogNote { font-size: 11px; margin-top: 6px; }
+
+/* 마지막 채팅 3일 이상: 주황 (5일 이상은 기존 빨강 warning) */
+.memberCard.chatIdle { border-color: #fdba74; background: #fffaf5; }
+.chatIdleText { color: #ea580c; font-size: 11px; font-weight: 800; }
+.memberActivityLine .warningText, .memberActivityLine .chatIdleText { margin-top: 0; }

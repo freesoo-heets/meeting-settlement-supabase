@@ -75,7 +75,7 @@ type Meeting = MeetingRow & {
 
 type MainTab = "dashboard" | "meetings" | "members" | "monthly" | "history" | "help";
 type MemberFilter = "all" | "active" | "warning" | "withdrawn";
-type MemberSort = "nickname_asc" | "nickname_desc" | "join_desc" | "join_asc" | "last_desc" | "last_asc" | "points_desc";
+type MemberSort = "nickname_asc" | "nickname_desc" | "join_desc" | "join_asc" | "last_desc" | "last_asc" | "points_desc" | "chat_desc" | "chat_asc";
 type MonthlySortKey = "member" | "status" | "join" | "attendance" | "last" | "burden" | "warning";
 type SortDirection = "asc" | "desc";
 type AttendeeSort = "selected_first" | "nickname_asc" | "nickname_desc" | "join_desc" | "join_asc" | "last_desc" | "last_asc" | "count_desc";
@@ -799,6 +799,13 @@ export default function Home() {
       if (memberSort === "join_asc") {
         return a.join_date.localeCompare(b.join_date) || a.name.localeCompare(b.name, "ko");
       }
+      if (memberSort === "chat_desc" || memberSort === "chat_asc") {
+        // 채팅 기록이 없는 회원은 항상 뒤로
+        const aChat = lastChats[a.name] ?? "";
+        const bChat = lastChats[b.name] ?? "";
+        if (!aChat || !bChat) return (aChat ? -1 : bChat ? 1 : 0) || a.name.localeCompare(b.name, "ko");
+        return (memberSort === "chat_desc" ? bChat.localeCompare(aChat) : aChat.localeCompare(bChat)) || a.name.localeCompare(b.name, "ko");
+      }
       if (memberSort === "points_desc") {
         const aExp = pointsByMember[a.id]?.exp ?? -1;
         const bExp = pointsByMember[b.id]?.exp ?? -1;
@@ -826,6 +833,7 @@ export default function Home() {
     warningByMember,
     lastAttendanceByMember,
     pointsByMember,
+    lastChats,
   ]);
 
   const adjustmentByKey = useMemo(() => {
@@ -4429,6 +4437,8 @@ async function setAttendanceMembers(memberIds: string[]) {
                   <option value="last_desc">최근 참석일 최신순</option>
                   <option value="last_asc">최근 참석일 오래된순</option>
                   <option value="points_desc">카톡 점수 높은순</option>
+                  <option value="chat_desc">최근 채팅 최신순</option>
+                  <option value="chat_asc">최근 채팅 오래된순</option>
                 </select>
               </label>
             </div>
@@ -4485,11 +4495,17 @@ async function setAttendanceMembers(memberIds: string[]) {
               const last = lastAttendanceByMember[member.id];
               const profile = profiles.find((item) => item.member_id === member.id);
               const point = pointsByMember[member.id];
+              // 마지막 채팅: 3일 이상 주황, 5일 이상 빨강 (기록이 아예 없으면 표시하지 않음)
+              const chatAt = lastChats[member.name];
+              const chatDays = chatAt ? Math.floor((Date.now() - new Date(chatAt).getTime()) / 86400000) : -1;
+              const chatLevel = chatDays >= 5 ? "red" : chatDays >= 3 ? "orange" : "";
+              const red = Boolean(warning?.warning) || chatLevel === "red";
+              const orange = !red && chatLevel === "orange";
 
               return (
                 <article
                   className={`memberCard ${
-                    !member.active ? "withdrawn" : warning?.warning ? "warning" : ""
+                    !member.active ? "withdrawn" : red ? "warning" : orange ? "chatIdle" : ""
                   }`}
                   key={member.id}
                 >
@@ -4515,7 +4531,7 @@ async function setAttendanceMembers(memberIds: string[]) {
                         <span className={`statusBadge ${member.active ? "active" : "withdrawn"}`}>
                           {member.active ? "활동중" : "탈퇴"}
                         </span>
-                        {member.active && warning?.warning && (
+                        {member.active && red && (
                           <span className="warningBadge">⚠ 확인 필요</span>
                         )}
                       </div>
@@ -4528,10 +4544,13 @@ async function setAttendanceMembers(memberIds: string[]) {
                         )}
                       </div>
                       {member.active && (
-                        <div className={`memberActivityLine ${warning?.warning ? "warningText" : "muted"}`}>
+                        <div className={`memberActivityLine ${red ? "warningText" : orange ? "chatIdleText" : "muted"}`}>
                           <span>
-                            {warning?.text}
-                            {" · "}마지막 채팅 {chatAgo(lastChats[member.name])}
+                            <span className={warning?.warning ? "warningText" : ""}>{warning?.text}</span>
+                            {" · "}
+                            <span className={chatLevel === "red" ? "warningText" : chatLevel === "orange" ? "chatIdleText" : ""}>
+                              마지막 채팅 {chatAgo(chatAt)}
+                            </span>
                           </span>
                           {(isAdmin || currentMember?.id === member.id) && (
                             <button
