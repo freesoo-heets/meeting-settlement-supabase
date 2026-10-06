@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { matchesHangul } from "../lib/hangulSearch";
 import GameHub, { type GameKind } from "./GameHub";
+import { ChatLogModal, chatAgo, useLastChats } from "./ChatLog";
 
 type Member = {
   id: string;
@@ -242,6 +243,7 @@ export default function Home() {
   const [editingMeetingTitle, setEditingMeetingTitle] = useState("");
   const [editingMeetingDate, setEditingMeetingDate] = useState("");
   const [memberDetailId, setMemberDetailId] = useState("");
+  const [chatLogName, setChatLogName] = useState(""); // 📜 채팅 내역 창
   const [showMyActivity, setShowMyActivity] = useState(false);
   const [showAccountPanel, setShowAccountPanel] = useState(false);
 
@@ -532,6 +534,7 @@ export default function Home() {
   }, [applySignedInUser, loadAll]);
 
   const isAdmin = currentRole === "owner" || currentRole === "admin";
+  const lastChats = useLastChats(Boolean(currentRole)); // 이름 → 마지막 채팅 시각 (카톡 봇)
   const isOwner = currentRole === "owner";
 
   const monthMeetings = useMemo(
@@ -4525,8 +4528,22 @@ async function setAttendanceMembers(memberIds: string[]) {
                         )}
                       </div>
                       {member.active && (
-                        <div className={warning?.warning ? "warningText" : "muted"}>
-                          {warning?.text}
+                        <div className={`memberActivityLine ${warning?.warning ? "warningText" : "muted"}`}>
+                          <span>
+                            {warning?.text}
+                            {" · "}마지막 채팅 {chatAgo(lastChats[member.name])}
+                          </span>
+                          {(isAdmin || currentMember?.id === member.id) && (
+                            <button
+                              type="button"
+                              className="chatLogButton"
+                              title="채팅 내역 보기"
+                              aria-label={`${member.name} 채팅 내역`}
+                              onClick={() => setChatLogName(member.name)}
+                            >
+                              📜
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
@@ -4727,6 +4744,8 @@ async function setAttendanceMembers(memberIds: string[]) {
               );
             })}
           </section>
+
+          {chatLogName && <ChatLogModal name={chatLogName} onClose={() => setChatLogName("")} />}
 
           {guestMembers.length > 0 && (
             <section className="panel standalonePanel guestPanel">
