@@ -638,7 +638,12 @@ export default function Home() {
   const filteredAttendanceMembers = useMemo(() => {
     // 초성 검색 가능: 'ㅍ' → 푸들·퐁당, 'ㅍㄷ' → 푸들
     const query = attendeeSearch.trim();
-    const rows = activeMembers.filter((member) => !query || matchesHangul(member.name, query));
+    // 게스트로 가입한 사람은 빼고 회원만 (이미 체크된 사람은 해제할 수 있게 남긴다)
+    const rows = activeMembers.filter(
+      (member) =>
+        (!member.is_guest || selectedMeeting?.attendeeIds.includes(member.id)) &&
+        (!query || matchesHangul(member.name, query)),
+    );
 
     return [...rows].sort((a, b) => {
       if (attendeeSort === "count_desc") {
