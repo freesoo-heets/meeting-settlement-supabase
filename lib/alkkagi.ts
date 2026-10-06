@@ -32,14 +32,20 @@ export type Shot = { id: string; vx: number; vy: number };
 
 // 알마다 낼 수 있는 최고 세기 (작은 사·졸은 약하게)
 export const POWER: Record<Kind, number> = {
-  gung: 1,
-  cha: 1,
-  po: 1,
-  ma: 1,
-  sang: 1,
+  gung: 0.66, // 무거워서 세면 첫 수에 상대 궁이 나간다 → 0.67 까지는 어떤 각도로도 안 나가는 것을 확인
+  cha: 0.9,
+  po: 0.9,
+  ma: 0.9,
+  sang: 0.9,
   sa: 0.65,
-  jol: 0.65,
+  jol: 0.75,
 };
+
+// 마지막 1알만 남으면 세기 50% 증가 (불타는 마지막 알)
+export const LAST_STAND_BOOST = 1.5;
+export function isLastStand(pieces: Piece[], side: Side) {
+  return pieces.filter((piece) => piece.side === side && !piece.out).length === 1;
+}
 
 export const RADIUS: Record<Kind, number> = {
   gung: 21,
@@ -106,8 +112,9 @@ export function simulate(pieces: Piece[], shot: Shot, onStep?: (state: Piece[]) 
   const cap = VMAX * POWER[shooter.kind];
   const speed = Math.hypot(vx, vy);
   const scale = speed > cap ? cap / speed : 1;
-  shooter.vx = vx * scale;
-  shooter.vy = vy * scale;
+  const boost = isLastStand(pieces, shooter.side) ? LAST_STAND_BOOST : 1;
+  shooter.vx = vx * scale * boost;
+  shooter.vy = vy * scale * boost;
 
   for (let step = 0; step < MAX_STEPS; step += 1) {
     let moving = false;
