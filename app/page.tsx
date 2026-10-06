@@ -1248,6 +1248,7 @@ export default function Home() {
       .filter(
         (member) =>
           member.active &&
+          !member.is_guest &&
           member.birthday &&
           member.birthday.slice(5, 7) === targetMonth
       )
