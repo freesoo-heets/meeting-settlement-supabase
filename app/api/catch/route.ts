@@ -257,9 +257,13 @@ export async function POST(request: Request) {
     if ("error" in member) return fail(member.error, member.status);
     const existing = await inOtherRoom(admin, memberId);
     if (existing && existing !== room.id) return fail("이미 다른 캐치마인드 방에 들어가 있습니다.");
-    const ok = await updateIfUnchanged(admin, TABLE, room, {
-      players: [...room.players, { id: member.id, name: member.name }],
-    });
+    // 게임 중에 들어오면 문제 수를 한 사람 몫(ROUNDS)만큼 늘려 새로 온 사람도 출제할 수 있게 한다
+    const joinFields: Record<string, unknown> = { players: [...room.players, { id: member.id, name: member.name }] };
+    if (room.status === "playing") {
+      joinFields.turn_total = room.turn_total + ROUNDS;
+      joinFields.scores = { ...room.scores, [member.id]: room.scores?.[member.id] ?? 0 };
+    }
+    const ok = await updateIfUnchanged(admin, TABLE, room, joinFields);
     if (!ok) return fail("잠시 후 다시 시도해 주세요.", 409);
     return NextResponse.json({ ok: true });
   }
