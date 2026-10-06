@@ -5669,3 +5669,7 @@ button.meetingMetricCard {
 .hostPanelItem.host .hostPick { font-weight: 800; background: #fef3c7; }
 .hostOnline { border: 0; border-left: 1px solid #e2e8f0; background: transparent; padding: 5px 8px; cursor: pointer; opacity: .35; }
 .hostOnline.on { opacity: 1; background: #dbeafe; }
+
+/* 재경기 예약 */
+.rematchReserve { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 4px 0; font-size: 12px; color: #7c3aed; }
+.rematchReserve .smallButton.on { background: #7c3aed; color: #fff; border-color: #7c3aed; }

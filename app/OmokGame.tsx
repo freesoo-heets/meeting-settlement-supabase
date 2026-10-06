@@ -316,11 +316,40 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
       void channelRef.current?.send({
         type: "broadcast",
         event: "rematch",
-        payload: { id, from: myName, to: opponent, stake: game.stake, friendly: !!game.is_friendly },
+        payload: { id, prev: game.id, from: myName, to: opponent, stake: game.stake, friendly: !!game.is_friendly },
       });
       setViewId(id);
     });
   }
+  // ── 재경기 예약: 대국 중에 눌러 두면 끝나자마자 재경기 신청 · 상대도 예약했으면 자동 수락 ──
+  const [reserved, setReserved] = useState<Record<string, boolean>>({});
+  const [oppReserved, setOppReserved] = useState<Record<string, boolean>>({});
+  const reservedRef = useRef(reserved);
+  reservedRef.current = reserved;
+  function toggleReserve(game: OmokRow) {
+    const on = !reserved[game.id];
+    setReserved((current) => ({ ...current, [game.id]: on }));
+    void channelRef.current?.send({ type: "broadcast", event: "reserve", payload: { gameId: game.id, from: currentMemberId, on } });
+  }
+  // 상대가 새로고침해도 알 수 있게 예약 중엔 5초마다 다시 알린다
+  useEffect(() => {
+    if (!viewId || !reserved[viewId]) return;
+    const timer = window.setInterval(() => {
+      void channelRef.current?.send({ type: "broadcast", event: "reserve", payload: { gameId: viewId, from: currentMemberId, on: true } });
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [viewId, reserved, currentMemberId]);
+  const autoRematched = useRef<Record<string, boolean>>({});
+  useEffect(() => {
+    if (!viewing || viewing.status !== "finished" || !reserved[viewing.id]) return;
+    const seat = seatOf(viewing);
+    if (!seat || autoRematched.current[viewing.id]) return;
+    // 둘 다 예약했으면 방장만 신청하고, 손님은 신청을 받아 자동 수락한다 (중복 신청 방지)
+    if (oppReserved[viewing.id] && seat === "guest") return;
+    autoRematched.current[viewing.id] = true;
+    void requestRematch(viewing);
+  }, [viewing?.id, viewing?.status, reserved, oppReserved]);
+
   const live = viewing && (viewing.status === "playing" || viewing.status === "escrow");
 
   useEffect(() => {
@@ -351,9 +380,21 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
     if (!viewId) return;
     const channel = supabase
       .channel(`omok-${viewId}`, { config: { broadcast: { self: false } } })
+      .on("broadcast", { event: "reserve" }, ({ payload }) => {
+        const data = payload as { gameId?: string; from?: string; on?: boolean };
+        if (!data.gameId || !data.from || data.from === currentMemberId) return;
+        setOppReserved((current) => ({ ...current, [String(data.gameId)]: data.on === true }));
+      })
       .on("broadcast", { event: "rematch" }, ({ payload }) => {
         const data = payload as { id?: string; from?: string; to?: string; stake?: number; friendly?: boolean };
         if (!data.id || data.to !== currentMemberId) return;
+        const prevId = String((payload as { prev?: string }).prev ?? "");
+        if (prevId && reservedRef.current[prevId]) {
+          // 나도 재경기를 예약해 뒀으면 묻지 않고 바로 수락
+          setResultFor(null);
+          void run({ action: "join", gameId: data.id }, () => setViewId(String(data.id)));
+          return;
+        }
         setRematchOffer({ id: data.id, from: String(data.from ?? "").slice(0, 10), stake: Number(data.stake) || 0, friendly: !!data.friendly });
       })
       .on("broadcast", { event: "emote" }, ({ payload }) => {
@@ -515,6 +556,20 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
             )}
           </div>
         ) : viewing ? (
+          <>
+          {viewing.status === "playing" && seatOf(viewing) && !viewing.is_test && (
+            <div className="rematchReserve">
+              <button
+                type="button"
+                className={`smallButton ${reserved[viewing.id] ? "on" : "ghost"}`}
+                aria-pressed={!!reserved[viewing.id]}
+                onClick={() => toggleReserve(viewing)}
+              >
+                🔁 {reserved[viewing.id] ? "재경기 예약됨" : "재경기 예약"}
+              </button>
+              <span style={{ visibility: oppReserved[viewing.id] ? "visible" : "hidden" }}>상대도 재경기를 예약했어요 ✋</span>
+            </div>
+          )}
           <OmokBoardView
             game={viewing}
             me={currentMemberId}
@@ -539,6 +594,7 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
             emoteReadyIn={Math.max(0, emoteCooldownUntil - now)}
             onEmote={sendEmote}
           />
+          </>
         ) : (
           <div className="omokLobby">
             <div className="omokMine">
