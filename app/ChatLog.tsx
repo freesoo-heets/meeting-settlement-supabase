@@ -43,7 +43,7 @@ export function chatAgo(iso: string | undefined, now = Date.now()) {
   return `${Math.floor(hours / 24)}일 전`;
 }
 
-const PAGE_SIZE = 500;
+const PAGE_SIZE = 300;
 
 // '26/10/07' → '2026.10.07 (수)'
 function dayLabel(day: string) {
@@ -79,7 +79,8 @@ export function ChatLogModal({ name, onClose }: { name: string; onClose: () => v
   const pages = Math.max(1, Math.ceil(all.length / PAGE_SIZE));
   const current = Math.min(page, pages - 1);
   const end = all.length - current * PAGE_SIZE;
-  const rows = all.slice(Math.max(0, end - PAGE_SIZE), end);
+  // 최근 채팅이 위로
+  const rows = all.slice(Math.max(0, end - PAGE_SIZE), end).reverse();
 
   // 같은 날짜끼리 묶기 ('26/10/07 14:03:11' → 날짜 '26/10/07', 시각 '14:03')
   const groups: Array<{ day: string; items: Array<{ time: string; m: string }> }> = [];
@@ -91,9 +92,9 @@ export function ChatLogModal({ name, onClose }: { name: string; onClose: () => v
     else groups.push({ day, items: [item] });
   }
 
-  // 열 때 · 페이지 · 검색이 바뀔 때 최신 메시지(아래)로
+  // 열 때 · 페이지 · 검색이 바뀔 때 맨 위(최신)로
   useEffect(() => {
-    if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
+    if (logRef.current) logRef.current.scrollTop = 0;
   }, [chat, current, query]);
 
   return (
@@ -144,12 +145,12 @@ export function ChatLogModal({ name, onClose }: { name: string; onClose: () => v
         )}
         {chat && pages > 1 && (
           <div className="chatLogPager">
-            <button type="button" className="smallButton ghost" disabled={current >= pages - 1} onClick={() => setPage(current + 1)}>
-              ← 이전 {PAGE_SIZE}개
-            </button>
-            <span>{pages - current} / {pages}</span>
             <button type="button" className="smallButton ghost" disabled={current === 0} onClick={() => setPage(current - 1)}>
-              최근 →
+              ← 최근
+            </button>
+            <span>{current + 1} / {pages} 페이지</span>
+            <button type="button" className="smallButton ghost" disabled={current >= pages - 1} onClick={() => setPage(current + 1)}>
+              이전 {PAGE_SIZE}개 →
             </button>
           </div>
         )}
