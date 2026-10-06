@@ -39,7 +39,7 @@ export function useRatingChange(kind: Kind, gameId: string | null, enabled: bool
   return change;
 }
 
-const KIND_LABEL: Record<Kind, string> = { omok: "⚫ 오목", alkkagi: "🥏 알까기" };
+const KIND_LABEL: Record<Kind, string> = { omok: "🏁 오목", alkkagi: "🥏 알까기" };
 
 export default function RatingBoard({ onClose }: { onClose: () => void }) {
   const [kind, setKind] = useState<Kind>("omok");

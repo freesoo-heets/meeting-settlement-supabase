@@ -48,7 +48,7 @@ type Props = {
 const STAKE_COLUMNS = "id,status,stake,host_member,host_name,guest_member,guest_name,target_member,is_test,is_friendly";
 
 const GAMES: Array<{ kind: GameKind; icon: string; name: string; desc: string }> = [
-  { kind: "omok", icon: "⚫", name: "오목", desc: "렌주룰 · 점수 내기 · 1:1" },
+  { kind: "omok", icon: "🏁", name: "오목", desc: "렌주룰 · 점수 내기 · 1:1" },
   { kind: "alkkagi", icon: "🥏", name: "알까기", desc: "장기알 · 점수 내기 · 1:1" },
   { kind: "catch", icon: "🎨", name: "캐치마인드", desc: "그림 맞히기 · 최대 6명 · 점수 없음" },
 ];

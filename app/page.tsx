@@ -2984,7 +2984,7 @@ async function setAttendanceMembers(memberIds: string[]) {
                   ? "🎨 캐치마인드 초대가 도착했어요!"
                   : gameInvite.kind === "alkkagi"
                     ? "🥏 알까기 대국신청이 도착했어요!"
-                    : "⚫ 오목 대국신청이 도착했어요!"}
+                    : "🏁 오목 대국신청이 도착했어요!"}
               </strong>
               <span>로그인하면 바로 대국 화면으로 이동합니다.</span>
               <span>
