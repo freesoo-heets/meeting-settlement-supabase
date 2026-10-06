@@ -17,6 +17,7 @@ import {
   spotStyle,
   type EmoteKind,
 } from "./OmokEmotes";
+import { copyInviteLink } from "./copyInvite";
 import { GameResultPopup, RematchOfferPopup } from "./GameResult";
 
 type OmokRow = {
@@ -38,7 +39,7 @@ type OmokRow = {
   settle_state: string;
   is_test?: boolean;
   is_friendly?: boolean;
-  undo?: { pending?: { by: "host" | "guest"; n: number } | null; used?: Partial<Record<"host" | "guest", number>> } | null;
+  undo?: { pending?: { by: "host" | "guest"; n: number; k?: number } | null; used?: Partial<Record<"host" | "guest", number>> } | null;
   created_at: string;
   finished_at: string | null;
   started_at?: string | null;
@@ -481,7 +482,10 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
                 <div className="omokControls">
                   <button className="smallButton ghost" onClick={() => setViewId("")}>← 대기실</button>
                   <button className="smallButton inviteButton" disabled={busy} onClick={() => sendInvite(viewing.id)}>
-                    📣 카톡방에 초대하기
+                    📣 카톡방에 초대
+                  </button>
+                  <button className="smallButton ghost" onClick={() => void copyInviteLink("omok", viewing.id).then(setInfo)}>
+                    🔗 링크 복사
                   </button>
                   <button className="smallButton ghost" disabled={busy} onClick={() => run({ action: "cancel", gameId: viewing.id }, () => setViewId(""))}>
                     취소
@@ -561,9 +565,14 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
                     <button className="smallButton" onClick={() => setViewId(myActive.id)}>판 보기</button>
                   )}
                   {(myActive.status === "open" || myActive.status === "challenge") && !myActive.is_test && (
+                    <>
                     <button className="smallButton inviteButton" disabled={busy} onClick={() => sendInvite(myActive.id)}>
-                      📣 초대
+                      📣 카톡방
                     </button>
+                    <button className="smallButton ghost" onClick={() => void copyInviteLink("omok", myActive.id).then(setInfo)}>
+                      🔗 링크
+                    </button>
+                    </>
                   )}
                   {(myActive.status === "open" || myActive.status === "challenge") && (
                     <button className="smallButton ghost" disabled={busy} onClick={() => run({ action: "cancel", gameId: myActive.id })}>
@@ -808,7 +817,7 @@ function OmokBoardView({
     realSide !== null &&
     game.moves.length >= 2 &&
     !undoPending &&
-    (game.is_test ? true : lastBy === realSide && undoUsed < MAX_UNDO);
+    (game.is_test ? true : (lastBy === realSide || game.moves.length >= 3) && undoUsed < MAX_UNDO);
   const undoIncoming = game.status === "playing" && !!undoPending && realSide !== null && undoPending.by !== realSide;
   const undoWaiting = game.status === "playing" && !!undoPending && undoPending.by === realSide;
 
@@ -952,7 +961,7 @@ function OmokBoardView({
 
       {undoIncoming && (
         <div className="omokUndoAsk" role="alert">
-          <span>↩ <b>{nameOf(game, undoPending!.by)}</b>님이 방금 둔 수를 무르고 싶어 해요.</span>
+          <span>↩ <b>{nameOf(game, undoPending!.by)}</b>님이 {(undoPending!.k ?? 1) === 2 ? "내 수와 자기 수(2수)를" : "방금 둔 수를"} 무르고 싶어 해요.</span>
           <div>
             <button className="primaryButton" disabled={busy} onClick={() => onUndoAnswer(true)}>수락</button>
             <button className="smallButton ghost" disabled={busy} onClick={() => onUndoAnswer(false)}>거절</button>

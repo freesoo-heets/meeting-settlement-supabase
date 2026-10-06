@@ -1,5 +1,6 @@
 "use client";
 
+import { copyInviteLink } from "./copyInvite";
 import { useGameViewport } from "./useGameViewport";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
@@ -186,6 +187,7 @@ export default function CatchMindGame({ onClose, onBack, initialRoomId, currentM
               if (first.ok) await load();
               else await run({ action: "join", roomId: room.id });
             }}
+            onCopyLink={() => void copyInviteLink("catch", room.id).then(setInfo)}
             onRecruit={() => {
               if (!window.confirm("카톡방에 참가자 모집 알림을 보낼까요?")) return;
               void run({ action: "recruit", roomId: room.id }, () =>
@@ -250,6 +252,7 @@ function CatchRoomView({
   onLeave,
   onStart,
   onRecruit,
+  onCopyLink,
   onRestart,
 }: {
   room: Room;
@@ -262,6 +265,7 @@ function CatchRoomView({
   onLeave: () => void;
   onStart: () => void;
   onRecruit: () => void;
+  onCopyLink: () => void;
   onRestart: () => void;
 }) {
   const joined = room.players.some((player) => player.id === me);
@@ -889,7 +893,12 @@ function CatchRoomView({
           )}
           {canRecruit && (
             <button className="smallButton cmRecruit" disabled={busy} onClick={onRecruit}>
-              📣 모집하기
+              📣 카톡방에 모집
+            </button>
+          )}
+          {room.status === "waiting" && (
+            <button className="smallButton ghost" onClick={onCopyLink}>
+              🔗 링크 복사
             </button>
           )}
           {joined && isHost && room.status === "waiting" && (

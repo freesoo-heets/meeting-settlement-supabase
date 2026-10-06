@@ -34,6 +34,7 @@ import {
   spotStyle,
   type EmoteKind,
 } from "./OmokEmotes";
+import { copyInviteLink } from "./copyInvite";
 import { GameResultPopup, RematchOfferPopup } from "./GameResult";
 
 type Seat = "host" | "guest";
@@ -378,7 +379,10 @@ export default function AlkkagiGame({
               <div className="omokControls">
                 <button className="smallButton ghost" onClick={() => setViewId("")}>← 대기실</button>
                 <button className="smallButton inviteButton" disabled={busy} onClick={() => sendInvite(viewing.id)}>
-                  📣 카톡방에 초대하기
+                  📣 카톡방에 초대
+                </button>
+                <button className="smallButton ghost" onClick={() => void copyInviteLink("alkkagi", viewing.id).then(setInfo)}>
+                  🔗 링크 복사
                 </button>
                 <button className="smallButton ghost" disabled={busy} onClick={() => run({ action: "cancel", gameId: viewing.id }, () => setViewId(""))}>
                   취소
@@ -453,9 +457,14 @@ export default function AlkkagiGame({
                     <button className="smallButton" onClick={() => setViewId(myActive.id)}>판 보기</button>
                   )}
                   {(myActive.status === "open" || myActive.status === "challenge") && !myActive.is_test && (
+                    <>
                     <button className="smallButton inviteButton" disabled={busy} onClick={() => sendInvite(myActive.id)}>
-                      📣 초대
+                      📣 카톡방
                     </button>
+                    <button className="smallButton ghost" onClick={() => void copyInviteLink("alkkagi", myActive.id).then(setInfo)}>
+                      🔗 링크
+                    </button>
+                    </>
                   )}
                   {(myActive.status === "open" || myActive.status === "challenge") && (
                     <button className="smallButton ghost" disabled={busy} onClick={() => run({ action: "cancel", gameId: myActive.id })}>

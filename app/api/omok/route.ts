@@ -36,7 +36,7 @@ type Game = {
   escrow_state: string;
   is_test?: boolean;
   is_friendly?: boolean;
-  undo?: { pending?: { by: "host" | "guest"; n: number } | null; used?: Partial<Record<"host" | "guest", number>> } | null;
+  undo?: { pending?: { by: "host" | "guest"; n: number; k?: number } | null; used?: Partial<Record<"host" | "guest", number>> } | null;
   updated_at: string;
 };
 
@@ -350,7 +350,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  // ── 무르기 요청: 방금 내가 둔 수를, 상대가 두기 전에 ──
+  // ── 무르기 요청: 내 마지막 수를 무른다. 상대가 이미 뒀으면 상대 수까지 2수를 되돌린다 ──
   if (action === "undo_request") {
     if (game.status !== "playing") return fail("진행 중인 대국이 아닙니다.");
     if (game.moves.length < 2) return fail("무를 수가 없습니다.");
@@ -367,11 +367,13 @@ export async function POST(request: Request) {
       return ok ? NextResponse.json({ ok: true, undone: true }) : fail("판이 바뀌었습니다.", 409);
     }
 
-    if (lastBy !== side) return fail("방금 내가 둔 수만 무를 수 있습니다. (상대가 두기 전에)");
+    // 상대가 아직 안 뒀으면 1수, 이미 뒀으면 상대 수 + 내 수 2수
+    const k = lastBy === side ? 1 : 2;
+    if (k === 2 && game.moves.length < 3) return fail("무를 수가 없습니다.");
     if (game.undo?.pending) return fail("이미 무르기를 요청했습니다.");
     if ((used[side] ?? 0) >= MAX_UNDO) return fail(`무르기는 한 판에 ${MAX_UNDO}번까지입니다.`);
     const ok = await updateGame(admin, game, {
-      undo: { ...(game.undo ?? {}), used, pending: { by: side, n: game.moves.length } },
+      undo: { ...(game.undo ?? {}), used, pending: { by: side, n: game.moves.length, k } },
     });
     if (!ok) return fail("판이 바뀌었습니다. 다시 시도해 주세요.", 409);
     return NextResponse.json({ ok: true });
@@ -389,7 +391,7 @@ export async function POST(request: Request) {
     }
     used[pending.by] = (used[pending.by] ?? 0) + 1;
     const ok = await updateGame(admin, game, {
-      moves: game.moves.slice(0, -1),
+      moves: game.moves.slice(0, -(pending.k ?? 1)),
       turn_deadline: deadlineFromNow(), // 다시 요청한 사람 차례, 시간 새로
       undo: { used, pending: null },
     });
