@@ -1,7 +1,7 @@
 // 게임 초대 링크 복사 (개인톡 등으로 보낼 수 있게)
 export async function copyInviteLink(kind: "omok" | "alkkagi" | "catch", id: string): Promise<string> {
   const label = kind === "omok" ? "🏁 오목" : kind === "alkkagi" ? "🥏 알까기" : "🎨 캐치마인드";
-  const link = `${window.location.origin}/?${kind}=${id}`;
+  const link = `${window.location.origin}/game?${kind}=${id}`; // /game: 카톡 미리보기에 게임 제목
   const text = `${label} 같이 해요!\n👉 ${link}`;
   try {
     await navigator.clipboard.writeText(text);
