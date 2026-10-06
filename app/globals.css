@@ -5657,3 +5657,15 @@ button.meetingMetricCard {
 .alkPiece.fire .alkPieceBody { stroke: #dc2626; stroke-width: 3; }
 .alkLastStand { display: block; text-align: center; font-weight: 800; color: #ea580c; margin-top: 4px; }
 @media (prefers-reduced-motion: reduce) { .alkFireOuter, .alkFireInner { animation: none; } }
+
+/* 👑 벙주 · 💻 온라인 (벙포) */
+.hostPanel { border: 1px solid #e2e8f0; border-radius: 12px; padding: 10px; margin: 8px 0; background: #fffbeb; }
+.hostPanelHead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-bottom: 8px; }
+.hostPanelHead small { color: #64748b; font-size: 12px; }
+.hostPanelList { display: flex; flex-wrap: wrap; gap: 6px; }
+.hostPanelItem { display: inline-flex; border: 1px solid #e2e8f0; border-radius: 999px; overflow: hidden; background: #fff; }
+.hostPanelItem.host { border-color: #f59e0b; box-shadow: 0 0 0 1px #f59e0b; }
+.hostPick { border: 0; background: transparent; padding: 5px 10px; font-size: 13px; cursor: pointer; color: #0f172a; }
+.hostPanelItem.host .hostPick { font-weight: 800; background: #fef3c7; }
+.hostOnline { border: 0; border-left: 1px solid #e2e8f0; background: transparent; padding: 5px 8px; cursor: pointer; opacity: .35; }
+.hostOnline.on { opacity: 1; background: #dbeafe; }

@@ -35,11 +35,13 @@ type MeetingRow = {
   title: string;
   cost: number | string | null;
   created_at: string;
+  host_member?: string | null; // 벙주 (벙포 지급 대상)
 };
 
 type AttendanceRow = {
   meeting_id: string;
   member_id: string;
+  online?: boolean; // 온라인 참석 (벙포 50%)
 };
 
 type SettlementAdjustment = {
@@ -66,6 +68,7 @@ type MeetingPrepayment = {
 
 type Meeting = MeetingRow & {
   attendeeIds: string[];
+  onlineIds: string[];
   guests: MeetingGuest[];
 };
 
@@ -314,11 +317,18 @@ export default function Home() {
           ? await query("id,name,active,join_date,birthday,withdrawn_at,created_at")
           : withGuest;
       })(),
-      supabase
-        .from("meetings")
-        .select("id,date,title,cost,created_at")
-        .order("date", { ascending: false }),
-      supabase.from("attendance").select("meeting_id,member_id"),
+      (async () => {
+        // 벙주 칸(host_member)이 DB 에 아직 없으면 빼고 다시 불러온다
+        const query = (columns: string) => supabase.from("meetings").select(columns).order("date", { ascending: false });
+        const withHost = await query("id,date,title,cost,created_at,host_member");
+        return withHost.error?.code === "42703" ? await query("id,date,title,cost,created_at") : withHost;
+      })(),
+      (async () => {
+        const withOnline = await supabase.from("attendance").select("meeting_id,member_id,online");
+        return withOnline.error?.code === "42703"
+          ? await supabase.from("attendance").select("meeting_id,member_id")
+          : withOnline;
+      })(),
       supabase
         .from("settlement_adjustments")
         .select("id,meeting_id,member_id,amount"),
@@ -356,8 +366,13 @@ export default function Home() {
     }
 
     const memberRows = (memberResult.data ?? []) as unknown as Member[];
-    const meetingRows = (meetingResult.data ?? []) as MeetingRow[];
-    const attendanceRows = (attendanceResult.data ?? []) as AttendanceRow[];
+    const meetingRows = (meetingResult.data ?? []) as unknown as MeetingRow[];
+    const attendanceRows = (attendanceResult.data ?? []) as unknown as AttendanceRow[];
+    const onlineByMeeting = new Map<string, string[]>();
+    for (const row of attendanceRows) {
+      if (!row.online) continue;
+      onlineByMeeting.set(row.meeting_id, [...(onlineByMeeting.get(row.meeting_id) ?? []), row.member_id]);
+    }
     const guestRows = (guestResult.data ?? []) as MeetingGuest[];
 
     const attendanceByMeeting = new Map<string, string[]>();
@@ -377,6 +392,7 @@ export default function Home() {
     const assembled: Meeting[] = meetingRows.map((meeting) => ({
       ...meeting,
       attendeeIds: attendanceByMeeting.get(meeting.id) ?? [],
+      onlineIds: onlineByMeeting.get(meeting.id) ?? [],
       guests: guestsByMeeting.get(meeting.id) ?? [],
     }));
 
@@ -2548,6 +2564,45 @@ async function setAttendanceMembers(memberIds: string[]) {
   //   예전에는 저장 → PET 알림 → 전체 다시 불러오기를 모두 기다리고, 그동안 다른 체크도 막혀서 느렸다.
   const attendancePending = useRef<Set<string>>(new Set());
 
+  // 👑 벙주 지정 (벙포 지급 대상)
+  async function setMeetingHost(memberId: string | null) {
+    if (!selectedMeeting) return;
+    const meetingId = selectedMeeting.id;
+    const before = selectedMeeting.host_member ?? null;
+    setMeetings((current) => current.map((meeting) => (meeting.id === meetingId ? { ...meeting, host_member: memberId } : meeting)));
+    const { error } = await supabase.from("meetings").update({ host_member: memberId }).eq("id", meetingId);
+    if (error) {
+      setMeetings((current) => current.map((meeting) => (meeting.id === meetingId ? { ...meeting, host_member: before } : meeting)));
+      setNotice(`벙주 저장 실패: ${error.message}`);
+    }
+  }
+
+  // 💻 온라인 참석 표시 (벙포 50%)
+  async function toggleOnline(memberId: string) {
+    if (!selectedMeeting) return;
+    const meetingId = selectedMeeting.id;
+    const on = !(selectedMeeting.onlineIds ?? []).includes(memberId);
+    const apply = (value: boolean) =>
+      setMeetings((current) =>
+        current.map((meeting) =>
+          meeting.id !== meetingId
+            ? meeting
+            : {
+                ...meeting,
+                onlineIds: value
+                  ? [...(meeting.onlineIds ?? []).filter((id) => id !== memberId), memberId]
+                  : (meeting.onlineIds ?? []).filter((id) => id !== memberId),
+              },
+        ),
+      );
+    apply(on);
+    const { error } = await supabase.from("attendance").update({ online: on }).eq("meeting_id", meetingId).eq("member_id", memberId);
+    if (error) {
+      apply(!on);
+      setNotice(`온라인 표시 실패: ${error.message}`);
+    }
+  }
+
   async function toggleAttendance(memberId: string) {
     if (!selectedMeeting) return;
     const meetingId = selectedMeeting.id;
@@ -3874,6 +3929,44 @@ async function setAttendanceMembers(memberIds: string[]) {
                       선택 {selectedMeeting.attendeeIds.length}명 / 전체 {activeMembers.length}명
                     </span>
                   </div>
+
+                  {selectedMeeting.attendeeIds.length > 0 && (
+                    <div className="hostPanel">
+                      <div className="hostPanelHead">
+                        <strong>👑 벙주 · 💻 온라인</strong>
+                        <small>이름을 누르면 벙주, 💻 를 켜면 온라인 참석 (벙포 계산용)</small>
+                      </div>
+                      <div className="hostPanelList">
+                        {selectedMeeting.attendeeIds.map((memberId) => {
+                          const member = members.find((item) => item.id === memberId);
+                          if (!member) return null;
+                          const isHost = selectedMeeting.host_member === memberId;
+                          const online = (selectedMeeting.onlineIds ?? []).includes(memberId);
+                          return (
+                            <div className={`hostPanelItem ${isHost ? "host" : ""}`} key={memberId}>
+                              <button
+                                type="button"
+                                className="hostPick"
+                                aria-pressed={isHost}
+                                onClick={() => void setMeetingHost(isHost ? null : memberId)}
+                              >
+                                {isHost ? "👑 " : ""}{member.name}
+                              </button>
+                              <button
+                                type="button"
+                                className={`hostOnline ${online ? "on" : ""}`}
+                                aria-pressed={online}
+                                title="온라인 참석"
+                                onClick={() => void toggleOnline(memberId)}
+                              >
+                                💻
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
 
                   <div className="chipGrid compactChips">
                     {filteredAttendanceMembers.map((member) => {
