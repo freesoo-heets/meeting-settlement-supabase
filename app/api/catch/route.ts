@@ -445,6 +445,19 @@ export async function POST(request: Request) {
     scores[memberId] = (scores[memberId] ?? 0) + GUESS_POINTS;
     if (room.drawer_member) scores[room.drawer_member] = (scores[room.drawer_member] ?? 0) + DRAWER_POINTS;
     const ok = await reveal(admin, room, { scores, last_winner: me?.name ?? "" });
+    if (ok) {
+      // 정답 기록 (그림 저장과 별개 · 게임 1등 메달 🎨 집계용). 실패해도 게임은 계속.
+      const { error: logError } = await admin.from("catch_correct").insert({
+        room_id: room.id,
+        play_no: room.play_no ?? 0,
+        turn_no: room.turn_no,
+        member_id: memberId,
+        name: me?.name ?? "",
+        word: secret.word,
+        is_test: Boolean(room.is_test),
+      });
+      if (logError) console.error("catch_correct insert", logError.message);
+    }
     return NextResponse.json({ ok: true, correct: ok });
   }
 
