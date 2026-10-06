@@ -5693,3 +5693,12 @@ button.meetingMetricCard {
 .memberCard.chatIdle { border-color: #fdba74; background: #fffaf5; }
 .chatIdleText { color: #ea580c; font-size: 11px; font-weight: 800; }
 .memberActivityLine .warningText, .memberActivityLine .chatIdleText { margin-top: 0; }
+
+/* 📜 채팅 내역: 날짜별 묶음 · 한 줄 표시 · 페이지 */
+.chatLogDay { display: flex; flex-direction: column; gap: 1px; }
+.chatLogDay h4 { position: sticky; top: 0; margin: 6px 0 2px; padding: 4px 8px; font-size: 12px; color: #475569; background: #eef2f7; border-radius: 6px; }
+.chatLogLine { display: flex; gap: 8px; padding: 3px 8px; font-size: 13px; line-height: 1.45; border-bottom: 1px solid #f1f5f9; }
+.chatLogLine time { flex: none; color: #94a3b8; font-variant-numeric: tabular-nums; }
+.chatLogLine span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chatLogLine:hover span { white-space: normal; word-break: break-word; }
+.chatLogPager { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; font-size: 13px; }

@@ -43,12 +43,23 @@ export function chatAgo(iso: string | undefined, now = Date.now()) {
   return `${Math.floor(hours / 24)}일 전`;
 }
 
+const PAGE_SIZE = 500;
+
+// '26/10/07' → '2026.10.07 (수)'
+function dayLabel(day: string) {
+  const [yy, mm, dd] = day.split("/").map(Number);
+  if (!yy || !mm || !dd) return day;
+  const date = new Date(2000 + yy, mm - 1, dd);
+  return `${2000 + yy}.${String(mm).padStart(2, "0")}.${String(dd).padStart(2, "0")} (${"일월화수목금토"[date.getDay()]})`;
+}
+
 type Chat = { name: string; full_nick: string | null; last_chat_at: string | null; messages: Array<{ t: string; m: string }> };
 
 export function ChatLogModal({ name, onClose }: { name: string; onClose: () => void }) {
   const [chat, setChat] = useState<Chat | null>(null);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
+  const [page, setPage] = useState(0); // 0 = 가장 최근 500개
   const logRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -64,12 +75,26 @@ export function ChatLogModal({ name, onClose }: { name: string; onClose: () => v
     };
   }, [name]);
 
-  // 처음 열면 최신 메시지(아래)로
+  const all = (chat?.messages ?? []).filter((row) => !query || row.m.includes(query));
+  const pages = Math.max(1, Math.ceil(all.length / PAGE_SIZE));
+  const current = Math.min(page, pages - 1);
+  const end = all.length - current * PAGE_SIZE;
+  const rows = all.slice(Math.max(0, end - PAGE_SIZE), end);
+
+  // 같은 날짜끼리 묶기 ('26/10/07 14:03:11' → 날짜 '26/10/07', 시각 '14:03')
+  const groups: Array<{ day: string; items: Array<{ time: string; m: string }> }> = [];
+  for (const row of rows) {
+    const [day = "", time = ""] = row.t.split(" ");
+    const last = groups[groups.length - 1];
+    const item = { time: time.slice(0, 5), m: row.m.replace(/\s*\n\s*/g, " ") };
+    if (last && last.day === day) last.items.push(item);
+    else groups.push({ day, items: [item] });
+  }
+
+  // 열 때 · 페이지 · 검색이 바뀔 때 최신 메시지(아래)로
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
-  }, [chat]);
-
-  const rows = (chat?.messages ?? []).filter((row) => !query || row.m.includes(query));
+  }, [chat, current, query]);
 
   return (
     <div
@@ -93,7 +118,10 @@ export function ChatLogModal({ name, onClose }: { name: string; onClose: () => v
             type="search"
             placeholder="내용 검색"
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setPage(0);
+            }}
           />
         )}
         {error && <p className="muted chatLogEmpty">{error}</p>}
@@ -101,15 +129,31 @@ export function ChatLogModal({ name, onClose }: { name: string; onClose: () => v
         {chat && (
           <div className="chatLogList" ref={logRef}>
             {rows.length === 0 && <p className="muted chatLogEmpty">검색 결과가 없어요.</p>}
-            {rows.map((row, index) => (
-              <div className="chatLogRow" key={index}>
-                <time>{row.t}</time>
-                <p>{row.m}</p>
-              </div>
+            {groups.map((group) => (
+              <section className="chatLogDay" key={group.day}>
+                <h4>{dayLabel(group.day)}</h4>
+                {group.items.map((item, index) => (
+                  <div className="chatLogLine" key={index}>
+                    <time>{item.time}</time>
+                    <span>{item.m}</span>
+                  </div>
+                ))}
+              </section>
             ))}
           </div>
         )}
-        <p className="muted chatLogNote">최근 {chat?.messages.length ?? 0}개 · 카톡방 일반 채팅만 (명령어 제외) · 운영진과 본인만 볼 수 있어요</p>
+        {chat && pages > 1 && (
+          <div className="chatLogPager">
+            <button type="button" className="smallButton ghost" disabled={current >= pages - 1} onClick={() => setPage(current + 1)}>
+              ← 이전 {PAGE_SIZE}개
+            </button>
+            <span>{pages - current} / {pages}</span>
+            <button type="button" className="smallButton ghost" disabled={current === 0} onClick={() => setPage(current - 1)}>
+              최근 →
+            </button>
+          </div>
+        )}
+        <p className="muted chatLogNote">{query ? `검색 ${all.length.toLocaleString("ko-KR")}개 · ` : ""}전체 {(chat?.messages.length ?? 0).toLocaleString("ko-KR")}개 (최대 5,000개) · 카톡방 일반 채팅만 (명령어 제외) · 운영진과 본인만 볼 수 있어요</p>
       </section>
     </div>
   );
