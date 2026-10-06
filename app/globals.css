@@ -5604,6 +5604,7 @@ button.meetingMetricCard {
   stroke-dasharray: 6 4;
   pointer-events: none;
   animation: alkPick 1s ease-in-out infinite;
+}
 @keyframes alkPick { 50% { stroke: #fde047; opacity: .55; } }
 .alkCancelRing { fill: rgba(148, 163, 184, .12); stroke: #94a3b8; stroke-width: 2; stroke-dasharray: 4 3; pointer-events: none; }
 .alkCancelRing.active { fill: rgba(148, 163, 184, .35); stroke: #475569; }
