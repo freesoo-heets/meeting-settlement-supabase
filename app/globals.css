@@ -5673,3 +5673,4 @@ button.meetingMetricCard {
 /* 재경기 예약 */
 .rematchReserve { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 4px 0; font-size: 12px; color: #7c3aed; }
 .rematchToggle.on { background: #7c3aed; color: #fff; border-color: #7c3aed; }
+.hostPanelWarn { margin: 0 0 6px; font-size: 12px; color: #b45309; }

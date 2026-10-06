@@ -3931,12 +3931,17 @@ async function setAttendanceMembers(memberIds: string[]) {
                     </span>
                   </div>
 
-                  {selectedMeeting.attendeeIds.length > 0 && (
+                  {(selectedMeeting.attendeeIds.length > 0 || selectedMeeting.host_member) && (
                     <div className="hostPanel">
                       <div className="hostPanelHead">
                         <strong>👑 벙주 · 💻 온라인</strong>
                         <small>이름을 누르면 벙주, 💻 를 켜면 온라인 참석 (벙포 계산용)</small>
                       </div>
+                      {selectedMeeting.host_member && !selectedMeeting.attendeeIds.includes(selectedMeeting.host_member) && (
+                        <p className="hostPanelWarn">
+                          👑 벙주 {members.find((item) => item.id === selectedMeeting.host_member)?.name ?? "?"}님이 아직 참석 체크되지 않았어요.
+                        </p>
+                      )}
                       <div className="hostPanelList">
                         {selectedMeeting.attendeeIds.map((memberId) => {
                           const member = members.find((item) => item.id === memberId);
