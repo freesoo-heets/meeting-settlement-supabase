@@ -557,21 +557,13 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
           </div>
         ) : viewing ? (
           <>
-          {viewing.status === "playing" && seatOf(viewing) && !viewing.is_test && (
-            <div className="rematchReserve">
-              <button
-                type="button"
-                className={`smallButton ${reserved[viewing.id] ? "on" : "ghost"}`}
-                aria-pressed={!!reserved[viewing.id]}
-                onClick={() => toggleReserve(viewing)}
-              >
-                🔁 {reserved[viewing.id] ? "재경기 예약됨" : "재경기 예약"}
-              </button>
-              <span style={{ visibility: oppReserved[viewing.id] ? "visible" : "hidden" }}>상대도 재경기를 예약했어요 ✋</span>
-            </div>
-          )}
           <OmokBoardView
             game={viewing}
+            reserve={
+              viewing.status === "playing" && seatOf(viewing) && !viewing.is_test
+                ? { mine: !!reserved[viewing.id], theirs: !!oppReserved[viewing.id], toggle: () => toggleReserve(viewing) }
+                : null
+            }
             me={currentMemberId}
             now={now}
             busy={busy}
@@ -815,6 +807,7 @@ function OmokBoardView({
   onBack,
   onMove,
   onResign,
+  reserve,
   onCancel,
   onUndoRequest,
   onUndoAnswer,
@@ -831,6 +824,7 @@ function OmokBoardView({
   onBack: () => void;
   onMove: (x: number, y: number) => void;
   onResign: () => void;
+  reserve: { mine: boolean; theirs: boolean; toggle: () => void } | null;
   onCancel: () => void;
   onUndoRequest: () => void;
   onUndoAnswer: (accept: boolean) => void;
@@ -1039,6 +1033,17 @@ function OmokBoardView({
         {myTurn && pending && (
           <button className="primaryButton" disabled={busy} onClick={() => onMove(pending[0], pending[1])}>
             여기에 두기
+          </button>
+        )}
+        {reserve && (
+          <button
+            type="button"
+            className={`smallButton rematchToggle ${reserve.mine ? "on" : "ghost"}`}
+            aria-pressed={reserve.mine}
+            title={reserve.theirs ? "상대도 재경기를 예약했어요" : "끝나자마자 재경기를 신청합니다"}
+            onClick={reserve.toggle}
+          >
+            🔁 {reserve.mine ? "재경기 예약됨" : "재경기 예약"}{reserve.theirs ? " · 상대 ✋" : ""}
           </button>
         )}
         {game.status === "playing" && mySide && (
