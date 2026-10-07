@@ -5702,3 +5702,12 @@ button.meetingMetricCard {
 .chatLogLine span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .chatLogLine:hover span { white-space: normal; word-break: break-word; }
 .chatLogPager { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; font-size: 13px; }
+
+/* 📢 참석 안내 (월별 참석 현황 · 관리자) */
+.noticeBar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin: 8px 0; padding: 8px 10px; border: 1px solid #fde68a; background: #fffbeb; border-radius: 10px; font-size: 12px; color: #92400e; }
+.noticeBar > div { display: flex; gap: 6px; flex-wrap: wrap; }
+.tinyButton.danger { border-color: #fca5a5; color: #b91c1c; }
+.noticeCol { width: 64px; white-space: nowrap; }
+.noticeCell { display: inline-flex; align-items: center; gap: 4px; }
+.noticeOne { border: 1px solid #e2e8f0; background: #fff; border-radius: 6px; padding: 0 5px; cursor: pointer; font-size: 13px; }
+.noticeOne:disabled { opacity: .5; cursor: default; }

@@ -244,6 +244,8 @@ export default function Home() {
   const [editingMeetingDate, setEditingMeetingDate] = useState("");
   const [memberDetailId, setMemberDetailId] = useState("");
   const [chatLogName, setChatLogName] = useState(""); // 📜 채팅 내역 창
+  const [noticePick, setNoticePick] = useState<string[]>([]); // 월별 참석 현황: 알림 보낼 회원 선택
+  const [noticeBusy, setNoticeBusy] = useState(false);
   const [showMyActivity, setShowMyActivity] = useState(false);
   const [showAccountPanel, setShowAccountPanel] = useState(false);
 
@@ -949,6 +951,30 @@ export default function Home() {
     });
   }, [members, monthMeetings, meetingAllocation]);
 
+
+  // 📢 참석 안내 알림 (관리자): 봇이 카톡방에 멘션으로 올린다
+  async function sendAttendanceNotice(memberIds: string[], label: string) {
+    if (memberIds.length === 0) {
+      setNotice("알림 보낼 회원을 골라 주세요.");
+      return;
+    }
+    if (!window.confirm(`${label} ${memberIds.length}명에게 카톡방 참석 안내(멘션)를 보낼까요?`)) return;
+    setNoticeBusy(true);
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      const response = await fetch("/api/notice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token ?? ""}` },
+        body: JSON.stringify({ memberIds }),
+      });
+      const json = await response.json().catch(() => ({ ok: false, error: "응답 오류" }));
+      setNotice(json.ok ? `📢 ${json.count}명 참석 안내를 보냈어요. (봇이 몇 초 안에 카톡방에 올립니다)` : `알림 실패: ${json.error}`);
+      if (json.ok) setNoticePick([]);
+    } finally {
+      setNoticeBusy(false);
+    }
+  }
 
   const sortedMonthStats = useMemo(() => {
     const direction = monthlySortDirection === "asc" ? 1 : -1;
@@ -4890,10 +4916,47 @@ async function setAttendanceMembers(memberIds: string[]) {
               </div>
             </div>
 
+            {isAdmin && (
+              <div className="noticeBar">
+                <span>📢 참석 안내 (카톡방 멘션) · 자동: 경고 7일 전 · 3일 전 오전 10시</span>
+                <div>
+                  <button
+                    type="button"
+                    className="tinyButton"
+                    disabled={noticeBusy || noticePick.length === 0}
+                    onClick={() => void sendAttendanceNotice(noticePick, "선택한 회원")}
+                  >
+                    선택 {noticePick.length}명 알림
+                  </button>
+                  <button
+                    type="button"
+                    className="tinyButton danger"
+                    disabled={noticeBusy || warningMembers.length === 0}
+                    onClick={() => void sendAttendanceNotice(warningMembers.map((member) => member.id), "경고 회원 전체")}
+                  >
+                    경고 전체 알림 ({warningMembers.length}명)
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="tableWrap">
               <table className="monthlyTable attendanceOnlyTable">
                 <thead>
                   <tr>
+                    {isAdmin && (
+                      <th className="noticeCol">
+                        <input
+                          type="checkbox"
+                          aria-label="경고 회원 모두 선택"
+                          title="경고 회원 모두 선택"
+                          checked={warningMembers.length > 0 && warningMembers.every((member) => noticePick.includes(member.id))}
+                          onChange={(event) =>
+                            setNoticePick(event.target.checked ? warningMembers.map((member) => member.id) : [])
+                          }
+                        />
+                      </th>
+                    )}
                     {[
                       ["member", "회원"],
                       ["status", "상태"],
@@ -4922,6 +4985,33 @@ async function setAttendanceMembers(memberIds: string[]) {
                 <tbody>
                   {sortedMonthStats.map(({ member, attendanceCount, expectedAmount }) => (
                     <tr key={member.id}>
+                      {isAdmin && (
+                        <td className="noticeCol">
+                          {member.active && (
+                            <span className="noticeCell">
+                              <input
+                                type="checkbox"
+                                aria-label={`${member.name} 선택`}
+                                checked={noticePick.includes(member.id)}
+                                onChange={(event) =>
+                                  setNoticePick((current) =>
+                                    event.target.checked ? [...current, member.id] : current.filter((id) => id !== member.id),
+                                  )
+                                }
+                              />
+                              <button
+                                type="button"
+                                className="noticeOne"
+                                title={`${member.name}님에게 참석 안내`}
+                                disabled={noticeBusy}
+                                onClick={() => void sendAttendanceNotice([member.id], member.name)}
+                              >
+                                📢
+                              </button>
+                            </span>
+                          )}
+                        </td>
+                      )}
                       <td><strong>{member.name}</strong></td>
                       <td>
                         <span className={`statusBadge ${member.active ? "active" : "withdrawn"}`}>
