@@ -5711,3 +5711,6 @@ button.meetingMetricCard {
 .noticeCell { display: inline-flex; align-items: center; gap: 4px; }
 .noticeOne { border: 1px solid #e2e8f0; background: #fff; border-radius: 6px; padding: 0 5px; cursor: pointer; font-size: 13px; }
 .noticeOne:disabled { opacity: .5; cursor: default; }
+
+/* 브라우저 강제 다크 모드 끄기 (오목돌·알까기 색이 바뀌는 문제) */
+:root { color-scheme: only light; }
