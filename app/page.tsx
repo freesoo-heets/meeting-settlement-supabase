@@ -967,6 +967,26 @@ export default function Home() {
       return;
     }
     if (!window.confirm(`${label} ${memberIds.length}명에게 카톡방 참석 안내(멘션)를 보낼까요?`)) return;
+    // 앞으로 참석 예정인 벙이 있는 회원은 한 번 더 확인 (자동 안내에서는 빠지는 사람들)
+    const todayIso = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
+    const planned = memberIds
+      .map((id) => {
+        const next = meetings
+          .filter((meeting) => meeting.date > todayIso && meeting.attendeeIds.includes(id))
+          .sort((a, b) => a.date.localeCompare(b.date))[0];
+        const member = members.find((item) => item.id === id);
+        return next && member ? `· ${member.name} → ${next.date.slice(5).replace("-", "/")} ${next.title}` : "";
+      })
+      .filter(Boolean);
+    if (
+      planned.length > 0 &&
+      !window.confirm(
+        `참석 예정인 벙이 있는 회원이 ${planned.length}명 있어요.\n\n${planned.slice(0, 15).join("\n")}${
+          planned.length > 15 ? `\n… 외 ${planned.length - 15}명` : ""
+        }\n\n그래도 보낼까요?`,
+      )
+    )
+      return;
     setNoticeBusy(true);
     try {
       const { data } = await supabase.auth.getSession();
