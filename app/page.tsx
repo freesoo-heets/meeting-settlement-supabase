@@ -952,6 +952,14 @@ export default function Home() {
   }, [members, monthMeetings, meetingAllocation]);
 
 
+  // 알림 대상 = 참석 경고 + 미채팅 3일 이상 (게스트 제외)
+  const noticeTargets = activeMembers.filter((member) => {
+    if (member.is_guest) return false;
+    if (warningByMember[member.id]?.warning) return true;
+    const chatAt = lastChats[member.name];
+    return Boolean(chatAt) && Date.now() - new Date(chatAt).getTime() >= 3 * 86400000;
+  });
+
   // 📢 참석 안내 알림 (관리자): 봇이 카톡방에 멘션으로 올린다
   async function sendAttendanceNotice(memberIds: string[], label: string) {
     if (memberIds.length === 0) {
@@ -4918,7 +4926,7 @@ async function setAttendanceMembers(memberIds: string[]) {
 
             {isAdmin && (
               <div className="noticeBar">
-                <span>📢 참석 안내 (카톡방 멘션) · 자동: 경고 7일 전 · 3일 전 오전 10시</span>
+                <span>📢 참석 안내 (카톡방 멘션) · 자동 오전 10시: 참석 경고 7일 전·3일 전 / 미채팅 3일째·4일째 · 경고 = 참석 경고 + 미채팅 3일↑</span>
                 <div>
                   <button
                     type="button"
@@ -4931,10 +4939,10 @@ async function setAttendanceMembers(memberIds: string[]) {
                   <button
                     type="button"
                     className="tinyButton danger"
-                    disabled={noticeBusy || warningMembers.length === 0}
-                    onClick={() => void sendAttendanceNotice(warningMembers.map((member) => member.id), "경고 회원 전체")}
+                    disabled={noticeBusy || noticeTargets.length === 0}
+                    onClick={() => void sendAttendanceNotice(noticeTargets.map((member) => member.id), "경고 회원 전체")}
                   >
-                    경고 전체 알림 ({warningMembers.length}명)
+                    경고 전체 알림 ({noticeTargets.length}명)
                   </button>
                 </div>
               </div>
@@ -4950,9 +4958,9 @@ async function setAttendanceMembers(memberIds: string[]) {
                           type="checkbox"
                           aria-label="경고 회원 모두 선택"
                           title="경고 회원 모두 선택"
-                          checked={warningMembers.length > 0 && warningMembers.every((member) => noticePick.includes(member.id))}
+                          checked={noticeTargets.length > 0 && noticeTargets.every((member) => noticePick.includes(member.id))}
                           onChange={(event) =>
-                            setNoticePick(event.target.checked ? warningMembers.map((member) => member.id) : [])
+                            setNoticePick(event.target.checked ? noticeTargets.map((member) => member.id) : [])
                           }
                         />
                       </th>
