@@ -5,6 +5,8 @@ import {
   hasActiveStakeGame,
   isAdminMember,
   requestInvite,
+  FRIENDLY_TICKET_ERROR,
+  loadFriendlyPlayer,
   loadMember,
   loadPlayer,
   requireMemberId,
@@ -40,6 +42,7 @@ type Game = {
   status: string;
   stake: number;
   host_member: string;
+  host_uid?: string;
   guest_member: string | null;
   target_member: string | null;
   cho: Seat | null;
@@ -108,15 +111,11 @@ export async function POST(request: Request) {
   // 친선 대국은 점수·티켓을 보지 않는다 (봇 점수판에 없어도 할 수 있다)
   const friendly = action === "create" ? body?.friendly === true : !!loaded?.is_friendly;
   if ((action === "create" || action === "join") && friendly) {
-    // 친선은 점수·티켓을 보지 않지만, !전적 기록용으로 카톡 user_id 는 있으면 저장한다
-    const player = await loadPlayer(admin, memberId);
-    if ("error" in player) {
-      const member = await loadMember(admin, memberId);
-      if ("error" in member) return fail(member.error, member.status);
-      me = { memberId, name: member.name, uid: "friendly", exp: 0, tickets: 0 };
-    } else {
-      me = player;
-    }
+    // 친선은 점수를 걸지 않지만 티켓 1장이 든다 (게스트 · 점수판에 없는 사람은 무료, uid 'friendly')
+    const player = await loadFriendlyPlayer(admin, memberId);
+    if ("error" in player) return fail(player.error, player.status);
+    if (!player.free && player.tickets < 1) return fail(FRIENDLY_TICKET_ERROR);
+    me = player;
   } else if (action === "create" || action === "join") {
     const player = await loadPlayer(admin, memberId);
     if ("error" in player) return fail(player.error, player.status);
@@ -170,6 +169,12 @@ export async function POST(request: Request) {
       const { data: target } = await admin.from("members").select("id,active").eq("id", targetId).maybeSingle();
       if (!target?.active) return fail("상대 회원을 찾지 못했습니다.");
       // ★ 점수 내기면 상대의 점수·티켓도 미리 확인 (모자라면 신청 자체를 막는다, 친선은 확인 안 함)
+      if (friendly) {
+        const opponent = await loadFriendlyPlayer(admin, targetId);
+        if (!("error" in opponent) && !opponent.free && opponent.tickets < 1) {
+          return fail(`${opponent.name}님이 티켓이 없어서 친선전 신청을 보낼 수 없습니다.`);
+        }
+      }
       if (!friendly) {
         const opponent = await loadPlayer(admin, targetId);
         if ("error" in opponent) return fail("상대를 카톡 점수판에서 찾지 못해 대국신청을 보낼 수 없습니다. (친선전은 가능)");
@@ -229,8 +234,8 @@ export async function POST(request: Request) {
       cho,
       turn: cho, // 초가 먼저
       pieces: initialPieces(),
-      // 친선은 봇 확인 없이 바로 시작, 점수 내기는 봇이 판돈·티켓을 차감한 뒤 시작
-      ...(friendly
+      // 둘 다 무료(게스트)인 친선만 바로 시작, 그 외에는 봇이 티켓(·판돈)을 차감한 뒤 시작
+      ...(friendly && game.host_uid === "friendly" && me.uid === "friendly"
         ? { status: "playing", started_at: now(), turn_deadline: deadline() }
         : { status: "escrow", escrow_state: "requested" }),
     });

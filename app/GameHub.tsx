@@ -200,14 +200,14 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
     omok: omok.map((row) => ({
       id: row.id,
       line: stakeLine(row),
-      sub: row.is_friendly ? "🤝 친선전 · 점수 없음" : `💎 ${row.stake.toLocaleString("ko-KR")}점`,
+      sub: row.is_friendly ? "🤝 친선전 · 점수 없음 · 🎫1장" : `💎 ${row.stake.toLocaleString("ko-KR")}점`,
       action: stakeAction(row),
       hot: row.status === "open" || (row.status === "challenge" && row.target_member === currentMemberId),
     })),
     alkkagi: alkkagi.map((row) => ({
       id: row.id,
       line: stakeLine(row),
-      sub: row.is_friendly ? "🤝 친선전 · 점수 없음" : `💎 ${row.stake.toLocaleString("ko-KR")}점`,
+      sub: row.is_friendly ? "🤝 친선전 · 점수 없음 · 🎫1장" : `💎 ${row.stake.toLocaleString("ko-KR")}점`,
       action: stakeAction(row),
       hot: row.status === "open" || (row.status === "challenge" && row.target_member === currentMemberId),
     })),

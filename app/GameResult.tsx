@@ -51,7 +51,7 @@ export function GameResultPopup({
   const money = game.is_test
     ? "🧪 테스트 대국 · 점수 변동 없음"
     : noPoints
-      ? "🤝 친선전 · 점수 변동 없음"
+      ? "🤝 친선전 · 점수 변동 없음 (티켓 1장 사용)"
       : draw
         ? `판돈 ${game.stake.toLocaleString("ko-KR")}점 반환`
         : won

@@ -31,6 +31,20 @@ export async function loadMember(admin: Admin, memberId: string): Promise<{ id: 
   return { id: member.id, name: member.name };
 }
 
+// 친선전용: 게스트(또는 카톡 점수판에 없는 사람)는 티켓 없이(free), 그 외 회원은 티켓 1장이 든다 (봇이 시작할 때 차감)
+export async function loadFriendlyPlayer(admin: Admin, memberId: string): Promise<(Player & { free: boolean }) | Fail> {
+  const member = await loadMember(admin, memberId);
+  if ("error" in member) return member;
+  const free = { memberId, name: member.name, uid: "friendly", exp: 0, tickets: 0, free: true };
+  const { data: row } = await admin.from("members").select("is_guest").eq("id", memberId).maybeSingle();
+  if (row?.is_guest) return free;
+  const player = await loadPlayer(admin, memberId);
+  if ("error" in player) return free;
+  return { ...player, free: false };
+}
+
+export const FRIENDLY_TICKET_ERROR = "친선전도 티켓이 1장 필요합니다. 카톡에서 !티켓구매 로 살 수 있습니다. (게스트는 무료)";
+
 // 점수 내기 게임용: 봇 점수판의 점수·티켓까지
 export async function loadPlayer(admin: Admin, memberId: string): Promise<Player | Fail> {
   const member = await loadMember(admin, memberId);
