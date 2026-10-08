@@ -249,6 +249,7 @@ export default function Home() {
   const [editingMeetingDate, setEditingMeetingDate] = useState("");
   const [memberDetailId, setMemberDetailId] = useState("");
   const [chatLogName, setChatLogName] = useState(""); // 📜 채팅 내역 창
+  const [expandedDays, setExpandedDays] = useState<string[]>([]); // 모임 달력: '+N개 더' 를 펼친 날짜
   const [noticePick, setNoticePick] = useState<string[]>([]); // 월별 참석 현황: 알림 보낼 회원 선택
   const [noticeBusy, setNoticeBusy] = useState(false);
   const [showMyActivity, setShowMyActivity] = useState(false);
@@ -3738,6 +3739,7 @@ async function setAttendanceMembers(memberIds: string[]) {
             <div className="calendarGrid">
               {meetingCalendarCells.map((cell) => {
                 const dayMeetings = meetingsByDate.get(cell.date) ?? [];
+                const expanded = expandedDays.includes(cell.date);
                 return (
                   <div
                     className={`calendarDay ${cell.inMonth ? "" : "outside"} ${cell.date === today ? "today" : ""} ${cell.date === selectedCalendarDate ? "selectedDate" : ""}`}
@@ -3749,7 +3751,7 @@ async function setAttendanceMembers(memberIds: string[]) {
                       {dayMeetings.length > 0 && <em>{dayMeetings.length}</em>}
                     </div>
                     <div className="calendarEvents">
-                      {dayMeetings.slice(0, 3).map((meeting) => (
+                      {(expanded ? dayMeetings : dayMeetings.slice(0, 3)).map((meeting) => (
                         <button
                           key={meeting.id}
                           type="button"
@@ -3768,13 +3770,16 @@ async function setAttendanceMembers(memberIds: string[]) {
                         <button
                           type="button"
                           className="calendarMoreEvents"
-                          onClick={() => {
-                            setSelectedMeetingId(dayMeetings[3].id);
-                            setMemberFixedDrafts({});
-                            setGuestFixedDrafts({});
+                          aria-expanded={expanded}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            // 그 날짜 칸을 아래로 펼쳐 모든 벙을 보여준다 (다시 누르면 접기)
+                            setExpandedDays((current) =>
+                              expanded ? current.filter((day) => day !== cell.date) : [...current, cell.date],
+                            );
                           }}
                         >
-                          +{dayMeetings.length - 3}개 더
+                          {expanded ? "접기 ▲" : `+${dayMeetings.length - 3}개 더 ▼`}
                         </button>
                       )}
                     </div>
