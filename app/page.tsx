@@ -161,6 +161,11 @@ function calendarDates(month: string) {
   return cells;
 }
 
+// 봇 계정(푸들봇 등)은 경고 · 참석 안내 대상에서 뺀다
+function isBotName(name: string) {
+  return name.replace(/\s/g, "").endsWith("봇");
+}
+
 export default function Home() {
   useEffect(() => {
     document.title = "[86~02] 강서구 찐친만들기❤️";
@@ -742,7 +747,7 @@ export default function Home() {
   }, [members, lastAttendanceByMember, today]);
 
   const warningMembers = useMemo(
-    () => activeMembers.filter((member) => !member.is_guest && warningByMember[member.id]?.warning),
+    () => activeMembers.filter((member) => !member.is_guest && !isBotName(member.name) && warningByMember[member.id]?.warning),
     [activeMembers, warningByMember]
   );
 
@@ -954,7 +959,7 @@ export default function Home() {
 
   // 알림 대상 = 참석 경고 + 미채팅 3일 이상 (게스트 제외)
   const noticeTargets = activeMembers.filter((member) => {
-    if (member.is_guest) return false;
+    if (member.is_guest || isBotName(member.name)) return false;
     if (warningByMember[member.id]?.warning) return true;
     const chatAt = lastChats[member.name];
     return Boolean(chatAt) && Date.now() - new Date(chatAt).getTime() >= 3 * 86400000;
