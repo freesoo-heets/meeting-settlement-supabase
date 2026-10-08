@@ -1,6 +1,7 @@
 "use client";
 
 import { useGameViewport } from "./useGameViewport";
+import { playLose, playStone, playTick, playWin, useGameSound } from "./gameSound";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { BOARD_SIZE, TURN_SECONDS, boardFromMoves, forbiddenPoints, type Board, type Move } from "../lib/omok";
@@ -857,6 +858,23 @@ function OmokBoardView({
     : TURN_SECONDS;
   const last = game.moves[game.moves.length - 1];
 
+  // ── 효과음 (🔊 켜고 끄기는 이 기기에 저장) ──
+  const sound = useGameSound();
+  const seen = useRef<{ id: string; moves: number; status: string } | null>(null);
+  useEffect(() => {
+    const prev = seen.current;
+    seen.current = { id: game.id, moves: game.moves.length, status: game.status };
+    if (!sound.on || !prev || prev.id !== game.id) return; // 처음 열 때는 소리 없음
+    if (game.moves.length > prev.moves) playStone();
+    if (prev.status !== "finished" && game.status === "finished" && mySide) {
+      window.setTimeout(() => (game.winner === mySide ? playWin() : game.winner === "draw" ? playTick() : playLose()), 250);
+    }
+  }, [game.id, game.moves.length, game.status, game.winner, mySide, sound.on]);
+  // 내 차례 남은 10초 · 5초 알림
+  useEffect(() => {
+    if (sound.on && myTurn && (remaining === 10 || remaining === 5)) playTick();
+  }, [remaining, myTurn, sound.on]);
+
   // ── 무르기 ──
   const realSide = game.host_member === me ? "host" : game.guest_member === me ? "guest" : null;
   const whiteOf = game.black === "host" ? "guest" : "host";
@@ -912,7 +930,19 @@ function OmokBoardView({
           <strong>{nameOf(game, blackSide)}</strong>
           {mySide === blackSide && <em>나</em>}
         </div>
-        <span className="omokStake">{game.is_friendly ? "🤝 친선" : `💎 ${game.stake.toLocaleString("ko-KR")}`}</span>
+        <div className="omokCenterCol">
+          <span className="omokStake">{game.is_friendly ? "🤝 친선" : `💎 ${game.stake.toLocaleString("ko-KR")}`}</span>
+          <button
+            type="button"
+            className={`gameSoundToggle ${sound.on ? "on" : ""}`}
+            aria-pressed={sound.on}
+            aria-label={sound.on ? "효과음 끄기" : "효과음 켜기"}
+            title={sound.on ? "효과음 끄기" : "효과음 켜기"}
+            onClick={sound.toggle}
+          >
+            {sound.on ? "🔊" : "🔇"}
+          </button>
+        </div>
         <div className={`omokPlayer ${game.status === "playing" && !blackTurn ? "turn" : ""}`}>
           <i className="omokStoneIcon white" />
           <strong>{nameOf(game, whiteSide)}</strong>
