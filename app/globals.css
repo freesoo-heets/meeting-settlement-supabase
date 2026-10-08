@@ -5724,3 +5724,144 @@ button.meetingMetricCard {
 }
 .dashboardRankingGrid > .dashboardRankingPanel { min-width: 0; }
 .hostTopPanel .dashboardAttendanceList { display: grid; gap: 10px; }
+
+
+/* STEP 45: dashboard visual refresh. Scoped to dashboard cards; preserves game/PET. */
+@media (min-width: 901px) {
+  .dashboardRankingGrid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 18px !important;
+    align-items: stretch;
+  }
+  .dashboardRankingGrid > .popularMeetingPanel { order: 1; }
+  .dashboardRankingGrid > .birthdayPanel { order: 2; }
+  .dashboardRankingGrid > .attendanceTopPanel { order: 3; }
+  .dashboardRankingGrid > .hostTopPanel { order: 4; }
+}
+.dashboardRankingGrid > .dashboardRankingPanel {
+  min-width: 0;
+  padding: 22px !important;
+  border: 1px solid #e9e6f2 !important;
+  border-radius: 22px !important;
+  background: #fff !important;
+  box-shadow: 0 5px 24px rgba(40, 35, 77, .055) !important;
+}
+.dashboardRankingGrid .panelHead.compactHead { margin-bottom: 17px; gap: 10px; }
+.dashboardRankingGrid .panelHead h2 { font-size: clamp(16px, 1.35vw, 19px); letter-spacing: -.035em; font-weight: 800; }
+.dashboardRankingGrid .panelHead p { margin-top: 5px; font-size: 12px; color: #818096; }
+.dashboardRankingGrid .dashboardPanelBadge { border-radius: 999px; padding: 6px 11px; background: #f2efff; color: #7050c8; font-weight: 800; }
+.dashboardRankingGrid .popularMeetingList,
+.dashboardRankingGrid .dashboardAttendanceList,
+.dashboardRankingGrid .birthdayMemberList { gap: 10px; }
+.dashboardRankingGrid .popularMeetingCard,
+.dashboardRankingGrid .dashboardAttendanceCard,
+.dashboardRankingGrid .birthdayMemberCard {
+  min-height: 64px;
+  padding: 12px 14px;
+  border: 1px solid #efedf4;
+  border-radius: 15px;
+  background: #faf9fd;
+  transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+.dashboardRankingGrid .popularMeetingCard:hover,
+.dashboardRankingGrid .dashboardAttendanceCard:hover,
+.dashboardRankingGrid .birthdayMemberCard:hover {
+  transform: translateY(-2px);
+  border-color: #d6c9ff;
+  background: #fff;
+  box-shadow: 0 8px 20px rgba(101, 75, 168, .09);
+}
+.dashboardRankingGrid .dashboardAttendanceCard > div strong,
+.dashboardRankingGrid .birthdayMemberCard > div strong { font-size: 13px; }
+.dashboardRankingGrid .dashboardAttendanceCard > div small,
+.dashboardRankingGrid .birthdayMemberCard > div small { font-size: 11px; }
+.dashboardRankingGrid .attendanceCountValue { font-size: 15px; font-weight: 800; color: #3e3267; }
+.dashboardRankingGrid .dashboardRankNumber { width: 32px; height: 32px; border-radius: 11px; }
+.dashboardRankingGrid .birthdayIcon { background: #fff0ed; border-radius: 12px; }
+.dashboardRankingGrid .popularMeetingRateTrack { border-radius: 99px; }
+.dashboardRankingGrid .popularMeetingRateTrack span { border-radius: 99px; }
+.dashboardRankingGrid .dashboardEmpty { min-height: 100px; display: grid; place-items: center; border-radius: 15px; background: #faf9fd; }
+@media (max-width: 900px) {
+  .dashboardRankingGrid { grid-template-columns: minmax(0, 1fr) !important; gap: 12px !important; }
+  .dashboardRankingGrid > .dashboardRankingPanel { padding: 16px !important; border-radius: 18px !important; }
+  .dashboardRankingGrid .popularMeetingCard,
+  .dashboardRankingGrid .dashboardAttendanceCard,
+  .dashboardRankingGrid .birthdayMemberCard { min-height: 58px; padding: 10px 11px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dashboardRankingGrid .popularMeetingCard,
+  .dashboardRankingGrid .dashboardAttendanceCard,
+  .dashboardRankingGrid .birthdayMemberCard { transition: none; }
+}
+
+
+/* STEP 46: three ranking cards and horizontal birthday bar.
+   Overrides Step44/Step45 without changing game, PET, or dashboard logic. */
+@media (min-width: 1101px) {
+  .dashboardRankingGrid {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 16px !important;
+    align-items: stretch;
+  }
+  .dashboardRankingGrid > .popularMeetingPanel { order: 1 !important; }
+  .dashboardRankingGrid > .hostTopPanel { order: 2 !important; }
+  .dashboardRankingGrid > .attendanceTopPanel { order: 3 !important; }
+  .dashboardRankingGrid > .birthdayPanel {
+    order: 4 !important;
+    grid-column: 1 / -1 !important;
+  }
+}
+@media (min-width: 701px) and (max-width: 1100px) {
+  .dashboardRankingGrid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 14px !important;
+  }
+  .dashboardRankingGrid > .popularMeetingPanel { order: 1 !important; }
+  .dashboardRankingGrid > .hostTopPanel { order: 2 !important; }
+  .dashboardRankingGrid > .attendanceTopPanel { order: 3 !important; }
+  .dashboardRankingGrid > .birthdayPanel { order: 4 !important; grid-column: 1 / -1 !important; }
+}
+@media (max-width: 700px) {
+  .dashboardRankingGrid { display: grid !important; grid-template-columns: minmax(0, 1fr) !important; gap: 12px !important; }
+  .dashboardRankingGrid > .popularMeetingPanel { order: 1 !important; }
+  .dashboardRankingGrid > .hostTopPanel { order: 2 !important; }
+  .dashboardRankingGrid > .attendanceTopPanel { order: 3 !important; }
+  .dashboardRankingGrid > .birthdayPanel { order: 4 !important; grid-column: auto !important; }
+}
+.dashboardRankingGrid > .dashboardRankingPanel { min-width: 0; }
+.dashboardRankingGrid > .birthdayPanel {
+  padding: 18px 22px !important;
+  background: linear-gradient(105deg, #fffaf6 0%, #fff 60%, #faf7ff 100%) !important;
+  border: 1px solid #f0e5dd !important;
+  border-radius: 20px !important;
+}
+.dashboardRankingGrid > .birthdayPanel .panelHead.compactHead { margin-bottom: 12px !important; }
+.dashboardRankingGrid > .birthdayPanel .birthdayMemberList {
+  display: flex !important;
+  flex-flow: row nowrap !important;
+  gap: 10px !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  padding: 2px 2px 8px !important;
+  scrollbar-width: thin;
+}
+.dashboardRankingGrid > .birthdayPanel .birthdayMemberCard {
+  flex: 0 0 auto !important;
+  width: clamp(190px, 21vw, 260px) !important;
+  min-height: 58px !important;
+  padding: 10px 12px !important;
+  border-radius: 14px !important;
+  background: #fff !important;
+}
+.dashboardRankingGrid > .birthdayPanel .dashboardEmpty {
+  flex: 1 0 100%;
+  min-height: 48px !important;
+  padding: 12px !important;
+}
+@media (max-width: 700px) {
+  .dashboardRankingGrid > .birthdayPanel { padding: 15px !important; }
+  .dashboardRankingGrid > .birthdayPanel .birthdayMemberCard { width: 205px !important; }
+}
