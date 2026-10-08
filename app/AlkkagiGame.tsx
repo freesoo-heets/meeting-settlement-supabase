@@ -219,6 +219,15 @@ export default function AlkkagiGame({
     const timer = window.setTimeout(() => setResultReady(true), 1800);
     return () => window.clearTimeout(timer);
   }, [resultFor, boardAnimating]);
+  // 결과 창이 뜨는 순간 승패음 (대국한 두 사람만)
+  useEffect(() => {
+    if (!resultReady || !sound.on || !viewing || viewing.id !== resultFor) return;
+    const seat = seatOf(viewing);
+    if (!seat) return;
+    if (viewing.winner === seat) playAlkWin();
+    else if (viewing.winner === "draw") playAlkTick();
+    else playAlkLose();
+  }, [resultReady]);
   const [rematchOffer, setRematchOffer] = useState<{ id: string; from: string; stake: number; friendly: boolean } | null>(null);
   const seenStatus = useRef<Record<string, string>>({});
   useEffect(() => {
@@ -1048,16 +1057,7 @@ function AlkkagiBoardView({
   const remaining = game.turn_deadline
     ? Math.max(0, Math.ceil((new Date(game.turn_deadline).getTime() - now) / 1000))
     : TURN_SECONDS;
-  // 효과음: 승패 · 내 차례 남은 10초 · 5초
-  const seenEnd = useRef<{ id: string; status: string } | null>(null);
-  useEffect(() => {
-    const prev = seenEnd.current;
-    seenEnd.current = { id: game.id, status: game.status };
-    if (!soundOn || !prev || prev.id !== game.id || !mySeat) return;
-    if (prev.status !== "finished" && game.status === "finished") {
-      window.setTimeout(() => (game.winner === mySeat ? playAlkWin() : game.winner === "draw" ? playAlkTick() : playAlkLose()), 600);
-    }
-  }, [game.id, game.status, game.winner, mySeat, soundOn]);
+  // 효과음: 내 차례 남은 10초 · 5초 (승패음은 결과 창이 뜰 때)
   useEffect(() => {
     if (soundOn && myTurn && (remaining === 10 || remaining === 5)) playAlkTick();
   }, [remaining, myTurn, soundOn]);
