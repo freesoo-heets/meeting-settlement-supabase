@@ -45,55 +45,72 @@ export function useGameSound() {
   return { on, toggle };
 }
 
-// 오목판에 돌을 '딱' 내려놓는 소리
-//   ① 돌과 판이 부딪히는 아주 짧고 높은 마찰음  ② 단단한 돌의 맑은 울림  ③ 나무판의 낮은 울림
+// 오목판에 돌을 '똑' 내려놓는 묵직한 소리 (두꺼운 나무 바둑판 느낌)
+//   ① 돌이 닿는 순간의 짧은 '딱' (높은 소리는 줄임)  ② 판 몸통의 낮은 '똑' 울림  ③ 아래로 깔리는 둔한 울림
 export function playStone() {
   const ac = audio();
   if (!ac) return;
   const t = ac.currentTime + 0.005;
   const out = ac.createGain();
-  out.gain.value = 0.9;
-  out.connect(ac.destination);
+  out.gain.value = 1;
+  const soft = ac.createBiquadFilter();   // 너무 날카롭지 않게
+  soft.type = "lowpass";
+  soft.frequency.value = 3200;
+  out.connect(soft).connect(ac.destination);
 
-  // ① 딱 (6ms 잡음 · 높은 대역)
-  const len = Math.floor(ac.sampleRate * 0.006);
+  // ① 닿는 순간 (4ms 잡음, 중간 높이)
+  const len = Math.floor(ac.sampleRate * 0.004);
   const buf = ac.createBuffer(1, len, ac.sampleRate);
   const d = buf.getChannelData(0);
-  for (let i = 0; i < len; i += 1) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+  for (let i = 0; i < len; i += 1) d[i] = (Math.random() * 2 - 1) * (1 - i / len) ** 2;
   const click = ac.createBufferSource();
   click.buffer = buf;
-  const hp = ac.createBiquadFilter();
-  hp.type = "bandpass";
-  hp.frequency.value = 3800;
-  hp.Q.value = 0.7;
+  const bp = ac.createBiquadFilter();
+  bp.type = "bandpass";
+  bp.frequency.value = 1900;
+  bp.Q.value = 0.9;
   const cg = ac.createGain();
-  cg.gain.value = 1.4;
-  click.connect(hp).connect(cg).connect(out);
+  cg.gain.value = 0.9;
+  click.connect(bp).connect(cg).connect(out);
   click.start(t);
 
-  // ② 돌의 맑은 울림 (짧게)
-  const stone = ac.createOscillator();
-  stone.type = "sine";
-  stone.frequency.setValueAtTime(1650, t);
-  stone.frequency.exponentialRampToValueAtTime(1250, t + 0.05);
-  const sg = ac.createGain();
-  sg.gain.setValueAtTime(0.22, t);
-  sg.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
-  stone.connect(sg).connect(out);
-  stone.start(t);
-  stone.stop(t + 0.07);
+  // ② 판 몸통의 '똑' (낮고 단단하게, 빠르게 사라짐)
+  const body = ac.createOscillator();
+  body.type = "sine";
+  body.frequency.setValueAtTime(310, t);
+  body.frequency.exponentialRampToValueAtTime(190, t + 0.12);
+  const bg = ac.createGain();
+  bg.gain.setValueAtTime(0.0001, t);
+  bg.gain.exponentialRampToValueAtTime(0.7, t + 0.003);
+  bg.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+  body.connect(bg).connect(out);
+  body.start(t);
+  body.stop(t + 0.17);
 
-  // ③ 나무판 울림 (낮고 조금 길게)
-  const wood = ac.createOscillator();
-  wood.type = "triangle";
-  wood.frequency.setValueAtTime(420, t);
-  wood.frequency.exponentialRampToValueAtTime(300, t + 0.09);
-  const wg = ac.createGain();
-  wg.gain.setValueAtTime(0.3, t);
-  wg.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
-  wood.connect(wg).connect(out);
-  wood.start(t);
-  wood.stop(t + 0.11);
+  // ③ 둔한 저음 (묵직함)
+  const sub = ac.createOscillator();
+  sub.type = "sine";
+  sub.frequency.setValueAtTime(140, t);
+  sub.frequency.exponentialRampToValueAtTime(95, t + 0.1);
+  const ub = ac.createGain();
+  ub.gain.setValueAtTime(0.0001, t);
+  ub.gain.exponentialRampToValueAtTime(0.45, t + 0.004);
+  ub.gain.exponentialRampToValueAtTime(0.001, t + 0.13);
+  sub.connect(ub).connect(out);
+  sub.start(t);
+  sub.stop(t + 0.14);
+
+  // 나무의 짧은 잔향 (살짝)
+  const ring = ac.createOscillator();
+  ring.type = "triangle";
+  ring.frequency.setValueAtTime(820, t);
+  ring.frequency.exponentialRampToValueAtTime(640, t + 0.05);
+  const rg = ac.createGain();
+  rg.gain.setValueAtTime(0.08, t);
+  rg.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
+  ring.connect(rg).connect(out);
+  ring.start(t);
+  ring.stop(t + 0.07);
 }
 
 function tones(notes: Array<[number, number]>, volume = 0.18) {
