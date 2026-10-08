@@ -1317,6 +1317,25 @@ export default function Home() {
     }));
   }, [monthMeetings, activeMembers]);
 
+  // 선택한 월에 벙주로 지정된 모임 수를 집계합니다.
+  const topMeetingHosts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const meeting of monthMeetings) {
+      if (meeting.host_member) {
+        counts.set(meeting.host_member, (counts.get(meeting.host_member) ?? 0) + 1);
+      }
+    }
+    const ranked = members
+      .filter((member) => counts.has(member.id))
+      .map((member) => ({ member, hostCount: counts.get(member.id) ?? 0 }))
+      .sort((a, b) => b.hostCount - a.hostCount || a.member.name.localeCompare(b.member.name, "ko"))
+      .slice(0, 5);
+    return ranked.map((item) => ({
+      ...item,
+      displayRank: ranked.findIndex((candidate) => candidate.hostCount === item.hostCount) + 1,
+    }));
+  }, [monthMeetings, members]);
+
   const monthBirthdays = useMemo(() => {
     const targetMonth = selectedMonth.slice(5, 7);
 
@@ -3538,6 +3557,38 @@ async function setAttendanceMembers(memberIds: string[]) {
               </div>
             </div>
 
+            <div className="panel dashboardRankingPanel birthdayPanel">
+              <div className="panelHead compactHead">
+                <div>
+                  <h2>🎂 이달의 생일자</h2>
+                  <p>{selectedMonth.slice(0, 4)}년 {Number(selectedMonth.slice(5, 7))}월 · 활동중 회원</p>
+                </div>
+                <span className="dashboardPanelBadge">{monthBirthdays.length}명</span>
+              </div>
+
+              <div className="birthdayMemberList">
+                {monthBirthdays.map((member) => (
+                  <button
+                    className="birthdayMemberCard"
+                    key={member.id}
+                    onClick={() => setMemberDetailId(member.id)}
+                  >
+                    <span className="birthdayIcon">🎉</span>
+                    <div>
+                      <strong>{member.name}</strong>
+                      <small>생일 축하해요!</small>
+                    </div>
+                    <strong className="birthdayDate">
+                      {member.birthday?.slice(5).replace("-", ".")}
+                    </strong>
+                  </button>
+                ))}
+
+                {monthBirthdays.length === 0 && (
+                  <div className="empty dashboardEmpty">이번 달 생일자가 없습니다.</div>
+                )}
+              </div>
+            </div>
             <div className="panel dashboardRankingPanel attendanceTopPanel">
               <div className="panelHead compactHead">
                 <div>
@@ -3578,38 +3629,35 @@ async function setAttendanceMembers(memberIds: string[]) {
               </div>
             </div>
 
-            <div className="panel dashboardRankingPanel birthdayPanel">
+            <div className="panel dashboardRankingPanel hostTopPanel">
               <div className="panelHead compactHead">
                 <div>
-                  <h2>🎂 이달의 생일자</h2>
-                  <p>{selectedMonth.slice(0, 4)}년 {Number(selectedMonth.slice(5, 7))}월 · 활동중 회원</p>
+                  <h2>👑 이달의 벙주 TOP 5</h2>
+                  <p>이번 달 모임을 가장 많이 개최한 회원</p>
                 </div>
-                <span className="dashboardPanelBadge">{monthBirthdays.length}명</span>
+                <span className="dashboardPanelBadge">{topMeetingHosts.length}명</span>
               </div>
-
-              <div className="birthdayMemberList">
-                {monthBirthdays.map((member) => (
+              <div className="dashboardAttendanceList">
+                {topMeetingHosts.map((item) => (
                   <button
-                    className="birthdayMemberCard"
-                    key={member.id}
-                    onClick={() => setMemberDetailId(member.id)}
+                    className={`dashboardAttendanceCard rank${item.displayRank}`}
+                    key={item.member.id}
+                    onClick={() => setMemberDetailId(item.member.id)}
                   >
-                    <span className="birthdayIcon">🎉</span>
+                    <span className="dashboardRankNumber">{item.displayRank === 1 ? "🥇" : item.displayRank === 2 ? "🥈" : item.displayRank === 3 ? "🥉" : item.displayRank}</span>
                     <div>
-                      <strong>{member.name}</strong>
-                      <small>생일 축하해요!</small>
+                      <strong>{item.member.name}</strong>
+                      <small>모임 개최 횟수</small>
                     </div>
-                    <strong className="birthdayDate">
-                      {member.birthday?.slice(5).replace("-", ".")}
-                    </strong>
+                    <strong className="attendanceCountValue">{item.hostCount}회</strong>
                   </button>
                 ))}
-
-                {monthBirthdays.length === 0 && (
-                  <div className="empty dashboardEmpty">이번 달 생일자가 없습니다.</div>
+                {topMeetingHosts.length === 0 && (
+                  <div className="empty dashboardEmpty">이번 달 벙주 지정 기록이 없습니다.</div>
                 )}
               </div>
             </div>
+
           </section>
 
           <section className="dashboardActionGrid">

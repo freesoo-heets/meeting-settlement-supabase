@@ -5714,3 +5714,13 @@ button.meetingMetricCard {
 
 /* 브라우저 강제 다크 모드 끄기 (오목돌·알까기 색이 바뀌는 문제) */
 :root { color-scheme: only light; }
+
+/* STEP 44: four dashboard cards in balanced 2x2 arrangement */
+@media (min-width: 901px) {
+  .dashboardRankingGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 900px) {
+  .dashboardRankingGrid { grid-template-columns: minmax(0, 1fr); }
+}
+.dashboardRankingGrid > .dashboardRankingPanel { min-width: 0; }
+.hostTopPanel .dashboardAttendanceList { display: grid; gap: 10px; }
