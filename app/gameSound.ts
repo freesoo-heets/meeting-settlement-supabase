@@ -20,15 +20,15 @@ function audio() {
 
 function readOn() {
   try {
-    return window.localStorage.getItem(KEY) !== "off";
+    return window.localStorage.getItem(KEY) === "on";   // 기본은 꺼짐 (직접 켜야 소리가 난다)
   } catch {
-    return true;
+    return false;
   }
 }
 
-// 🔊 / 🔇 상태 (기본: 켜짐)
+// 🔊 / 🔇 상태 (기본: 꺼짐)
 export function useGameSound() {
-  const [on, setOn] = useState(true);
+  const [on, setOn] = useState(false);
   useEffect(() => {
     setOn(readOn());
   }, []);
@@ -45,36 +45,55 @@ export function useGameSound() {
   return { on, toggle };
 }
 
-// 바둑돌 놓는 '딱' 소리: 짧은 잡음 + 낮게 떨어지는 울림
+// 오목판에 돌을 '딱' 내려놓는 소리
+//   ① 돌과 판이 부딪히는 아주 짧고 높은 마찰음  ② 단단한 돌의 맑은 울림  ③ 나무판의 낮은 울림
 export function playStone() {
   const ac = audio();
   if (!ac) return;
-  const t = ac.currentTime;
+  const t = ac.currentTime + 0.005;
+  const out = ac.createGain();
+  out.gain.value = 0.9;
+  out.connect(ac.destination);
 
-  const noise = ac.createBuffer(1, Math.floor(ac.sampleRate * 0.04), ac.sampleRate);
-  const data = noise.getChannelData(0);
-  for (let i = 0; i < data.length; i += 1) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length) ** 3;
-  const src = ac.createBufferSource();
-  src.buffer = noise;
-  const band = ac.createBiquadFilter();
-  band.type = "bandpass";
-  band.frequency.value = 2200;
-  band.Q.value = 1.2;
-  const ng = ac.createGain();
-  ng.gain.value = 0.9;
-  src.connect(band).connect(ng).connect(ac.destination);
-  src.start(t);
+  // ① 딱 (6ms 잡음 · 높은 대역)
+  const len = Math.floor(ac.sampleRate * 0.006);
+  const buf = ac.createBuffer(1, len, ac.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i += 1) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+  const click = ac.createBufferSource();
+  click.buffer = buf;
+  const hp = ac.createBiquadFilter();
+  hp.type = "bandpass";
+  hp.frequency.value = 3800;
+  hp.Q.value = 0.7;
+  const cg = ac.createGain();
+  cg.gain.value = 1.4;
+  click.connect(hp).connect(cg).connect(out);
+  click.start(t);
 
-  const osc = ac.createOscillator();
-  osc.type = "sine";
-  osc.frequency.setValueAtTime(220, t);
-  osc.frequency.exponentialRampToValueAtTime(90, t + 0.09);
-  const og = ac.createGain();
-  og.gain.setValueAtTime(0.35, t);
-  og.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
-  osc.connect(og).connect(ac.destination);
-  osc.start(t);
-  osc.stop(t + 0.13);
+  // ② 돌의 맑은 울림 (짧게)
+  const stone = ac.createOscillator();
+  stone.type = "sine";
+  stone.frequency.setValueAtTime(1650, t);
+  stone.frequency.exponentialRampToValueAtTime(1250, t + 0.05);
+  const sg = ac.createGain();
+  sg.gain.setValueAtTime(0.22, t);
+  sg.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
+  stone.connect(sg).connect(out);
+  stone.start(t);
+  stone.stop(t + 0.07);
+
+  // ③ 나무판 울림 (낮고 조금 길게)
+  const wood = ac.createOscillator();
+  wood.type = "triangle";
+  wood.frequency.setValueAtTime(420, t);
+  wood.frequency.exponentialRampToValueAtTime(300, t + 0.09);
+  const wg = ac.createGain();
+  wg.gain.setValueAtTime(0.3, t);
+  wg.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+  wood.connect(wg).connect(out);
+  wood.start(t);
+  wood.stop(t + 0.11);
 }
 
 function tones(notes: Array<[number, number]>, volume = 0.18) {

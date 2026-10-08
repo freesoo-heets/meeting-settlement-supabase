@@ -219,6 +219,7 @@ function nameOf(game: OmokRow, side: "host" | "guest" | null) {
 }
 
 export default function OmokGame({ onClose, onBack, initialGameId, currentMemberId, myPoints, myTickets, myName, isAdmin, opponents }: Props) {
+  const sound = useGameSound(); // 🔊 효과음 (기본 꺼짐 · 이 기기에 저장)
   useGameViewport(); // 휴대폰: 뒤 페이지 스크롤 막기 · 키보드 높이에 맞추기
   const [games, setGames] = useState<OmokRow[]>([]);
   const [viewId, setViewId] = useState<string>(initialGameId ?? "");
@@ -491,9 +492,19 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
         <div className="meetingModalHeader">
           <div>
             <span>렌주룰 · 한 수 {TURN_SECONDS}초 · 티켓 1장씩</span>
-            <h2>⚫ 오목 대결</h2>
+            <h2>🏁 오목 대결</h2>
           </div>
           <div className="gameHeaderActions">
+            <button
+              type="button"
+              className={`gameSoundToggle ${sound.on ? "on" : ""}`}
+              aria-pressed={sound.on}
+              aria-label={sound.on ? "효과음 끄기" : "효과음 켜기"}
+              title={sound.on ? "효과음 끄기" : "효과음 켜기"}
+              onClick={sound.toggle}
+            >
+              {sound.on ? "🔊" : "🔇"}
+            </button>
             {onBack && <button className="smallButton ghost" onClick={onBack}>← 게임</button>}
             <button className="modalCloseButton" onClick={onClose}>×</button>
           </div>
@@ -561,6 +572,7 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
           <>
           <OmokBoardView
             game={viewing}
+            soundOn={sound.on}
             reserve={
               viewing.status === "playing" && seatOf(viewing) && !viewing.is_test
                 ? { mine: !!reserved[viewing.id], theirs: !!oppReserved[viewing.id], toggle: () => toggleReserve(viewing) }
@@ -810,6 +822,7 @@ function OmokBoardView({
   onMove,
   onResign,
   reserve,
+  soundOn,
   onCancel,
   onUndoRequest,
   onUndoAnswer,
@@ -827,6 +840,7 @@ function OmokBoardView({
   onMove: (x: number, y: number) => void;
   onResign: () => void;
   reserve: { mine: boolean; theirs: boolean; toggle: () => void } | null;
+  soundOn: boolean;
   onCancel: () => void;
   onUndoRequest: () => void;
   onUndoAnswer: (accept: boolean) => void;
@@ -859,7 +873,7 @@ function OmokBoardView({
   const last = game.moves[game.moves.length - 1];
 
   // ── 효과음 (🔊 켜고 끄기는 이 기기에 저장) ──
-  const sound = useGameSound();
+  const sound = { on: soundOn };
   const seen = useRef<{ id: string; moves: number; status: string } | null>(null);
   useEffect(() => {
     const prev = seen.current;
@@ -930,19 +944,7 @@ function OmokBoardView({
           <strong>{nameOf(game, blackSide)}</strong>
           {mySide === blackSide && <em>나</em>}
         </div>
-        <div className="omokCenterCol">
-          <span className="omokStake">{game.is_friendly ? "🤝 친선" : `💎 ${game.stake.toLocaleString("ko-KR")}`}</span>
-          <button
-            type="button"
-            className={`gameSoundToggle ${sound.on ? "on" : ""}`}
-            aria-pressed={sound.on}
-            aria-label={sound.on ? "효과음 끄기" : "효과음 켜기"}
-            title={sound.on ? "효과음 끄기" : "효과음 켜기"}
-            onClick={sound.toggle}
-          >
-            {sound.on ? "🔊" : "🔇"}
-          </button>
-        </div>
+        <span className="omokStake">{game.is_friendly ? "🤝 친선" : `💎 ${game.stake.toLocaleString("ko-KR")}`}</span>
         <div className={`omokPlayer ${game.status === "playing" && !blackTurn ? "turn" : ""}`}>
           <i className="omokStoneIcon white" />
           <strong>{nameOf(game, whiteSide)}</strong>
