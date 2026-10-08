@@ -1,7 +1,7 @@
 "use client";
 
 import { useGameViewport } from "./useGameViewport";
-import { playClack, playFall, playFlick, playLose, playTick, playWin, useGameSound } from "./gameSound";
+import { playAlkLose, playAlkTick, playAlkWin, playClack, playFall, playFlick, useGameSound } from "./gameSound";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
@@ -1040,11 +1040,11 @@ function AlkkagiBoardView({
     seenEnd.current = { id: game.id, status: game.status };
     if (!soundOn || !prev || prev.id !== game.id || !mySeat) return;
     if (prev.status !== "finished" && game.status === "finished") {
-      window.setTimeout(() => (game.winner === mySeat ? playWin() : game.winner === "draw" ? playTick() : playLose()), 600);
+      window.setTimeout(() => (game.winner === mySeat ? playAlkWin() : game.winner === "draw" ? playAlkTick() : playAlkLose()), 600);
     }
   }, [game.id, game.status, game.winner, mySeat, soundOn]);
   useEffect(() => {
-    if (soundOn && myTurn && (remaining === 10 || remaining === 5)) playTick();
+    if (soundOn && myTurn && (remaining === 10 || remaining === 5)) playAlkTick();
   }, [remaining, myTurn, soundOn]);
   const strikes = { host: 0, guest: 0, ...(game.strikes ?? {}) };
   const choAlive = alive(shown, "cho");

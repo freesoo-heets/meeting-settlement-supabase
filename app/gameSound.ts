@@ -51,6 +51,7 @@ type Hit = {
   body: { f1: number; f2: number; dec: number; g: number };
   wood?: { f: number; q: number; dec: number; g: number };
   sub?: { f1: number; f2: number; dec: number; g: number };
+  ring?: { f1: number; f2: number; dec: number; g: number };
   lp: number;
 };
 
@@ -98,7 +99,7 @@ function hit(p: Hit, volume = 1, delay = 0) {
     ws.start(t);
   }
 
-  for (const [tone, type] of [[p.body, "sine"], [p.sub, "sine"]] as const) {
+  for (const [tone, type] of [[p.body, "sine"], [p.sub, "sine"], [p.ring, "triangle"]] as const) {
     if (!tone) continue;
     const o = ac.createOscillator();
     o.type = type;
@@ -119,38 +120,63 @@ export function playStone() {
   hit({ click: { f: 3600, q: 1.6, g: 1.2, len: 0.003 }, body: { f1: 1500, f2: 1300, dec: 0.03, g: 0.25 }, lp: 8000 });
 }
 
-// 🥏 알까기: 손가락으로 튕기는 '톡'
+// 🥏 알까기 효과음 (샘플 페이지에서 고른 조합: F9 · C6 · D7 · W2 · L3 · T4)
+
+// F9 '팅' — 고무줄 튕기는 느낌
 export function playFlick() {
-  hit({ click: { f: 2600, q: 1, g: 0.7, len: 0.004 }, body: { f1: 900, f2: 600, dec: 0.04, g: 0.2 }, lp: 6000 }, 0.8);
+  hit({
+    click: { f: 2200, q: 1, g: 0.5, len: 0.003 },
+    body: { f1: 700, f2: 520, dec: 0.09, g: 0.3 },
+    ring: { f1: 1400, f2: 1300, dec: 0.08, g: 0.08 },
+    lp: 7000,
+  });
 }
 
-// 🥏 알까기: 장기알끼리 부딪히는 '딱' (세게 부딪힐수록 크게)
+// C6 '탕' — 울림이 조금 남는 금속성 (세게 부딪힐수록 크게)
 export function playClack(power: number) {
   const v = Math.min(1, Math.max(0.15, power / 450));
   hit(
     {
-      click: { f: 3000, q: 1, g: 1.2, len: 0.004 },
-      body: { f1: 1100, f2: 980, dec: 0.04, g: 0.3 },
-      wood: { f: 1350, q: 12, dec: 0.08, g: 0.8 },
-      lp: 7500,
+      click: { f: 3500, q: 1.2, g: 1, len: 0.003 },
+      body: { f1: 1800, f2: 1750, dec: 0.1, g: 0.15 },
+      ring: { f1: 2700, f2: 2650, dec: 0.2, g: 0.08 },
+      lp: 10000,
     },
     v,
   );
 }
 
-// 🥏 알까기: 판 밖으로 떨어지는 '툭' (낮게, 조금 늦게)
+// D7 '퐁당' — 판 밖으로 떨어짐
 export function playFall() {
-  hit(
-    {
-      click: { f: 1500, q: 0.8, g: 0.6, len: 0.005 },
-      body: { f1: 260, f2: 170, dec: 0.14, g: 0.6 },
-      sub: { f1: 120, f2: 80, dec: 0.12, g: 0.4 },
-      lp: 2600,
-    },
-    0.9,
-    0.08,
-  );
+  hit({ click: { f: 800, q: 0.7, g: 0.3, len: 0.01 }, body: { f1: 300, f2: 900, dec: 0.12, g: 0.35 }, lp: 4000 });
 }
+
+// 음 이어 붙이기 (샘플 페이지와 같은 방식: 세모파 · 0.2 크기 · 음 길이의 90% 간격, 0Hz 는 쉼표)
+function melody(notes: Array<[number, number]>) {
+  const ac = audio();
+  if (!ac) return;
+  let t = ac.currentTime + 0.01;
+  for (const [freq, len] of notes) {
+    if (freq > 0) {
+      const o = ac.createOscillator();
+      o.type = "triangle";
+      o.frequency.value = freq;
+      const g = ac.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.2, t + 0.003);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + len + 0.02);
+      o.connect(g).connect(ac.destination);
+      o.start(t);
+      o.stop(t + len + 0.05);
+    }
+    t += len * 0.9;
+  }
+}
+
+// W2 팡파레 · L3 띠로리 · T4 삑삑
+export const playAlkWin = () => melody([[523, 0.1], [523, 0.1], [523, 0.1], [659, 0.35], [587, 0.12], [784, 0.45]]);
+export const playAlkLose = () => melody([[523, 0.12], [494, 0.12], [466, 0.12], [440, 0.4]]);
+export const playAlkTick = () => melody([[1100, 0.06], [0, 0.05], [1100, 0.06]]);
 
 function tones(notes: Array<[number, number]>, volume = 0.18) {
   const ac = audio();
