@@ -210,6 +210,15 @@ export default function AlkkagiGame({
 
   // ── 종료 팝업 · 재경기 ──
   const [resultFor, setResultFor] = useState<string | null>(null);
+  // ★ 마지막 수의 알이 다 멈추고 판을 볼 시간(1.8초)이 지난 뒤에 결과 창을 띄운다
+  const [boardAnimating, setBoardAnimating] = useState(false);
+  const [resultReady, setResultReady] = useState(false);
+  useEffect(() => {
+    setResultReady(false);
+    if (!resultFor || boardAnimating) return;
+    const timer = window.setTimeout(() => setResultReady(true), 1800);
+    return () => window.clearTimeout(timer);
+  }, [resultFor, boardAnimating]);
   const [rematchOffer, setRematchOffer] = useState<{ id: string; from: string; stake: number; friendly: boolean } | null>(null);
   const seenStatus = useRef<Record<string, string>>({});
   useEffect(() => {
@@ -465,6 +474,7 @@ export default function AlkkagiGame({
           <>
           <AlkkagiBoardView
             game={viewing}
+            onAnimating={setBoardAnimating}
             soundOn={sound.on}
             reserve={
               viewing.status === "playing" && seatOf(viewing) && !viewing.is_test
@@ -666,7 +676,7 @@ export default function AlkkagiGame({
             )}
           </div>
         )}
-        {viewing && resultFor === viewing.id && viewing.status === "finished" && !rematchOffer && (
+        {viewing && resultFor === viewing.id && resultReady && viewing.status === "finished" && !rematchOffer && (
           <GameResultPopup
             game={viewing}
             mySeat={seatOf(viewing)}
@@ -713,6 +723,7 @@ function AlkkagiBoardView({
   onResign,
   reserve,
   soundOn,
+  onAnimating,
   onCancel,
   emotes,
   emoteReadyIn,
@@ -727,6 +738,7 @@ function AlkkagiBoardView({
   onResign: () => void;
   reserve: { mine: boolean; theirs: boolean; toggle: () => void } | null;
   soundOn: boolean;
+  onAnimating: (animating: boolean) => void;
   onCancel: () => void;
   emotes: ShownEmote[];
   emoteReadyIn: number;
@@ -754,6 +766,9 @@ function AlkkagiBoardView({
   const frameRef = useRef(0);
   const soundOnRef = useRef(soundOn);
   soundOnRef.current = soundOn;
+  useEffect(() => {
+    onAnimating(animating); // 결과 창은 알이 다 멈춘 뒤에
+  }, [animating, onAnimating]);
 
   // 움직이는 동안에는 판 위에 캔버스를 올려 알을 그린다.
   // (SVG 알 32개와 한자를 매 순간 다시 그리면 휴대폰에서 끊기기 때문)
