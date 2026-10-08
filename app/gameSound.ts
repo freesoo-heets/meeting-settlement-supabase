@@ -45,72 +45,111 @@ export function useGameSound() {
   return { on, toggle };
 }
 
-// 오목판에 돌을 '똑' 내려놓는 묵직한 소리 (두꺼운 나무 바둑판 느낌)
-//   ① 돌이 닿는 순간의 짧은 '딱' (높은 소리는 줄임)  ② 판 몸통의 낮은 '똑' 울림  ③ 아래로 깔리는 둔한 울림
-export function playStone() {
+// 공통: 짧은 잡음 '딱' + 짧게 울리는 음 (샘플 페이지와 같은 방식)
+type Hit = {
+  click: { f: number; q: number; g: number; len: number };
+  body: { f1: number; f2: number; dec: number; g: number };
+  wood?: { f: number; q: number; dec: number; g: number };
+  sub?: { f1: number; f2: number; dec: number; g: number };
+  lp: number;
+};
+
+function hit(p: Hit, volume = 1, delay = 0) {
   const ac = audio();
   if (!ac) return;
-  const t = ac.currentTime + 0.005;
+  const t = ac.currentTime + 0.005 + delay;
   const out = ac.createGain();
-  out.gain.value = 1;
-  const soft = ac.createBiquadFilter();   // 너무 날카롭지 않게
-  soft.type = "lowpass";
-  soft.frequency.value = 3200;
-  out.connect(soft).connect(ac.destination);
+  out.gain.value = 0.9 * volume;
+  const lp = ac.createBiquadFilter();
+  lp.type = "lowpass";
+  lp.frequency.value = p.lp;
+  out.connect(lp).connect(ac.destination);
 
-  // ① 닿는 순간 (4ms 잡음, 중간 높이)
-  const len = Math.floor(ac.sampleRate * 0.004);
+  const len = Math.max(1, Math.floor(ac.sampleRate * p.click.len));
   const buf = ac.createBuffer(1, len, ac.sampleRate);
   const d = buf.getChannelData(0);
   for (let i = 0; i < len; i += 1) d[i] = (Math.random() * 2 - 1) * (1 - i / len) ** 2;
-  const click = ac.createBufferSource();
-  click.buffer = buf;
+  const src = ac.createBufferSource();
+  src.buffer = buf;
   const bp = ac.createBiquadFilter();
   bp.type = "bandpass";
-  bp.frequency.value = 1900;
-  bp.Q.value = 0.9;
+  bp.frequency.value = p.click.f;
+  bp.Q.value = p.click.q;
   const cg = ac.createGain();
-  cg.gain.value = 0.9;
-  click.connect(bp).connect(cg).connect(out);
-  click.start(t);
+  cg.gain.value = p.click.g;
+  src.connect(bp).connect(cg).connect(out);
+  src.start(t);
 
-  // ② 판 몸통의 '똑' (낮고 단단하게, 빠르게 사라짐)
-  const body = ac.createOscillator();
-  body.type = "sine";
-  body.frequency.setValueAtTime(310, t);
-  body.frequency.exponentialRampToValueAtTime(190, t + 0.12);
-  const bg = ac.createGain();
-  bg.gain.setValueAtTime(0.0001, t);
-  bg.gain.exponentialRampToValueAtTime(0.7, t + 0.003);
-  bg.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
-  body.connect(bg).connect(out);
-  body.start(t);
-  body.stop(t + 0.17);
+  if (p.wood) {
+    const wl = Math.floor(ac.sampleRate * 0.02);
+    const wb = ac.createBuffer(1, wl, ac.sampleRate);
+    const wd = wb.getChannelData(0);
+    for (let i = 0; i < wl; i += 1) wd[i] = (Math.random() * 2 - 1) * (1 - i / wl) ** 3;
+    const ws = ac.createBufferSource();
+    ws.buffer = wb;
+    const wf = ac.createBiquadFilter();
+    wf.type = "bandpass";
+    wf.frequency.value = p.wood.f;
+    wf.Q.value = p.wood.q;
+    const wg = ac.createGain();
+    wg.gain.setValueAtTime(p.wood.g, t);
+    wg.gain.exponentialRampToValueAtTime(0.0001, t + p.wood.dec);
+    ws.connect(wf).connect(wg).connect(out);
+    ws.start(t);
+  }
 
-  // ③ 둔한 저음 (묵직함)
-  const sub = ac.createOscillator();
-  sub.type = "sine";
-  sub.frequency.setValueAtTime(140, t);
-  sub.frequency.exponentialRampToValueAtTime(95, t + 0.1);
-  const ub = ac.createGain();
-  ub.gain.setValueAtTime(0.0001, t);
-  ub.gain.exponentialRampToValueAtTime(0.45, t + 0.004);
-  ub.gain.exponentialRampToValueAtTime(0.001, t + 0.13);
-  sub.connect(ub).connect(out);
-  sub.start(t);
-  sub.stop(t + 0.14);
+  for (const [tone, type] of [[p.body, "sine"], [p.sub, "sine"]] as const) {
+    if (!tone) continue;
+    const o = ac.createOscillator();
+    o.type = type;
+    o.frequency.setValueAtTime(tone.f1, t);
+    o.frequency.exponentialRampToValueAtTime(tone.f2, t + tone.dec);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(tone.g, t + 0.003);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + tone.dec + 0.02);
+    o.connect(g).connect(out);
+    o.start(t);
+    o.stop(t + tone.dec + 0.05);
+  }
+}
 
-  // 나무의 짧은 잔향 (살짝)
-  const ring = ac.createOscillator();
-  ring.type = "triangle";
-  ring.frequency.setValueAtTime(820, t);
-  ring.frequency.exponentialRampToValueAtTime(640, t + 0.05);
-  const rg = ac.createGain();
-  rg.gain.setValueAtTime(0.08, t);
-  rg.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
-  ring.connect(rg).connect(out);
-  ring.start(t);
-  ring.stop(t + 0.07);
+// 🏁 오목 착수: 샘플 35번 '플라스틱 돌'
+export function playStone() {
+  hit({ click: { f: 3600, q: 1.6, g: 1.2, len: 0.003 }, body: { f1: 1500, f2: 1300, dec: 0.03, g: 0.25 }, lp: 8000 });
+}
+
+// 🥏 알까기: 손가락으로 튕기는 '톡'
+export function playFlick() {
+  hit({ click: { f: 2600, q: 1, g: 0.7, len: 0.004 }, body: { f1: 900, f2: 600, dec: 0.04, g: 0.2 }, lp: 6000 }, 0.8);
+}
+
+// 🥏 알까기: 장기알끼리 부딪히는 '딱' (세게 부딪힐수록 크게)
+export function playClack(power: number) {
+  const v = Math.min(1, Math.max(0.15, power / 450));
+  hit(
+    {
+      click: { f: 3000, q: 1, g: 1.2, len: 0.004 },
+      body: { f1: 1100, f2: 980, dec: 0.04, g: 0.3 },
+      wood: { f: 1350, q: 12, dec: 0.08, g: 0.8 },
+      lp: 7500,
+    },
+    v,
+  );
+}
+
+// 🥏 알까기: 판 밖으로 떨어지는 '툭' (낮게, 조금 늦게)
+export function playFall() {
+  hit(
+    {
+      click: { f: 1500, q: 0.8, g: 0.6, len: 0.005 },
+      body: { f1: 260, f2: 170, dec: 0.14, g: 0.6 },
+      sub: { f1: 120, f2: 80, dec: 0.12, g: 0.4 },
+      lp: 2600,
+    },
+    0.9,
+    0.08,
+  );
 }
 
 function tones(notes: Array<[number, number]>, volume = 0.18) {

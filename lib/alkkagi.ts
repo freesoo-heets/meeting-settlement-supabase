@@ -99,7 +99,15 @@ export function clampShot(vx: number, vy: number) {
 type Body = Piece & { vx: number; vy: number; r: number; m: number };
 
 // 한 번 튕긴 결과를 계산한다. onStep 이 있으면 매 순간 위치를 넘겨준다 (화면 재생용).
-export function simulate(pieces: Piece[], shot: Shot, onStep?: (state: Piece[]) => void): Piece[] {
+// 효과음용: 몇 번째 계산 단계에 무슨 일이 있었는지 (화면만 쓰고, 결과에는 영향 없음)
+export type SimEvent = { step: number; kind: "hit" | "out"; power: number };
+
+export function simulate(
+  pieces: Piece[],
+  shot: Shot,
+  onStep?: (state: Piece[]) => void,
+  onEvent?: (event: SimEvent) => void,
+): Piece[] {
   const { vx, vy } = clampShot(shot.vx, shot.vy);
   const bodies: Body[] = pieces.map((piece) => {
     const r = RADIUS[piece.kind];
@@ -152,6 +160,7 @@ export function simulate(pieces: Piece[], shot: Shot, onStep?: (state: Piece[]) 
         // 부딪힘
         const vn = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
         if (vn < 0) {
+          if (vn < -20) onEvent?.({ step, kind: "hit", power: -vn });
           const impulse = (-(1 + RESTITUTION) * vn) / (ia + ib);
           a.vx -= impulse * ia * nx;
           a.vy -= impulse * ia * ny;
@@ -171,6 +180,7 @@ export function simulate(pieces: Piece[], shot: Shot, onStep?: (state: Piece[]) 
         b.vy = (b.vy / speed) * next;
       }
       if (b.x < 0 || b.x > BOARD_W || b.y < 0 || b.y > BOARD_H) {
+        onEvent?.({ step, kind: "out", power: speed });
         b.out = true;
         b.vx = 0;
         b.vy = 0;

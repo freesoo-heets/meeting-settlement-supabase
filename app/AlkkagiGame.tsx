@@ -1,6 +1,7 @@
 "use client";
 
 import { useGameViewport } from "./useGameViewport";
+import { playClack, playFall, playFlick, playLose, playTick, playWin, useGameSound } from "./gameSound";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
@@ -150,6 +151,7 @@ export default function AlkkagiGame({
   opponents,
   isAdmin,
 }: Props) {
+  const sound = useGameSound(); // 🔊 효과음 (기본 꺼짐 · 이 기기에 저장)
   useGameViewport(); // 휴대폰: 뒤 페이지 스크롤 막기 · 키보드 높이에 맞추기
   const [games, setGames] = useState<AlkRow[]>([]);
   const [viewId, setViewId] = useState(initialGameId ?? "");
@@ -395,6 +397,16 @@ export default function AlkkagiGame({
             <h2>🥏 알까기</h2>
           </div>
           <div className="gameHeaderActions">
+            <button
+              type="button"
+              className={`gameSoundToggle ${sound.on ? "on" : ""}`}
+              aria-pressed={sound.on}
+              aria-label={sound.on ? "효과음 끄기" : "효과음 켜기"}
+              title={sound.on ? "효과음 끄기" : "효과음 켜기"}
+              onClick={sound.toggle}
+            >
+              {sound.on ? "🔊" : "🔇"}
+            </button>
             {onBack && <button className="smallButton ghost" onClick={onBack}>← 게임</button>}
             <button className="modalCloseButton" onClick={onClose}>×</button>
           </div>
@@ -453,6 +465,7 @@ export default function AlkkagiGame({
           <>
           <AlkkagiBoardView
             game={viewing}
+            soundOn={sound.on}
             reserve={
               viewing.status === "playing" && seatOf(viewing) && !viewing.is_test
                 ? { mine: !!reserved[viewing.id], theirs: !!oppReserved[viewing.id], toggle: () => toggleReserve(viewing) }
@@ -699,6 +712,7 @@ function AlkkagiBoardView({
   onShoot,
   onResign,
   reserve,
+  soundOn,
   onCancel,
   emotes,
   emoteReadyIn,
@@ -712,6 +726,7 @@ function AlkkagiBoardView({
   onShoot: (pieceId: string, vx: number, vy: number) => Promise<boolean>;
   onResign: () => void;
   reserve: { mine: boolean; theirs: boolean; toggle: () => void } | null;
+  soundOn: boolean;
   onCancel: () => void;
   emotes: ShownEmote[];
   emoteReadyIn: number;
@@ -737,6 +752,8 @@ function AlkkagiBoardView({
   const [animating, setAnimating] = useState(false);
   const animatedNo = useRef(game.shot_no);
   const frameRef = useRef(0);
+  const soundOnRef = useRef(soundOn);
+  soundOnRef.current = soundOn;
 
   // 움직이는 동안에는 판 위에 캔버스를 올려 알을 그린다.
   // (SVG 알 32개와 한자를 매 순간 다시 그리면 휴대폰에서 끊기기 때문)
@@ -746,7 +763,31 @@ function AlkkagiBoardView({
 
   const play = useCallback((before: Piece[], shot: { id: string; vx: number; vy: number }, final: Piece[] | null) => {
     const frames: Piece[][] = [before];
-    const result = simulate(before, shot, (state) => frames.push(state));
+    const events: Array<{ frame: number; kind: "hit" | "out"; power: number }> = [];
+    const result = simulate(
+      before,
+      shot,
+      (state) => frames.push(state),
+      (event) => events.push({ frame: event.step + 1, kind: event.kind, power: event.power }),
+    );
+    let nextEvent = 0;
+    const playEvents = (t: number) => {
+      if (!soundOnRef.current) {
+        while (nextEvent < events.length && events[nextEvent].frame <= t) nextEvent += 1;
+        return;
+      }
+      let hitFrame = -1;
+      while (nextEvent < events.length && events[nextEvent].frame <= t) {
+        const event = events[nextEvent];
+        nextEvent += 1;
+        if (event.kind === "out") playFall();
+        else if (event.frame !== hitFrame) {
+          hitFrame = event.frame; // 같은 순간 여러 번 부딪혀도 한 번만
+          playClack(event.power);
+        }
+      }
+    };
+    if (soundOnRef.current) playFlick();
     window.cancelAnimationFrame(frameRef.current);
     setShown(before);
     setAnimating(true);
@@ -816,6 +857,7 @@ function AlkkagiBoardView({
         return;
       }
       drawAt(t);
+      playEvents(t);
       frameRef.current = window.requestAnimationFrame(step);
     };
     frameRef.current = window.requestAnimationFrame(step);
@@ -991,6 +1033,19 @@ function AlkkagiBoardView({
   const remaining = game.turn_deadline
     ? Math.max(0, Math.ceil((new Date(game.turn_deadline).getTime() - now) / 1000))
     : TURN_SECONDS;
+  // 효과음: 승패 · 내 차례 남은 10초 · 5초
+  const seenEnd = useRef<{ id: string; status: string } | null>(null);
+  useEffect(() => {
+    const prev = seenEnd.current;
+    seenEnd.current = { id: game.id, status: game.status };
+    if (!soundOn || !prev || prev.id !== game.id || !mySeat) return;
+    if (prev.status !== "finished" && game.status === "finished") {
+      window.setTimeout(() => (game.winner === mySeat ? playWin() : game.winner === "draw" ? playTick() : playLose()), 600);
+    }
+  }, [game.id, game.status, game.winner, mySeat, soundOn]);
+  useEffect(() => {
+    if (soundOn && myTurn && (remaining === 10 || remaining === 5)) playTick();
+  }, [remaining, myTurn, soundOn]);
   const strikes = { host: 0, guest: 0, ...(game.strikes ?? {}) };
   const choAlive = alive(shown, "cho");
   const hanAlive = alive(shown, "han");
