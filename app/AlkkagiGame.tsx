@@ -1,7 +1,7 @@
 "use client";
 
 import { useGameViewport } from "./useGameViewport";
-import { playAlkLose, playAlkTick, playAlkWin, playClack, playFall, playFlick, useGameSound } from "./gameSound";
+import { playAlkLose, playAlkTick, playAlkWin, playClack, playFall, playFlick, playPull, resetPull, useGameSound } from "./gameSound";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
@@ -960,6 +960,7 @@ function AlkkagiBoardView({
     const v = aimVector();
     if (!aim || !v) return;
     const cancel = v.power < CANCEL_POWER;
+    if (soundOnRef.current) playPull(v.power); // 당기는 소리 (세기에 따라)
     const color = cancel ? "#94a3b8" : v.power < 0.4 ? "#22c55e" : v.power < 0.75 ? "#f59e0b" : "#ef4444";
     // 처음 댄 자리의 '취소' 원 (이 안으로 돌아오면 취소)
     if (cancelEl.current) {
@@ -1032,6 +1033,7 @@ function AlkkagiBoardView({
     window.cancelAnimationFrame(aimFrame.current);
     aimFrame.current = 0;
     resetAimPiece();
+    resetPull();
     aimRef.current = null;
     setAimId(null);
     if (current && (!v || v.power < CANCEL_POWER)) {
@@ -1155,6 +1157,7 @@ function AlkkagiBoardView({
           }}
           onPointerUp={() => void release()}
           onPointerCancel={() => {
+            resetPull();
             resetAimPiece();
             aimRef.current = null;
             setAimId(null);

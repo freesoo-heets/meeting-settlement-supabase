@@ -120,7 +120,7 @@ export function playStone() {
   hit({ click: { f: 3600, q: 1.6, g: 1.2, len: 0.003 }, body: { f1: 1500, f2: 1300, dec: 0.03, g: 0.25 }, lp: 8000 });
 }
 
-// 🥏 알까기 효과음 (샘플 페이지에서 고른 조합: F9 · C6 · D7 · W2 · L3 · T4)
+// 🥏 알까기 효과음 (샘플 페이지에서 고른 조합: 당기기 P11 · 튕김 F9 · 충돌 C6 · 떨어짐 D24 · W2 · L3 · T4)
 
 // F9 '팅' — 고무줄 튕기는 느낌
 export function playFlick() {
@@ -146,9 +146,19 @@ export function playClack(power: number) {
   );
 }
 
-// D7 '퐁당' — 판 밖으로 떨어짐
-export function playFall() {
-  hit({ click: { f: 800, q: 0.7, g: 0.3, len: 0.01 }, body: { f1: 300, f2: 900, dec: 0.12, g: 0.35 }, lp: 4000 });
+// P11 '활시위 끼익' — 당기는 세기가 4% 오를 때마다 '끽' (세게 당길수록 높고 크게)
+const PULL_STEP = 4;
+let pullLast = -1;
+export function playPull(power: number) {
+  const step = Math.floor((power * 100) / PULL_STEP);
+  if (step > pullLast && step > 0) {
+    const f = 300 + 400 * power;
+    hit({ click: { f: 1600, q: 2, g: 0.5, len: 0.004 }, body: { f1: f, f2: (f * 290) / 300, dec: 0.02, g: 0.08 }, lp: 3500 }, 0.5 + power * 0.5);
+  }
+  pullLast = step;
+}
+export function resetPull() {
+  pullLast = -1;
 }
 
 // 음 이어 붙이기 (샘플 페이지와 같은 방식: 세모파 · 0.2 크기 · 음 길이의 90% 간격, 0Hz 는 쉼표)
@@ -172,6 +182,9 @@ function melody(notes: Array<[number, number]>) {
     t += len * 0.9;
   }
 }
+
+// D24 '빠빰' — 판 밖으로 떨어짐
+export const playFall = () => melody([[294, 0.1], [220, 0.3]]);
 
 // W2 팡파레 · L3 띠로리 · T4 삑삑
 export const playAlkWin = () => melody([[523, 0.1], [523, 0.1], [523, 0.1], [659, 0.35], [587, 0.12], [784, 0.45]]);
