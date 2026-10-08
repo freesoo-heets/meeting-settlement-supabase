@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServerAdmin } from "../../../lib/server-admin";
+import { isFriendlyTicketTime } from "../../../lib/friendlyTime";
 import { CENTER, TURN_SECONDS, checkMove, type Move } from "../../../lib/omok";
 import { FRIENDLY_TICKET_ERROR, isAdminMember, loadFriendlyPlayer, loadMember, requestInvite } from "../../../lib/gameServer";
 
@@ -280,8 +281,8 @@ export async function POST(request: Request) {
       guest_uid: me.uid,
       black,
       moves: [[CENTER, CENTER]], // 흑 첫 수는 천원 고정
-      // 둘 다 무료(게스트)인 친선만 바로 시작, 그 외에는 봇이 티켓(·판돈)을 차감한 뒤 시작
-      ...(friendly && game.host_uid === "friendly" && me.uid === "friendly"
+      // 친선이 무료인 경우(티켓 시간 밖 · 둘 다 게스트)는 바로 시작, 그 외에는 봇이 티켓(·판돈)을 차감한 뒤 시작
+      ...(friendly && (!isFriendlyTicketTime() || (game.host_uid === "friendly" && me.uid === "friendly"))
         ? { status: "playing", started_at: new Date().toISOString(), turn_deadline: deadlineFromNow() }
         : { status: "escrow", escrow_state: "requested" }),
     });

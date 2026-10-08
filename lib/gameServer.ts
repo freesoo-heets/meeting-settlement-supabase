@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServerAdmin } from "./server-admin";
+import { isFriendlyTicketTime } from "./friendlyTime";
 
 // 게임 API 공통 (서버 전용)
 
@@ -38,12 +39,18 @@ export async function loadFriendlyPlayer(admin: Admin, memberId: string): Promis
   const free = { memberId, name: member.name, uid: "friendly", exp: 0, tickets: 0, free: true };
   const { data: row } = await admin.from("members").select("is_guest").eq("id", memberId).maybeSingle();
   if (row?.is_guest) return free;
+  // 평일 8~20시가 아니면(밤 · 주말 · 공휴일) 누구나 무료. 전적 기록용 user_id 는 남긴다
+  if (!isFriendlyTicketTime()) {
+    const player = await loadPlayer(admin, memberId);
+    return "error" in player ? free : { ...player, free: true };
+  }
   const player = await loadPlayer(admin, memberId);
   if ("error" in player) return free;
   return { ...player, free: false };
 }
 
-export const FRIENDLY_TICKET_ERROR = "친선전도 티켓이 1장 필요합니다. 카톡에서 !티켓구매 로 살 수 있습니다. (게스트는 무료)";
+export const FRIENDLY_TICKET_ERROR =
+  "친선전은 평일 8~20시에 티켓이 1장 필요합니다. 카톡에서 !티켓구매 로 살 수 있습니다. (그 외 시간 · 주말 · 공휴일 · 게스트는 무료)";
 
 // 점수 내기 게임용: 봇 점수판의 점수·티켓까지
 export async function loadPlayer(admin: Admin, memberId: string): Promise<Player | Fail> {

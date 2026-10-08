@@ -35,6 +35,7 @@ import {
   type EmoteKind,
 } from "./OmokEmotes";
 import { copyInviteLink } from "./copyInvite";
+import { friendlyTicketText } from "../lib/friendlyTime";
 import { GameResultPopup, RematchOfferPopup } from "./GameResult";
 
 type Seat = "host" | "guest";
@@ -411,7 +412,7 @@ export default function AlkkagiGame({
                 : `${viewing.host_name}님이 알까기 상대를 찾고 있어요`}
             </strong>
             <span>
-              {viewing.is_friendly ? <b>🤝 친선전 · 점수 없음 · 티켓 🎫1장 (게스트 무료)</b> : <>판돈 <b>💎 {viewing.stake.toLocaleString("ko-KR")}점</b> · 티켓 🎫1장</>} · 한 턴 {TURN_SECONDS}초
+              {viewing.is_friendly ? <b>🤝 친선전 · 점수 없음 · {friendlyTicketText()}</b> : <>판돈 <b>💎 {viewing.stake.toLocaleString("ko-KR")}점</b> · 티켓 🎫1장</>} · 한 턴 {TURN_SECONDS}초
             </span>
             <span className="muted">
               내 점수 💎 {myPoints !== null ? myPoints.toLocaleString("ko-KR") : "-"} · 티켓 🎫 {myTickets ?? "-"}
@@ -547,7 +548,7 @@ export default function AlkkagiGame({
                   <button
                     className={`omokChip friendly ${stake === "friendly" ? "active" : ""}`}
                     onClick={() => setStake("friendly")}
-                    title="점수 없이 두는 친선전 (티켓 1장, 게스트 무료)"
+                    title="점수 없이 두는 친선전 (평일 8~20시만 티켓 1장, 게스트 무료)"
                   >
                     🤝 친선
                   </button>
@@ -669,7 +670,7 @@ export default function AlkkagiGame({
         {rematchOffer && (
           <RematchOfferPopup
             from={rematchOffer.from}
-            stakeText={rematchOffer.friendly ? "🤝 친선전 · 점수 없음 · 🎫 티켓 1장 (게스트 무료)" : `💎 판돈 ${rematchOffer.stake.toLocaleString("ko-KR")}점 · 🎫 티켓 1장`}
+            stakeText={rematchOffer.friendly ? `🤝 친선전 · 점수 없음 · ${friendlyTicketText()}` : `💎 판돈 ${rematchOffer.stake.toLocaleString("ko-KR")}점 · 🎫 티켓 1장`}
             busy={busy}
             onAccept={() => {
               const offer = rematchOffer;
@@ -1004,7 +1005,7 @@ function AlkkagiBoardView({
     const settle = game.is_test
       ? "🧪 테스트 대국 (점수 변동 없음)"
       : game.is_friendly
-        ? "🤝 친선전 (점수 변동 없음 · 티켓 1장)"
+        ? "🤝 친선전 (점수 변동 없음)"
       : game.settle_state === "done"
         ? "카톡 점수에 반영 완료"
         : "봇이 곧 카톡 점수에 반영합니다";
