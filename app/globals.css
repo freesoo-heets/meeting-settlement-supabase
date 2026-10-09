@@ -5871,3 +5871,10 @@ button.meetingMetricCard {
 .gameSoundToggle { border: 1px solid #e2e8f0; background: #fff; border-radius: 999px; padding: 1px 8px; font-size: 13px; line-height: 1.4; cursor: pointer; opacity: .6; }
 .gameSoundToggle.on { opacity: 1; }
 .gameSoundToggle:focus-visible { outline: 2px solid #f59e0b; outline-offset: 2px; }
+
+/* 🔊 소리 켜기/끄기: 판 바로 위 오른쪽 */
+.gameStatusRow { position: relative; display: flex; justify-content: center; align-items: center; min-height: 26px; }
+.gameStatusRow .omokStatus { padding: 0 92px; }
+.gameStatusRow .gameSoundToggle { position: absolute; right: 0; top: 50%; transform: translateY(-50%); font-size: 12px; padding: 2px 9px; opacity: .75; white-space: nowrap; }
+.gameStatusRow .gameSoundToggle.on { opacity: 1; }
+@media (max-width: 420px) { .gameStatusRow .omokStatus { padding: 0 84px 0 0; text-align: left; } }

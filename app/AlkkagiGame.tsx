@@ -415,16 +415,6 @@ export default function AlkkagiGame({
             <h2>🥏 알까기</h2>
           </div>
           <div className="gameHeaderActions">
-            <button
-              type="button"
-              className={`gameSoundToggle ${sound.on ? "on" : ""}`}
-              aria-pressed={sound.on}
-              aria-label={sound.on ? "효과음 끄기" : "효과음 켜기"}
-              title={sound.on ? "효과음 끄기" : "효과음 켜기"}
-              onClick={sound.toggle}
-            >
-              {sound.on ? "🔊" : "🔇"}
-            </button>
             {onBack && <button className="smallButton ghost" onClick={onBack}>← 게임</button>}
             <button className="modalCloseButton" onClick={onClose}>×</button>
           </div>
@@ -483,6 +473,7 @@ export default function AlkkagiGame({
           <>
           <AlkkagiBoardView
             game={viewing}
+            onToggleSound={sound.toggle}
             onAnimating={setBoardAnimating}
             soundOn={sound.on}
             reserve={
@@ -732,6 +723,7 @@ function AlkkagiBoardView({
   onResign,
   reserve,
   soundOn,
+  onToggleSound,
   onAnimating,
   onCancel,
   emotes,
@@ -747,6 +739,7 @@ function AlkkagiBoardView({
   onResign: () => void;
   reserve: { mine: boolean; theirs: boolean; toggle: () => void } | null;
   soundOn: boolean;
+  onToggleSound: () => void;
   onAnimating: (animating: boolean) => void;
   onCancel: () => void;
   emotes: ShownEmote[];
@@ -1114,7 +1107,17 @@ function AlkkagiBoardView({
           <div className={remaining <= 5 ? "urgent" : ""} style={{ width: `${(remaining / TURN_SECONDS) * 100}%` }} />
         </div>
       )}
-      <p className={`omokStatus ${myTurn ? "mine" : ""}`}>{status}</p>
+      <div className="gameStatusRow">
+        <p className={`omokStatus ${myTurn ? "mine" : ""}`}>{status}</p>
+        <button
+          type="button"
+          className={`gameSoundToggle ${soundOn ? "on" : ""}`}
+          aria-pressed={soundOn}
+          onClick={onToggleSound}
+        >
+          {soundOn ? "🔊 소리 끄기" : "🔇 소리 켜기"}
+        </button>
+      </div>
       {game.status === "playing" && (strikes.host > 0 || strikes.guest > 0) && (
         <p className="alkStrikes">
           시간 초과 · {game.host_name} {strikes.host}/{MAX_STRIKES} · {game.guest_name ?? "?"} {strikes.guest}/{MAX_STRIKES}

@@ -495,16 +495,6 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
             <h2>🏁 오목 대결</h2>
           </div>
           <div className="gameHeaderActions">
-            <button
-              type="button"
-              className={`gameSoundToggle ${sound.on ? "on" : ""}`}
-              aria-pressed={sound.on}
-              aria-label={sound.on ? "효과음 끄기" : "효과음 켜기"}
-              title={sound.on ? "효과음 끄기" : "효과음 켜기"}
-              onClick={sound.toggle}
-            >
-              {sound.on ? "🔊" : "🔇"}
-            </button>
             {onBack && <button className="smallButton ghost" onClick={onBack}>← 게임</button>}
             <button className="modalCloseButton" onClick={onClose}>×</button>
           </div>
@@ -572,6 +562,7 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
           <>
           <OmokBoardView
             game={viewing}
+            onToggleSound={sound.toggle}
             soundOn={sound.on}
             reserve={
               viewing.status === "playing" && seatOf(viewing) && !viewing.is_test
@@ -823,6 +814,7 @@ function OmokBoardView({
   onResign,
   reserve,
   soundOn,
+  onToggleSound,
   onCancel,
   onUndoRequest,
   onUndoAnswer,
@@ -841,6 +833,7 @@ function OmokBoardView({
   onResign: () => void;
   reserve: { mine: boolean; theirs: boolean; toggle: () => void } | null;
   soundOn: boolean;
+  onToggleSound: () => void;
   onCancel: () => void;
   onUndoRequest: () => void;
   onUndoAnswer: (accept: boolean) => void;
@@ -961,7 +954,17 @@ function OmokBoardView({
         </div>
       )}
 
-      <p className={`omokStatus ${myTurn ? "mine" : ""}`}>{status}</p>
+      <div className="gameStatusRow">
+        <p className={`omokStatus ${myTurn ? "mine" : ""}`}>{status}</p>
+        <button
+          type="button"
+          className={`gameSoundToggle ${soundOn ? "on" : ""}`}
+          aria-pressed={soundOn}
+          onClick={onToggleSound}
+        >
+          {soundOn ? "🔊 소리 끄기" : "🔇 소리 켜기"}
+        </button>
+      </div>
 
       <div className="omokStage">
       {emotes.map((emote) => (

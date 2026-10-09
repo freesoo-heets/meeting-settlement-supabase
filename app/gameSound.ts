@@ -20,15 +20,15 @@ function audio() {
 
 function readOn() {
   try {
-    return window.localStorage.getItem(KEY) === "on";   // 기본은 꺼짐 (직접 켜야 소리가 난다)
+    return window.localStorage.getItem(KEY) !== "off";   // 기본은 켜짐 (끈 사람만 꺼짐)
   } catch {
-    return false;
+    return true;
   }
 }
 
-// 🔊 / 🔇 상태 (기본: 꺼짐)
+// 🔊 / 🔇 상태 (기본: 켜짐)
 export function useGameSound() {
-  const [on, setOn] = useState(false);
+  const [on, setOn] = useState(true);
   useEffect(() => {
     setOn(readOn());
   }, []);
