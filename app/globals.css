@@ -5878,3 +5878,25 @@ button.meetingMetricCard {
 .gameStatusRow .gameSoundToggle { position: absolute; right: 0; top: 50%; transform: translateY(-50%); font-size: 12px; padding: 2px 9px; opacity: .75; white-space: nowrap; }
 .gameStatusRow .gameSoundToggle.on { opacity: 1; }
 @media (max-width: 420px) { .gameStatusRow .omokStatus { padding: 0 84px 0 0; text-align: left; } }
+
+/* STEP46_MULTI_SETTLEMENT: multi-meeting settlement workspace */
+.multiSettlementPanel { border: 1px solid #e5dff7; background: linear-gradient(145deg,#fff 0%,#faf8ff 100%); }
+.multiSettlementChoices { display:grid; grid-template-columns:repeat(auto-fit,minmax(235px,1fr)); gap:9px; margin:14px 0; }
+.multiSettlementChoice { display:flex; align-items:center; gap:10px; padding:12px; border:1px solid #e8e4ee; border-radius:13px; background:#fff; cursor:pointer; }
+.multiSettlementChoice.selected { border-color:#8664dc; background:#f6f0ff; box-shadow:0 0 0 1px #8664dc; }
+.multiSettlementChoice input { accent-color:#7048c7; width:17px; height:17px; flex-shrink:0; }
+.multiSettlementChoice span { display:grid; gap:4px; min-width:0; }
+.multiSettlementChoice strong { font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.multiSettlementChoice small { font-size:11px; color:#777087; }
+.multiSettlementChoice:has(input:disabled) { opacity:.5; cursor:not-allowed; }
+.multiSettlementToolbar { display:flex; flex-wrap:wrap; gap:8px; margin:10px 0; }
+.multiSettlementHint { margin:14px 0 4px; font-size:12px; color:#736981; }
+.multiSettlementPreview { margin-top:16px; border-top:1px solid #e9e2f1; padding-top:16px; }
+.multiSettlementPreviewHead { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px; }
+.multiSettlementGroup { margin-bottom:12px; border:1px solid #eae6ef; background:#fff; border-radius:14px; padding:12px 14px; }
+.multiSettlementGroup h3 { font-size:14px; margin:0 0 8px; }
+.multiSettlementGroup h3 small { font-size:11px; color:#827b8b; font-weight:400; }
+.multiSettlementPerson { display:flex; justify-content:space-between; gap:12px; padding:8px 0; border-top:1px solid #f1eef5; font-size:12px; }
+.multiSettlementPerson strong { text-align:right; font-variant-numeric:tabular-nums; }
+.multiSettlementText { width:100%; min-height:220px; padding:12px; border:1px solid #e5dff0; border-radius:12px; background:#fcfbff; font-size:12px; line-height:1.65; resize:vertical; }
+@media(max-width:640px) { .multiSettlementChoices { grid-template-columns:1fr; } .multiSettlementPreviewHead { align-items:flex-start; flex-direction:column; } .multiSettlementPerson { flex-direction:column; gap:3px; } .multiSettlementPerson strong { text-align:left; } }

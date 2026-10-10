@@ -230,6 +230,7 @@ export default function Home() {
 
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
   const [selectedMeetingId, setSelectedMeetingId] = useState("");
+  const [multiSettlementIds, setMultiSettlementIds] = useState<string[]>([]); // STEP46_MULTI_SETTLEMENT
 
   const [memberSearch, setMemberSearch] = useState("");
   const [memberFilter, setMemberFilter] = useState<MemberFilter>("all");
@@ -1861,6 +1862,77 @@ async function setAttendanceMembers(memberIds: string[]) {
       `━━━━━━━━━━━━━━`,
       `벙비 확인 부탁드립니다 🙌`,
     ].join("\n");
+  }
+
+  // 여러 벙의 최종 부담금(개별 배분액 - 해당 벙 선입금)을 회원 ID 기준으로 합산합니다.
+  const multiSettlementMeetings = useMemo(
+    () => meetings.filter((meeting) => multiSettlementIds.includes(meeting.id)).sort((a, b) => a.date.localeCompare(b.date) || a.title.localeCompare(b.title, "ko")),
+    [meetings, multiSettlementIds]
+  );
+
+  const multiSettlementResult = useMemo(() => {
+    const selected = multiSettlementMeetings;
+    const groups = new Map<string, { name: string; guest: boolean; parts: Map<string, number> }>();
+    for (const meeting of selected) {
+      if (meeting.cost == null) continue;
+      const allocation = meetingAllocation(meeting);
+      for (const memberId of meeting.attendeeIds) {
+        const member = members.find((item) => item.id === memberId);
+        if (!member) continue;
+        const share = allocation.shares[`m:${memberId}`] ?? 0;
+        const paid = Number(prepaymentByKey[`${meeting.id}:${memberId}`]?.amount ?? 0);
+        const key = `m:${memberId}`;
+        if (!groups.has(key)) groups.set(key, { name: member.name, guest: false, parts: new Map() });
+        groups.get(key)!.parts.set(meeting.id, Math.max(0, share - paid));
+      }
+      for (const guest of meeting.guests) {
+        // 게스트는 회원 ID가 없으므로 서로 다른 벙에서 동일 이름이어도 자동 합산하지 않습니다.
+        const key = `g:${meeting.id}:${guest.id}`;
+        groups.set(key, { name: guest.name, guest: true, parts: new Map([[meeting.id, allocation.shares[`g:${guest.id}`] ?? 0]]) });
+      }
+    }
+    const sections = new Map<string, { ids: string[]; rows: { name: string; guest: boolean; parts: number[]; total: number }[] }>();
+    for (const item of groups.values()) {
+      const ids = selected.filter((meeting) => item.parts.has(meeting.id)).map((meeting) => meeting.id);
+      const key = ids.join('|');
+      if (!sections.has(key)) sections.set(key, { ids, rows: [] });
+      const parts = ids.map((id) => item.parts.get(id) ?? 0);
+      sections.get(key)!.rows.push({ name: item.name, guest: item.guest, parts, total: parts.reduce((sum, amount) => sum + amount, 0) });
+    }
+    return [...sections.values()].sort((a, b) => a.ids.length - b.ids.length || selected.findIndex((m) => m.id === a.ids[0]) - selected.findIndex((m) => m.id === b.ids[0])).map((section) => ({
+      ...section,
+      label: section.ids.map((id) => `${selected.findIndex((m) => m.id === id) + 1}번`).join('+') + '모임',
+      rows: section.rows.sort((a, b) => a.name.localeCompare(b.name, 'ko')),
+    }));
+  }, [multiSettlementMeetings, members, prepaymentByKey, adjustmentByKey]);
+
+  const multiSettlementText = useMemo(() => {
+    if (multiSettlementMeetings.length < 2) return '';
+    const lines = [
+      '📌 강서구 찐친만들기 통합 벙비 정산', '━━━━━━━━━━━━━━',
+      ...multiSettlementMeetings.map((meeting, i) => `${i + 1}번) ${meeting.date} · ${meeting.title}`),
+      '',
+    ];
+    for (const section of multiSettlementResult) {
+      lines.push(`【 ${section.label} 】`);
+      for (const row of section.rows) {
+        const amounts = row.parts.map((amount) => won(amount));
+        const calculation = amounts.length > 1 ? `${amounts.join(' + ')} = ${won(row.total)}` : won(row.total);
+        lines.push(`• ${row.name}${row.guest ? '(게스트)' : ''} : ${calculation}`);
+      }
+      lines.push('');
+    }
+    lines.push('━━━━━━━━━━━━━━', '※ 선입금 차감 후 남은 부담금 기준', '벙비 확인 부탁드립니다 🙌');
+    return lines.join('\n');
+  }, [multiSettlementMeetings, multiSettlementResult]);
+
+  async function copyMultiSettlement() {
+    try {
+      await navigator.clipboard.writeText(multiSettlementText);
+      setNotice('통합 정산 문구를 복사했습니다. 카카오톡에 붙여넣어주세요.');
+    } catch {
+      setNotice('복사에 실패했습니다. 아래 미리보기에서 직접 복사해주세요.');
+    }
   }
 
   async function shareSettlement(meeting: Meeting) {
@@ -3727,6 +3799,37 @@ async function setAttendanceMembers(memberIds: string[]) {
 
       {mainTab === "meetings" && (
         <>
+          <section className="panel standalonePanel multiSettlementPanel">
+            <div className="panelHead compactHead">
+              <div><h2>🧾 여러 모임 통합 정산</h2><p>2개 이상의 모임을 선택하면 중복 참석자를 자동으로 합산합니다.</p></div>
+              <span className="dashboardPanelBadge">{multiSettlementMeetings.length}개 선택</span>
+            </div>
+            <div className="multiSettlementChoices">
+              {monthMeetings.map((meeting) => (
+                <label className={`multiSettlementChoice ${multiSettlementIds.includes(meeting.id) ? 'selected' : ''}`} key={meeting.id}>
+                  <input type="checkbox" checked={multiSettlementIds.includes(meeting.id)} disabled={meeting.cost == null} onChange={(event) => setMultiSettlementIds((current) => event.target.checked ? [...current, meeting.id] : current.filter((id) => id !== meeting.id))} />
+                  <span><strong>{meeting.title}</strong><small>{meeting.date} · {meeting.cost == null ? '비용 미입력' : `${meeting.attendeeIds.length + meeting.guests.length}명 · ${won(Number(meeting.cost))}`}</small></span>
+                </label>
+              ))}
+              {monthMeetings.length === 0 && <div className="empty">선택한 달에 모임이 없습니다.</div>}
+            </div>
+            <div className="multiSettlementToolbar">
+              <button className="smallButton ghost" onClick={() => setMultiSettlementIds(monthMeetings.filter((meeting) => meeting.cost != null).map((meeting) => meeting.id))}>비용 입력된 모임 전체 선택</button>
+              <button className="smallButton ghost" onClick={() => setMultiSettlementIds([])}>선택 해제</button>
+            </div>
+            {multiSettlementMeetings.length >= 2 ? (
+              <div className="multiSettlementPreview">
+                <div className="multiSettlementPreviewHead"><strong>통합 정산 미리보기</strong><button className="smallButton" onClick={() => void copyMultiSettlement()}>📋 카카오톡 문구 복사</button></div>
+                {multiSettlementResult.map((section) => (
+                  <div className="multiSettlementGroup" key={section.ids.join('|')}>
+                    <h3>{section.label} <small>{section.rows.length}명</small></h3>
+                    {section.rows.map((row, index) => <div className="multiSettlementPerson" key={`${section.ids.join('|')}-${row.name}-${index}`}><span>{row.name}{row.guest ? ' (게스트)' : ''}</span><strong>{row.parts.length > 1 ? `${row.parts.map((amount) => won(amount)).join(' + ')} = ` : ''}{won(row.total)}</strong></div>)}
+                  </div>
+                ))}
+                <textarea className="multiSettlementText" readOnly value={multiSettlementText} aria-label="카카오톡 통합 정산 문구" />
+              </div>
+            ) : <p className="multiSettlementHint">비용이 입력된 모임을 2개 이상 선택해주세요. 1번모임 / 1번+2번모임 / 2번모임처럼 참석 조합별로 분리됩니다.</p>}
+          </section>
           <section className="meetingOpsSummary panel standalonePanel">
             <div className="meetingOpsSummaryTitle">
               <div>
