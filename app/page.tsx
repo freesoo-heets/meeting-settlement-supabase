@@ -231,6 +231,10 @@ export default function Home() {
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
   const [selectedMeetingId, setSelectedMeetingId] = useState("");
   const [multiSettlementIds, setMultiSettlementIds] = useState<string[]>([]); // STEP46_MULTI_SETTLEMENT
+  // STEP47_MEETING_UI: presentation state only; settlement logic and data are unchanged.
+  const [meetingUiTab, setMeetingUiTab] = useState<"attendees" | "cost" | "multi">("attendees");
+  const [meetingCalendarExpanded, setMeetingCalendarExpanded] = useState(false);
+  const [meetingSettingsExpanded, setMeetingSettingsExpanded] = useState(false);
 
   const [memberSearch, setMemberSearch] = useState("");
   const [memberFilter, setMemberFilter] = useState<MemberFilter>("all");
@@ -3799,7 +3803,19 @@ async function setAttendanceMembers(memberIds: string[]) {
 
       {mainTab === "meetings" && (
         <>
-          <section className="panel standalonePanel multiSettlementPanel">
+          <section className="step47MeetingHeader panel standalonePanel">
+            <div><span className="memberControlEyebrow">MEETING WORKSPACE</span><h2>모임 관리</h2><p>모임을 선택하고 필요한 작업만 열어보세요.</p></div>
+            <div className="step47QuickActions">
+              <button type="button" className="smallButton ghost" onClick={() => setMeetingCalendarExpanded((value) => !value)} aria-expanded={meetingCalendarExpanded}>{meetingCalendarExpanded ? "달력 닫기" : "📅 달력 보기"}</button>
+              <button type="button" className="smallButton ghost" onClick={() => setMeetingSettingsExpanded((value) => !value)} aria-expanded={meetingSettingsExpanded}>{meetingSettingsExpanded ? "관리 도구 닫기" : "⚙ 관리 도구"}</button>
+            </div>
+          </section>
+          <nav className="step47Tabs" aria-label="모임 관리 작업 선택">
+            <button type="button" className={meetingUiTab === "attendees" ? "active" : ""} aria-pressed={meetingUiTab === "attendees"} onClick={() => setMeetingUiTab("attendees")}>👥 참석자 · 게스트</button>
+            <button type="button" className={meetingUiTab === "cost" ? "active" : ""} aria-pressed={meetingUiTab === "cost"} onClick={() => setMeetingUiTab("cost")}>💰 비용 배분</button>
+            <button type="button" className={meetingUiTab === "multi" ? "active" : ""} aria-pressed={meetingUiTab === "multi"} onClick={() => setMeetingUiTab("multi")}>🧾 통합 정산{multiSettlementIds.length ? ` (${multiSettlementIds.length})` : ""}</button>
+          </nav>
+          <section className="panel standalonePanel multiSettlementPanel" style={{display: meetingUiTab === "multi" ? undefined : "none"}}>
             <div className="panelHead compactHead">
               <div><h2>🧾 여러 모임 통합 정산</h2><p>2개 이상의 모임을 선택하면 중복 참석자를 자동으로 합산합니다.</p></div>
               <span className="dashboardPanelBadge">{multiSettlementMeetings.length}개 선택</span>
@@ -3830,7 +3846,7 @@ async function setAttendanceMembers(memberIds: string[]) {
               </div>
             ) : <p className="multiSettlementHint">비용이 입력된 모임을 2개 이상 선택해주세요. 1번모임 / 1번+2번모임 / 2번모임처럼 참석 조합별로 분리됩니다.</p>}
           </section>
-          <section className="meetingOpsSummary panel standalonePanel">
+          <section className="meetingOpsSummary panel standalonePanel step47Summary">
             <div className="meetingOpsSummaryTitle">
               <div>
                 <span>{selectedMonth}</span>
@@ -3846,6 +3862,7 @@ async function setAttendanceMembers(memberIds: string[]) {
             </div>
           </section>
 
+          <div style={{display: meetingCalendarExpanded ? undefined : "none"}}>
           <section className="panel standalonePanel appCalendarPanel meetingCalendarPanel">
             <div className="calendarHeader">
               <div>
@@ -3945,7 +3962,8 @@ async function setAttendanceMembers(memberIds: string[]) {
             </div>
           </section>
 
-          <section className="controlGrid">
+          </div>
+          <section className="controlGrid step47Controls">
             <div className="panel standalonePanel">
               <div className="panelHead compactHead">
                 <div>
@@ -4039,7 +4057,7 @@ async function setAttendanceMembers(memberIds: string[]) {
             </section>
           )}
 
-          {selectedMeeting && (
+          {selectedMeeting && meetingUiTab !== "multi" && (
             <section className="meetingFlowStepper" aria-label="모임 정산 진행 단계">
               <div className="meetingFlowStep complete">
                 <span>1</span>
@@ -4098,8 +4116,8 @@ async function setAttendanceMembers(memberIds: string[]) {
             </section>
           )}
 
-          <section className="meetingWorkspace">
-            <div className="panel standalonePanel">
+          <section className="meetingWorkspace step47Workspace" style={{display: meetingUiTab === "multi" ? "none" : undefined}}>
+            <div className="panel standalonePanel" style={{display: meetingUiTab === "attendees" ? undefined : "none"}}>
               <div className="panelHead compactHead">
                 <div>
                   <h2>참석자 · 게스트</h2>
@@ -4269,7 +4287,7 @@ async function setAttendanceMembers(memberIds: string[]) {
               )}
             </div>
 
-            <div className="panel standalonePanel">
+            <div className="panel standalonePanel" style={{display: meetingUiTab === "cost" ? undefined : "none"}}>
               <div className="panelHead compactHead">
                 <div>
                   <h2>비용 배분</h2>
@@ -4468,6 +4486,7 @@ async function setAttendanceMembers(memberIds: string[]) {
             </div>
           </section>
 
+          <div style={{display: meetingSettingsExpanded ? undefined : "none"}}>
           <section className="panel">
             <div className="panelHead compactHead">
               <div>
@@ -4555,6 +4574,7 @@ async function setAttendanceMembers(memberIds: string[]) {
               ))}
             </div>
           </section>
+          </div>
         </>
       )}
 

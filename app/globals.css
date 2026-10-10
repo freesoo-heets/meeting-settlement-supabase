@@ -5900,3 +5900,22 @@ button.meetingMetricCard {
 .multiSettlementPerson strong { text-align:right; font-variant-numeric:tabular-nums; }
 .multiSettlementText { width:100%; min-height:220px; padding:12px; border:1px solid #e5dff0; border-radius:12px; background:#fcfbff; font-size:12px; line-height:1.65; resize:vertical; }
 @media(max-width:640px) { .multiSettlementChoices { grid-template-columns:1fr; } .multiSettlementPreviewHead { align-items:flex-start; flex-direction:column; } .multiSettlementPerson { flex-direction:column; gap:3px; } .multiSettlementPerson strong { text-align:left; } }
+
+/* STEP47_MEETING_UI: scoped presentation only */
+.step47MeetingHeader{display:flex;justify-content:space-between;align-items:center;gap:18px;padding:20px 24px!important;border-radius:20px!important}
+.step47MeetingHeader h2{margin:4px 0 5px;font-size:23px;letter-spacing:-.04em}
+.step47MeetingHeader p{margin:0;color:var(--muted,#697386);font-size:13px}
+.step47QuickActions{display:flex;flex-wrap:wrap;gap:8px}
+.step47Tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:6px;background:rgba(105,91,181,.07);border:1px solid rgba(105,91,181,.12);border-radius:17px;margin:12px 0 16px}
+.step47Tabs button{min-width:0;border:0;border-radius:12px;background:transparent;color:inherit;padding:13px 9px;font:inherit;font-size:14px;font-weight:700;cursor:pointer;transition:background .15s ease,box-shadow .15s ease}
+.step47Tabs button.active{background:var(--card,#fff);box-shadow:0 3px 14px rgba(30,30,65,.11);color:#6551a6}
+.step47Tabs button:focus-visible{outline:3px solid #9b87e6;outline-offset:2px}
+.step47Summary{padding:13px 18px!important;border-radius:17px!important}
+.step47Summary .meetingOpsSummaryTitle{margin-bottom:8px!important}
+.step47Summary .meetingOpsSummaryGrid{gap:9px!important}
+.step47Workspace{display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:14px!important}
+.step47Workspace>.panel{min-width:0;border-radius:19px!important}
+.step47Controls{gap:12px!important}
+.multiSettlementPanel{border-radius:19px!important}
+@media(max-width:700px){.step47MeetingHeader{align-items:flex-start;flex-direction:column;padding:17px!important}.step47QuickActions{width:100%}.step47QuickActions button{flex:1}.step47Tabs{gap:3px;padding:4px}.step47Tabs button{font-size:12px;padding:11px 3px;line-height:1.3}.step47Summary{padding:12px!important}.step47Workspace>.panel{padding:14px!important}}
+@media(prefers-reduced-motion:reduce){.step47Tabs button{transition:none}}
