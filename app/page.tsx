@@ -246,7 +246,7 @@ export default function Home() {
   const [newMeetingTitle, setNewMeetingTitle] = useState("");
   const [newGuestName, setNewGuestName] = useState("");
   const [attendeeSearch, setAttendeeSearch] = useState("");
-  const [attendeeSort, setAttendeeSort] = useState<AttendeeSort>("selected_first");
+  const [attendeeSort, setAttendeeSort] = useState<AttendeeSort>("nickname_asc");
   const [guestSort, setGuestSort] = useState<GuestSort>("nickname_asc");
   const [detailMeetingId, setDetailMeetingId] = useState("");
   const [editingMeetingId, setEditingMeetingId] = useState("");
@@ -5304,7 +5304,7 @@ async function setAttendanceMembers(memberIds: string[]) {
               <div className="kicker">USER GUIDE</div>
               <h2>사용방법</h2>
               <p>
-                현재 로그인한 권한에 맞는 기능만 안내합니다.
+                최신 모임관리 화면과 정산 기능을 안내합니다. 권한별 기능은 아래에서 확인하세요.
               </p>
             </div>
             <span className={`roleBadge ${currentRole ?? "user"} helpRoleBadge`}>
@@ -5335,7 +5335,8 @@ async function setAttendanceMembers(memberIds: string[]) {
               <div className="helpStepNumber">02</div>
               <h3>대시보드 · 내 현황</h3>
               <p>
-                대시보드에서 활동 회원, 이번 달 모임, 총비용, 참석 순위를 확인합니다.
+                대시보드에서 이번 달 모임, 참여 회원, 인기 모임 TOP 5, 이달의 벙신 TOP 5,
+                이달의 벙주 TOP 5와 생일자를 확인합니다. 금액은 필요한 경우 금액 보기를 눌러 확인하세요.
               </p>
               <p>
                 상단의 <strong>내 현황 · 상세보기</strong>에서는 본인의 월 참석 횟수,
@@ -5345,24 +5346,27 @@ async function setAttendanceMembers(memberIds: string[]) {
 
             <article className="panel helpCard">
               <div className="helpStepNumber">03</div>
-              <h3>모임 관리 · 비용 배분</h3>
+              <h3>모임 관리 · 참석자 · 비용 배분</h3>
               <p>
-                모임을 선택하면 참석자, 게스트, 비용을 관리할 수 있습니다. 비용은 기본적으로
-                참석 인원 기준 1/N으로 계산되며 필요한 경우 회원별 <strong>특정값</strong>을
-                입력할 수 있습니다.
+                모임 관리에서 모임을 선택하고 <strong>참석자 · 게스트</strong>, <strong>비용 배분</strong>,
+                <strong>통합 정산</strong> 작업 탭을 전환해 사용합니다. 참석자 기본 정렬은
+                닉네임 가나다순이며 정렬 메뉴에서 다른 기준으로 변경할 수 있습니다.
+                비용은 참석 인원 기준 1/N으로 계산되고 회원별 특정값도 입력할 수 있습니다.
               </p>
               <p>
-                <strong>선입금</strong>은 해당 모임의 비용 배분 영역에서만 관리하며,
-                정산 금액에서 자동 차감됩니다.
+                <strong>선입금</strong>은 해당 모임의 비용 배분 영역에서 관리하며,
+                정산 금액에서 자동 차감됩니다. 달력과 상세 관리 도구는 필요할 때 펼쳐 사용합니다.
               </p>
             </article>
 
             <article className="panel helpCard">
               <div className="helpStepNumber">04</div>
-              <h3>카카오톡 정산 공유</h3>
+              <h3>개별 · 통합 정산 공유</h3>
               <p>
-                모임 비용과 참석자 입력이 끝나면 <strong>카카오톡 정산 공유</strong>를 누릅니다.
-                공유 문구는 카톡 꾸밈형으로 고정되어 실제 줄바꿈 형태로 전달됩니다.
+                개별 모임은 비용 배분 화면에서 <strong>카카오톡 정산 공유</strong>를 사용합니다.
+                여러 모임을 함께 정산할 때는 <strong>통합 정산</strong> 탭에서 비용이 입력된 모임을
+                2개 이상 선택하세요. 중복 참석 회원의 부담금이 합산되고 참석 조합별로 나뉩니다.
+                <strong>카카오톡 문구 복사</strong>를 누르면 줄바꿈이 포함된 정산 문구가 복사됩니다.
               </p>
               <div className="helpSharePreview">
                 <span>📌 강서구 찐친만들기 벙비 정산</span>
@@ -5376,6 +5380,17 @@ async function setAttendanceMembers(memberIds: string[]) {
               </div>
             </article>
           </div>
+
+          {/* STEP48_HELP_GUIDE: current workflow tips; presentation text only */}
+          <section className="panel helpTips">
+            <h3>모임관리 빠른 사용 순서</h3>
+            <div className="helpExampleGrid">
+              <div><span>01 · 모임 선택</span><strong>날짜와 모임 선택</strong><p>모임을 추가하거나 기존 모임을 선택합니다.</p></div>
+              <div><span>02 · 참석자</span><strong>회원 · 게스트 확인</strong><p>닉네임 가나다순으로 확인하고 참석자를 설정합니다.</p></div>
+              <div><span>03 · 비용 배분</span><strong>총비용 · 선입금 · 특정값</strong><p>비용을 입력하고 모임별 부담금을 확인합니다.</p></div>
+              <div><span>04 · 정산 공유</span><strong>개별 또는 통합 정산</strong><p>여러 모임은 통합 정산 탭에서 선택 후 복사합니다.</p></div>
+            </div>
+          </section>
 
           {currentRole === "user" && (
             <section className="panel helpPermissionPanel">
@@ -5392,7 +5407,7 @@ async function setAttendanceMembers(memberIds: string[]) {
                   <p>모임 생성 · 수정 · 삭제 · 복사</p>
                   <p>참석자 · 게스트 관리</p>
                   <p>비용 배분 · 특정값 · 선입금 입력</p>
-                  <p>카카오톡 정산 공유</p>
+                  <p>카카오톡 정산 공유 · 여러 모임 통합 정산</p>
                   <p>회원 및 월별 참석 현황 조회</p>
                   <p>월별 CSV 내보내기</p>
                 </div>
@@ -5513,7 +5528,7 @@ async function setAttendanceMembers(memberIds: string[]) {
             </div>
           </section>
 
-          <div className="helpVersion">사용방법 · Step 26 기준</div>
+          <div className="helpVersion">사용방법 · Step 48 기준</div>
         </section>
       )}
 
