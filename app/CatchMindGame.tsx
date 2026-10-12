@@ -316,6 +316,31 @@ function CatchRoomView({
   const blurTimer = useRef(0);
   isDrawerRef.current = isDrawer;
 
+  // ★ 색 · 굵기 도구가 안 눌리던 문제
+  //   ① 채팅 입력칸에 커서가 남은 채 내 차례(출제자)가 되면 '입력 중' 화면이 풀리지 않아 도구가 숨겨져 있었다
+  //   ② 안드로이드 '뒤로' 키로 키보드만 닫으면 입력칸이 포커스를 잃지 않아 같은 상태가 됐다
+  useEffect(() => {
+    if (!isDrawer) return;
+    inputRef.current?.blur();
+    window.clearTimeout(blurTimer.current);
+    setTyping(false);
+  }, [isDrawer]);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    let full = vv.height;
+    const onResize = () => {
+      full = Math.max(full, vv.height);
+      // 키보드가 내려가 화면 높이가 거의 다 돌아오면 '입력 중' 화면을 푼다
+      if (vv.height > full * 0.85) {
+        window.clearTimeout(blurTimer.current);
+        setTyping(false);
+      }
+    };
+    vv.addEventListener("resize", onResize);
+    return () => vv.removeEventListener("resize", onResize);
+  }, []);
+
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 250);
     return () => window.clearInterval(timer);
@@ -625,7 +650,7 @@ function CatchRoomView({
           : "닫힌 방";
 
   return (
-    <div className={`cmRoom ${typing ? "typing" : ""}`}>
+    <div className={`cmRoom ${typing && !isDrawer ? "typing" : ""}`}>
       <div className="cmTop">
         <span className={`cmPill ${room.status}`}>{room.is_test ? "🧪 " : ""}{statusLabel}</span>
         <div className="cmWord">
@@ -762,10 +787,12 @@ function CatchRoomView({
                     style={{ background: item }}
                     aria-label={item === "#ffffff" ? "지우개" : `색 ${item}`}
                     title={item === "#ffffff" ? "지우개" : undefined}
-                    onClick={() => {
+                    onPointerDown={(event) => {
+                      event.preventDefault(); // 입력칸 포커스 · 확대 동작에 막히지 않게 누르는 순간 바로 고른다
                       setColor(item);
                       touchInput();
                     }}
+                    onClick={() => setColor(item)}
                   >
                     {item === "#ffffff" ? "⌫" : ""}
                   </button>
