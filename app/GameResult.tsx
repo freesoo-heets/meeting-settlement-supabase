@@ -55,7 +55,7 @@ export function GameResultPopup({
       : draw
         ? `판돈 ${game.stake.toLocaleString("ko-KR")}점 반환`
         : won
-          ? `💎 +${(Math.floor(game.stake * 2 * 0.9) - game.stake).toLocaleString("ko-KR")}점 (수수료 10% 제외)`
+          ? `💎 +${(Math.floor(game.stake * 2 * 0.9) - game.stake).toLocaleString("ko-KR")}점`
           : lost
             ? `💎 -${game.stake.toLocaleString("ko-KR")}점`
             : `판돈 ${game.stake.toLocaleString("ko-KR")}점`;
