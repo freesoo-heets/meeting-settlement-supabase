@@ -5923,3 +5923,6 @@ button.meetingMetricCard {
 /* 캐치마인드 색 · 굵기 버튼: 손가락으로 누르기 쉽게 (보이는 크기는 그대로, 누르는 영역만 넓힘) */
 .catchColor, .catchSize { position: relative; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 .catchColor::after, .catchSize::after { content: ""; position: absolute; inset: -6px; }
+
+/* STEP49_MEETING_UX */
+.step49Choose{display:grid;gap:12px;margin:12px 0 18px}.step49Heading,.step49MultiHeading,.step49StepNav{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:12px 0}.step49Choose .step47Controls,.step49Choose .selectedStrip{margin:0}.step49StepNav{padding-bottom:12px;border-bottom:1px solid #ddd;font-weight:600}.step49MultiResult{margin-top:18px;padding-top:14px;border-top:2px solid #ddd}@media(max-width:700px){.step49Choose .step47Controls{display:flex;flex-direction:column}.step49Heading,.step49MultiHeading{flex-direction:column;align-items:flex-start;gap:3px}.step49StepNav button,.step49Choose select{min-height:44px}}

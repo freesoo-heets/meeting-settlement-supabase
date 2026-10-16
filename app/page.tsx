@@ -3810,6 +3810,105 @@ async function setAttendanceMembers(memberIds: string[]) {
               <button type="button" className="smallButton ghost" onClick={() => setMeetingSettingsExpanded((value) => !value)} aria-expanded={meetingSettingsExpanded}>{meetingSettingsExpanded ? "관리 도구 닫기" : "⚙ 관리 도구"}</button>
             </div>
           </section>
+          {/* STEP49_MEETING_UX */}
+          <div className="step49Choose">
+            <div className="step49Heading"><strong>① 관리할 모임 선택</strong></div>
+          <section className="controlGrid step47Controls">
+            <div className="panel standalonePanel">
+              <div className="panelHead compactHead">
+                <div>
+                  <h2>모임 추가</h2>
+                  <p>비용은 추후 입력</p>
+                </div>
+              </div>
+              <div className="inlineForm">
+                <input
+                  type="date"
+                  value={newMeetingDate}
+                  onChange={(event) => setNewMeetingDate(event.target.value)}
+                />
+                <input
+                  placeholder="모임명"
+                  value={newMeetingTitle}
+                  onChange={(event) => setNewMeetingTitle(event.target.value)}
+                />
+                <button className="smallButton" onClick={() => void addMeeting()}>
+                  추가
+                </button>
+              </div>
+            </div>
+
+            <div className="panel standalonePanel">
+              <div className="panelHead compactHead">
+                <div>
+                  <h2>모임 선택</h2>
+                  <p>{selectedMonth}</p>
+                </div>
+              </div>
+              <select
+                value={selectedMeetingId}
+                onChange={(event) => {
+                  setSelectedMeetingId(event.target.value);
+                  setMemberFixedDrafts({});
+                  setGuestFixedDrafts({});
+                }}
+              >
+                <option value="">모임 선택</option>
+                {monthMeetings.map((meeting) => (
+                  <option key={meeting.id} value={meeting.id}>
+                    {meeting.date} · {meeting.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </section>
+
+          {selectedMeeting && (
+            <section className="selectedStrip">
+              <div>
+                <strong>{selectedMeeting.title}</strong>
+                <span>{selectedMeeting.date}</span>
+              </div>
+              <div className="stripStats">
+                <span>회원 {selectedMeeting.attendeeIds.length}명</span>
+                <span>게스트 {selectedMeeting.guests.length}명</span>
+                <span>
+                  {selectedMeeting.cost == null
+                    ? "비용 미입력"
+                    : won(Number(selectedMeeting.cost))}
+                </span>
+                <button
+                  className="stripActionButton"
+                  onClick={() => setDetailMeetingId(selectedMeeting.id)}
+                >
+                  상세
+                </button>
+                <button
+                  className="stripActionButton"
+                  onClick={() => beginMeetingEdit(selectedMeeting)}
+                >
+                  수정
+                </button>
+                <button
+                  className="stripActionButton"
+                  onClick={() => void copyMeeting(selectedMeeting)}
+                  disabled={saving}
+                >
+                  모임 복사
+                </button>
+                <button
+                  className="stripActionButton danger"
+                  onClick={() => void deleteMeeting(selectedMeeting)}
+                  disabled={saving}
+                >
+                  삭제
+                </button>
+              </div>
+            </section>
+          )}
+
+          </div>
+          <div className="step49Heading"><strong>② 작업 선택</strong></div>
           <nav className="step47Tabs" aria-label="모임 관리 작업 선택">
             <button type="button" className={meetingUiTab === "attendees" ? "active" : ""} aria-pressed={meetingUiTab === "attendees"} onClick={() => setMeetingUiTab("attendees")}>👥 참석자 · 게스트</button>
             <button type="button" className={meetingUiTab === "cost" ? "active" : ""} aria-pressed={meetingUiTab === "cost"} onClick={() => setMeetingUiTab("cost")}>💰 비용 배분</button>
@@ -3820,6 +3919,7 @@ async function setAttendanceMembers(memberIds: string[]) {
               <div><h2>🧾 여러 모임 통합 정산</h2><p>2개 이상의 모임을 선택하면 중복 참석자를 자동으로 합산합니다.</p></div>
               <span className="dashboardPanelBadge">{multiSettlementMeetings.length}개 선택</span>
             </div>
+            <div className="step49MultiHeading"><strong>① 정산할 모임 선택</strong><small>2개 이상 선택</small></div>
             <div className="multiSettlementChoices">
               {monthMeetings.map((meeting) => (
                 <label className={`multiSettlementChoice ${multiSettlementIds.includes(meeting.id) ? 'selected' : ''}`} key={meeting.id}>
@@ -3834,7 +3934,8 @@ async function setAttendanceMembers(memberIds: string[]) {
               <button className="smallButton ghost" onClick={() => setMultiSettlementIds([])}>선택 해제</button>
             </div>
             {multiSettlementMeetings.length >= 2 ? (
-              <div className="multiSettlementPreview">
+              <div className="multiSettlementPreview step49MultiResult">
+                <div className="step49MultiHeading"><strong>② 통합 정산 결과</strong><small>참석 조합별 자동 합산</small></div>
                 <div className="multiSettlementPreviewHead"><strong>통합 정산 미리보기</strong><button className="smallButton" onClick={() => void copyMultiSettlement()}>📋 카카오톡 문구 복사</button></div>
                 {multiSettlementResult.map((section) => (
                   <div className="multiSettlementGroup" key={section.ids.join('|')}>
@@ -3963,100 +4064,6 @@ async function setAttendanceMembers(memberIds: string[]) {
           </section>
 
           </div>
-          <section className="controlGrid step47Controls">
-            <div className="panel standalonePanel">
-              <div className="panelHead compactHead">
-                <div>
-                  <h2>모임 추가</h2>
-                  <p>비용은 추후 입력</p>
-                </div>
-              </div>
-              <div className="inlineForm">
-                <input
-                  type="date"
-                  value={newMeetingDate}
-                  onChange={(event) => setNewMeetingDate(event.target.value)}
-                />
-                <input
-                  placeholder="모임명"
-                  value={newMeetingTitle}
-                  onChange={(event) => setNewMeetingTitle(event.target.value)}
-                />
-                <button className="smallButton" onClick={() => void addMeeting()}>
-                  추가
-                </button>
-              </div>
-            </div>
-
-            <div className="panel standalonePanel">
-              <div className="panelHead compactHead">
-                <div>
-                  <h2>모임 선택</h2>
-                  <p>{selectedMonth}</p>
-                </div>
-              </div>
-              <select
-                value={selectedMeetingId}
-                onChange={(event) => {
-                  setSelectedMeetingId(event.target.value);
-                  setMemberFixedDrafts({});
-                  setGuestFixedDrafts({});
-                }}
-              >
-                <option value="">모임 선택</option>
-                {monthMeetings.map((meeting) => (
-                  <option key={meeting.id} value={meeting.id}>
-                    {meeting.date} · {meeting.title}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </section>
-
-          {selectedMeeting && (
-            <section className="selectedStrip">
-              <div>
-                <strong>{selectedMeeting.title}</strong>
-                <span>{selectedMeeting.date}</span>
-              </div>
-              <div className="stripStats">
-                <span>회원 {selectedMeeting.attendeeIds.length}명</span>
-                <span>게스트 {selectedMeeting.guests.length}명</span>
-                <span>
-                  {selectedMeeting.cost == null
-                    ? "비용 미입력"
-                    : won(Number(selectedMeeting.cost))}
-                </span>
-                <button
-                  className="stripActionButton"
-                  onClick={() => setDetailMeetingId(selectedMeeting.id)}
-                >
-                  상세
-                </button>
-                <button
-                  className="stripActionButton"
-                  onClick={() => beginMeetingEdit(selectedMeeting)}
-                >
-                  수정
-                </button>
-                <button
-                  className="stripActionButton"
-                  onClick={() => void copyMeeting(selectedMeeting)}
-                  disabled={saving}
-                >
-                  모임 복사
-                </button>
-                <button
-                  className="stripActionButton danger"
-                  onClick={() => void deleteMeeting(selectedMeeting)}
-                  disabled={saving}
-                >
-                  삭제
-                </button>
-              </div>
-            </section>
-          )}
-
           {selectedMeeting && meetingUiTab !== "multi" && (
             <section className="meetingFlowStepper" aria-label="모임 정산 진행 단계">
               <div className="meetingFlowStep complete">
@@ -4118,6 +4125,7 @@ async function setAttendanceMembers(memberIds: string[]) {
 
           <section className="meetingWorkspace step47Workspace" style={{display: meetingUiTab === "multi" ? "none" : undefined}}>
             <div className="panel standalonePanel" style={{display: meetingUiTab === "attendees" ? undefined : "none"}}>
+              <div className="step49StepNav"><span>1 / 2 · 참석자</span><button type="button" className="smallButton" onClick={() => setMeetingUiTab("cost")}>다음 · 비용 배분 →</button></div>
               <div className="panelHead compactHead">
                 <div>
                   <h2>참석자 · 게스트</h2>
@@ -4288,6 +4296,7 @@ async function setAttendanceMembers(memberIds: string[]) {
             </div>
 
             <div className="panel standalonePanel" style={{display: meetingUiTab === "cost" ? undefined : "none"}}>
+              <div className="step49StepNav"><button type="button" className="smallButton ghost" onClick={() => setMeetingUiTab("attendees")}>← 참석자</button><span>2 / 2 · 비용 정산</span></div>
               <div className="panelHead compactHead">
                 <div>
                   <h2>비용 배분</h2>
