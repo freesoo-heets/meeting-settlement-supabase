@@ -5913,7 +5913,7 @@ button.meetingMetricCard {
 .step47Summary{padding:13px 18px!important;border-radius:17px!important}
 .step47Summary .meetingOpsSummaryTitle{margin-bottom:8px!important}
 .step47Summary .meetingOpsSummaryGrid{gap:9px!important}
-.step47Workspace{display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:14px!important}
+.step47Workspace{display:grid;grid-template-columns:minmax(0,1fr)!important;gap:14px!important}
 .step47Workspace>.panel{min-width:0;border-radius:19px!important}
 .step47Controls{gap:12px!important}
 .multiSettlementPanel{border-radius:19px!important}
@@ -5926,3 +5926,31 @@ button.meetingMetricCard {
 
 /* STEP49_MEETING_UX */
 .step49Choose{display:grid;gap:12px;margin:12px 0 18px}.step49Heading,.step49MultiHeading,.step49StepNav{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:12px 0}.step49Choose .step47Controls,.step49Choose .selectedStrip{margin:0}.step49StepNav{padding-bottom:12px;border-bottom:1px solid #ddd;font-weight:600}.step49MultiResult{margin-top:18px;padding-top:14px;border-top:2px solid #ddd}@media(max-width:700px){.step49Choose .step47Controls{display:flex;flex-direction:column}.step49Heading,.step49MultiHeading{flex-direction:column;align-items:flex-start;gap:3px}.step49StepNav button,.step49Choose select{min-height:44px}}
+
+/* STEP50_MEETING_UX: preserve handlers; simplify the workflow and mobile controls. */
+.step47Workspace[hidden]{display:none!important}
+.step50ModeBar{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:16px 0}
+.step50ModeButton{border:1px solid rgba(105,91,181,.18);background:var(--card,#fff);color:inherit;padding:15px 12px;border-radius:14px;font:inherit;font-weight:700;cursor:pointer;min-height:48px}
+.step50ModeButton.active{background:#6551a6;color:#fff;border-color:#6551a6}
+.step50ModeButton:focus-visible{outline:3px solid #9b87e6;outline-offset:2px}
+.step50Tabs{grid-template-columns:repeat(2,minmax(0,1fr))}
+.step50CreateCard{padding:0!important;overflow:hidden}
+.step50DetailsSummary{cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:15px 18px;font-weight:700;list-style:none}
+.step50DetailsSummary::-webkit-details-marker{display:none}
+.step50DetailsSummary span{font-size:12px;color:var(--muted,#697386);font-weight:400}
+.step50CreateCard[open] .step50DetailsSummary{border-bottom:1px solid rgba(105,91,181,.12)}
+.step50CreateCard .inlineForm{padding:14px 18px 18px}
+.step50ActionMenu{position:relative;display:inline-block}
+.step50ActionMenu>summary{cursor:pointer;list-style:none;border:1px solid rgba(105,91,181,.2);border-radius:9px;padding:7px 12px;font-weight:700;font-size:13px}
+.step50ActionMenu>summary::-webkit-details-marker{display:none}
+.step50ActionMenu[open]{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.step50ActionMenu[open]>summary{margin-right:3px}
+.step50ActionMenu .stripActionButton{min-height:36px}
+@media(max-width:700px){
+.step50ModeBar{grid-template-columns:1fr;gap:7px}
+.step50ModeButton{min-height:46px;text-align:left}
+.step50Tabs button{min-height:46px;font-size:13px}
+.step50ActionMenu[open]{width:100%}
+.step50ActionMenu .stripActionButton{min-height:44px}
+.step50CreateCard .inlineForm{display:flex;flex-wrap:wrap;gap:8px}
+}

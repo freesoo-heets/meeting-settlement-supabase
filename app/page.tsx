@@ -235,6 +235,8 @@ export default function Home() {
   const [meetingUiTab, setMeetingUiTab] = useState<"attendees" | "cost" | "multi">("attendees");
   const [meetingCalendarExpanded, setMeetingCalendarExpanded] = useState(false);
   const [meetingSettingsExpanded, setMeetingSettingsExpanded] = useState(false);
+  // STEP50_MEETING_UX: presentation-only controls.
+  // Native details controls keep secondary actions accessible without extra state.
 
   const [memberSearch, setMemberSearch] = useState("");
   const [memberFilter, setMemberFilter] = useState<MemberFilter>("all");
@@ -3817,30 +3819,6 @@ async function setAttendanceMembers(memberIds: string[]) {
             <div className="panel standalonePanel">
               <div className="panelHead compactHead">
                 <div>
-                  <h2>모임 추가</h2>
-                  <p>비용은 추후 입력</p>
-                </div>
-              </div>
-              <div className="inlineForm">
-                <input
-                  type="date"
-                  value={newMeetingDate}
-                  onChange={(event) => setNewMeetingDate(event.target.value)}
-                />
-                <input
-                  placeholder="모임명"
-                  value={newMeetingTitle}
-                  onChange={(event) => setNewMeetingTitle(event.target.value)}
-                />
-                <button className="smallButton" onClick={() => void addMeeting()}>
-                  추가
-                </button>
-              </div>
-            </div>
-
-            <div className="panel standalonePanel">
-              <div className="panelHead compactHead">
-                <div>
                   <h2>모임 선택</h2>
                   <p>{selectedMonth}</p>
                 </div>
@@ -3861,7 +3839,26 @@ async function setAttendanceMembers(memberIds: string[]) {
                 ))}
               </select>
             </div>
-          </section>
+          </section>            <details className="panel standalonePanel step50CreateCard">
+              <summary className="step50DetailsSummary">＋ 새 모임 추가 <span>필요할 때 펼치기</span></summary>
+              <div className="inlineForm">
+                <input
+                  type="date"
+                  value={newMeetingDate}
+                  onChange={(event) => setNewMeetingDate(event.target.value)}
+                />
+                <input
+                  placeholder="모임명"
+                  value={newMeetingTitle}
+                  onChange={(event) => setNewMeetingTitle(event.target.value)}
+                />
+                <button className="smallButton" onClick={() => void addMeeting()}>
+                  추가
+                </button>
+              </div>
+            </details>
+
+
 
           {selectedMeeting && (
             <section className="selectedStrip">
@@ -3883,6 +3880,8 @@ async function setAttendanceMembers(memberIds: string[]) {
                 >
                   상세
                 </button>
+                <details className="step50ActionMenu">
+                  <summary>⋯ 모임 관리</summary>
                 <button
                   className="stripActionButton"
                   onClick={() => beginMeetingEdit(selectedMeeting)}
@@ -3903,17 +3902,25 @@ async function setAttendanceMembers(memberIds: string[]) {
                 >
                   삭제
                 </button>
+                </details>
               </div>
             </section>
           )}
 
           </div>
-          <div className="step49Heading"><strong>② 작업 선택</strong></div>
-          <nav className="step47Tabs" aria-label="모임 관리 작업 선택">
-            <button type="button" className={meetingUiTab === "attendees" ? "active" : ""} aria-pressed={meetingUiTab === "attendees"} onClick={() => setMeetingUiTab("attendees")}>👥 참석자 · 게스트</button>
-            <button type="button" className={meetingUiTab === "cost" ? "active" : ""} aria-pressed={meetingUiTab === "cost"} onClick={() => setMeetingUiTab("cost")}>💰 비용 배분</button>
-            <button type="button" className={meetingUiTab === "multi" ? "active" : ""} aria-pressed={meetingUiTab === "multi"} onClick={() => setMeetingUiTab("multi")}>🧾 통합 정산{multiSettlementIds.length ? ` (${multiSettlementIds.length})` : ""}</button>
-          </nav>
+          <div className="step50ModeBar">
+            <button type="button" className={meetingUiTab === "multi" ? "step50ModeButton" : "step50ModeButton active"} aria-pressed={meetingUiTab !== "multi"} onClick={() => setMeetingUiTab("attendees")}>📋 일반 모임 정산</button>
+            <button type="button" className={meetingUiTab === "multi" ? "step50ModeButton active" : "step50ModeButton"} aria-pressed={meetingUiTab === "multi"} onClick={() => setMeetingUiTab("multi")}>🧾 여러 모임 통합 정산{multiSettlementIds.length ? ` (${multiSettlementIds.length})` : ""}</button>
+          </div>
+          {meetingUiTab !== "multi" && (
+            <>
+              <div className="step49Heading"><strong>② 작업 선택</strong><span>참석자 확인 후 비용을 정산하세요</span></div>
+              <nav className="step47Tabs step50Tabs" aria-label="모임 정산 단계">
+                <button type="button" className={meetingUiTab === "attendees" ? "active" : ""} aria-pressed={meetingUiTab === "attendees"} onClick={() => setMeetingUiTab("attendees")}>① 참석자 관리</button>
+                <button type="button" className={meetingUiTab === "cost" ? "active" : ""} aria-pressed={meetingUiTab === "cost"} onClick={() => setMeetingUiTab("cost")}>② 비용 정산 · 공유</button>
+              </nav>
+            </>
+          )}
           <section className="panel standalonePanel multiSettlementPanel" style={{display: meetingUiTab === "multi" ? undefined : "none"}}>
             <div className="panelHead compactHead">
               <div><h2>🧾 여러 모임 통합 정산</h2><p>2개 이상의 모임을 선택하면 중복 참석자를 자동으로 합산합니다.</p></div>
@@ -3947,7 +3954,7 @@ async function setAttendanceMembers(memberIds: string[]) {
               </div>
             ) : <p className="multiSettlementHint">비용이 입력된 모임을 2개 이상 선택해주세요. 1번모임 / 1번+2번모임 / 2번모임처럼 참석 조합별로 분리됩니다.</p>}
           </section>
-          <section className="meetingOpsSummary panel standalonePanel step47Summary">
+          {meetingUiTab !== "multi" && <section className="meetingOpsSummary panel standalonePanel step47Summary">
             <div className="meetingOpsSummaryTitle">
               <div>
                 <span>{selectedMonth}</span>
@@ -3961,9 +3968,9 @@ async function setAttendanceMembers(memberIds: string[]) {
               <div><span>참여 회원</span><strong>{uniqueMonthParticipants}명</strong></div>
               <div><span>총 벙비</span><strong>{won(monthTotalCost)}</strong></div>
             </div>
-          </section>
+          </section>}
 
-          <div style={{display: meetingCalendarExpanded ? undefined : "none"}}>
+          <div style={{display: meetingUiTab !== "multi" && meetingCalendarExpanded ? undefined : "none"}}>
           <section className="panel standalonePanel appCalendarPanel meetingCalendarPanel">
             <div className="calendarHeader">
               <div>
@@ -4064,26 +4071,7 @@ async function setAttendanceMembers(memberIds: string[]) {
           </section>
 
           </div>
-          {selectedMeeting && meetingUiTab !== "multi" && (
-            <section className="meetingFlowStepper" aria-label="모임 정산 진행 단계">
-              <div className="meetingFlowStep complete">
-                <span>1</span>
-                <div><strong>참석자</strong><small>{selectedMeeting.attendeeIds.length + selectedMeeting.guests.length}명</small></div>
-              </div>
-              <i />
-              <div className={`meetingFlowStep ${selectedMeeting.cost != null ? "complete" : "current"}`}>
-                <span>2</span>
-                <div><strong>비용 입력</strong><small>{selectedMeeting.cost == null ? "입력 필요" : won(Number(selectedMeeting.cost))}</small></div>
-              </div>
-              <i />
-              <div className={`meetingFlowStep ${selectedMeeting.cost != null && selectedMeeting.attendeeIds.length + selectedMeeting.guests.length > 0 ? "current" : ""}`}>
-                <span>3</span>
-                <div><strong>정산 공유</strong><small>카카오톡 공유</small></div>
-              </div>
-            </section>
-          )}
-
-          {selectedMeeting && editingMeetingId === selectedMeeting.id && (
+          {selectedMeeting && meetingUiTab !== "multi" && editingMeetingId === selectedMeeting.id && (
             <section className="panel meetingEditPanel">
               <div className="panelHead compactHead">
                 <div>
@@ -4123,7 +4111,7 @@ async function setAttendanceMembers(memberIds: string[]) {
             </section>
           )}
 
-          <section className="meetingWorkspace step47Workspace" style={{display: meetingUiTab === "multi" ? "none" : undefined}}>
+          <section className="meetingWorkspace step47Workspace" hidden={meetingUiTab === "multi"}>
             <div className="panel standalonePanel" style={{display: meetingUiTab === "attendees" ? undefined : "none"}}>
               <div className="step49StepNav"><span>1 / 2 · 참석자</span><button type="button" className="smallButton" onClick={() => setMeetingUiTab("cost")}>다음 · 비용 배분 →</button></div>
               <div className="panelHead compactHead">
