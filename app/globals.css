@@ -5983,3 +5983,19 @@ button.meetingMetricCard {
   .step49Choose > .step50CreateCard,
   .step49Choose > .selectedStrip { width: 100%; min-width: 0; }
 }
+
+/* STEP50_LAYOUT_FIX_2: prevent nested controlGrid from taking half the parent column */
+@media (min-width: 900px) {
+  .step49Choose { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) !important; align-items: start; gap: 12px 16px; }
+  .step49Choose > .step49Heading { grid-column: 1 / -1; }
+  .step49Choose > .step47Controls { grid-column: 1; display: block !important; width: 100%; max-width: none; min-width: 0; margin: 0 !important; }
+  .step49Choose > .step47Controls > .panel { width: 100%; max-width: none; min-width: 0; box-sizing: border-box; }
+  .step49Choose > .step50CreateCard { grid-column: 2; width: 100%; max-width: none; min-width: 0; box-sizing: border-box; align-self: start; }
+  .step49Choose > .selectedStrip { grid-column: 1 / -1; }
+}
+@media (max-width: 899px) {
+  .step49Choose { grid-template-columns: minmax(0, 1fr) !important; }
+  .step49Choose > .step47Controls { display: block !important; width: 100%; }
+  .step49Choose > .step47Controls > .panel { width: 100%; max-width: none; }
+  .step49Choose > .step50CreateCard, .step49Choose > .selectedStrip { grid-column: 1; width: 100%; }
+}
