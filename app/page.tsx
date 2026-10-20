@@ -3839,7 +3839,8 @@ async function setAttendanceMembers(memberIds: string[]) {
                 ))}
               </select>
             </div>
-          </section>            <details className="panel standalonePanel step50CreateCard">
+          </section>
+          <details className="panel standalonePanel step50CreateCard">
               <summary className="step50DetailsSummary">＋ 새 모임 추가 <span>필요할 때 펼치기</span></summary>
               <div className="inlineForm">
                 <input

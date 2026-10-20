@@ -5954,3 +5954,32 @@ button.meetingMetricCard {
 .step50ActionMenu .stripActionButton{min-height:44px}
 .step50CreateCard .inlineForm{display:flex;flex-wrap:wrap;gap:8px}
 }
+
+/* STEP50_LAYOUT_TUNE: selection and creation cards aligned on desktop */
+@media (min-width: 900px) {
+  .step49Choose {
+    grid-template-columns: minmax(0, 2fr) minmax(290px, 1fr);
+    align-items: start;
+    column-gap: 14px;
+    row-gap: 12px;
+  }
+  .step49Choose > .step49Heading,
+  .step49Choose > .selectedStrip { grid-column: 1 / -1; }
+  .step49Choose > .step47Controls { grid-column: 1; min-width: 0; }
+  .step49Choose > .step50CreateCard { grid-column: 2; min-width: 0; }
+  .step49Choose .step47Controls > .panel { width: 100%; min-width: 0; }
+  .step49Choose .step47Controls select { width: 100%; }
+  .step49Choose .step50CreateCard .inlineForm {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 9px;
+  }
+  .step49Choose .step50CreateCard .inlineForm input,
+  .step49Choose .step50CreateCard .inlineForm button { width: 100%; min-width: 0; }
+}
+@media (max-width: 899px) {
+  .step49Choose { grid-template-columns: minmax(0, 1fr); }
+  .step49Choose > .step47Controls,
+  .step49Choose > .step50CreateCard,
+  .step49Choose > .selectedStrip { width: 100%; min-width: 0; }
+}
