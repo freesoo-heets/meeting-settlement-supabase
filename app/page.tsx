@@ -1589,7 +1589,7 @@ async function setAttendanceMembers(memberIds: string[]) {
   const currentIds = new Set(selectedMeeting.attendeeIds);
   const nextIds = new Set(memberIds);
 
-  const toAdd = memberIds.filter((id) => !currentIds.has(id));
+  let toAdd = memberIds.filter((id) => !currentIds.has(id));
   const toRemove = selectedMeeting.attendeeIds.filter(
     (id) => !nextIds.has(id)
   );
@@ -1648,15 +1648,24 @@ async function setAttendanceMembers(memberIds: string[]) {
   let createdAttendances: CreatedAttendanceForPet[] = [];
 
   if (toAdd.length > 0) {
+    // ★ 화면이 최신이 아니어도(봇 자동 참석 등) 중복 오류가 나지 않게, 이미 DB 에 있는 사람은 뺀다
+    const { data: already } = await supabase
+      .from("attendance")
+      .select("member_id")
+      .eq("meeting_id", selectedMeeting.id)
+      .in("member_id", toAdd);
+    const existing = new Set((already ?? []).map((row) => row.member_id as string));
+    toAdd = toAdd.filter((memberId) => !existing.has(memberId));
+  }
+
+  if (toAdd.length > 0) {
     const { data, error: addError } = await supabase
       .from("attendance")
-      .upsert(
+      .insert(
         toAdd.map((memberId) => ({
           meeting_id: selectedMeeting.id,
           member_id: memberId,
-        })),
-        // ★ 이미 참석으로 있는 사람은 건너뛴다 (화면이 최신이 아니어도 오류가 나지 않게)
-        { onConflict: "meeting_id,member_id", ignoreDuplicates: true }
+        }))
       )
       .select("member_id, created_at");
 
@@ -2739,6 +2748,7 @@ async function setAttendanceMembers(memberIds: string[]) {
   // 참석 체크: 누르는 즉시 화면에 반영하고 저장은 뒤에서 한다 (실패하면 되돌린다)
   //   예전에는 저장 → PET 알림 → 전체 다시 불러오기를 모두 기다리고, 그동안 다른 체크도 막혀서 느렸다.
   const attendancePending = useRef<Set<string>>(new Set());
+  const attendanceJobs = useRef<Set<Promise<void>>>(new Set()); // 진행 중인 참석 저장 (다시 불러오기 전에 기다림)
 
   // 👑 벙주 지정 (벙포 지급 대상)
   async function setMeetingHost(memberId: string | null) {
@@ -2780,6 +2790,16 @@ async function setAttendanceMembers(memberIds: string[]) {
   }
 
   async function toggleAttendance(memberId: string) {
+    const job = toggleAttendanceInner(memberId);
+    attendanceJobs.current.add(job);
+    try {
+      await job;
+    } finally {
+      attendanceJobs.current.delete(job);
+    }
+  }
+
+  async function toggleAttendanceInner(memberId: string) {
     if (!selectedMeeting) return;
     const meetingId = selectedMeeting.id;
     const key = `${meetingId}:${memberId}`;
@@ -2819,15 +2839,16 @@ async function setAttendanceMembers(memberIds: string[]) {
         setPrepayments((current) => current.filter((item) => !(item.meeting_id === meetingId && item.member_id === memberId)));
       }
     } else {
-      // ★ 이미 참석으로 저장돼 있으면(봇 자동 참석 · 다른 운영진이 먼저 체크) 중복 오류 대신 그대로 둔다
       const { data: createdAttendance, error } = await supabase
         .from("attendance")
-        .upsert({ meeting_id: meetingId, member_id: memberId }, { onConflict: "meeting_id,member_id", ignoreDuplicates: true })
+        .insert({ meeting_id: meetingId, member_id: memberId })
         .select("member_id, created_at")
         .maybeSingle();
-      if (error) {
-        failed = error.message;
-      } else if (createdAttendance) {
+      if (error?.code === "23505") {
+        // ★ 이미 참석으로 저장돼 있음 (봇 자동 참석 · 다른 운영진이 먼저 체크) → 그대로 참석 상태로 둔다
+      } else if (error || !createdAttendance) {
+        failed = error?.message ?? "참석 저장 결과를 확인할 수 없습니다.";
+      } else {
         // PET 연동은 기다리지 않는다 (실패해도 참석 저장은 그대로) · 새로 들어간 경우만
         void notifyPetAttendances(meetingId, [createdAttendance]);
       }
@@ -2884,6 +2905,7 @@ async function setAttendanceMembers(memberIds: string[]) {
       );
       setEditingCostId("");
       setEditingCost("");
+      await Promise.all([...attendanceJobs.current]); // 참석 체크 저장이 끝난 뒤에 새로 불러온다
       await loadAll();
     }
     setSaving(false);
