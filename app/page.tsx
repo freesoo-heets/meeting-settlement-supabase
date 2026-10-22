@@ -1650,11 +1650,13 @@ async function setAttendanceMembers(memberIds: string[]) {
   if (toAdd.length > 0) {
     const { data, error: addError } = await supabase
       .from("attendance")
-      .insert(
+      .upsert(
         toAdd.map((memberId) => ({
           meeting_id: selectedMeeting.id,
           member_id: memberId,
-        }))
+        })),
+        // ★ 이미 참석으로 있는 사람은 건너뛴다 (화면이 최신이 아니어도 오류가 나지 않게)
+        { onConflict: "meeting_id,member_id", ignoreDuplicates: true }
       )
       .select("member_id, created_at");
 
@@ -2817,15 +2819,16 @@ async function setAttendanceMembers(memberIds: string[]) {
         setPrepayments((current) => current.filter((item) => !(item.meeting_id === meetingId && item.member_id === memberId)));
       }
     } else {
+      // ★ 이미 참석으로 저장돼 있으면(봇 자동 참석 · 다른 운영진이 먼저 체크) 중복 오류 대신 그대로 둔다
       const { data: createdAttendance, error } = await supabase
         .from("attendance")
-        .insert({ meeting_id: meetingId, member_id: memberId })
+        .upsert({ meeting_id: meetingId, member_id: memberId }, { onConflict: "meeting_id,member_id", ignoreDuplicates: true })
         .select("member_id, created_at")
-        .single();
-      if (error || !createdAttendance) {
-        failed = error?.message ?? "참석 저장 결과를 확인할 수 없습니다.";
-      } else {
-        // PET 연동은 기다리지 않는다 (실패해도 참석 저장은 그대로)
+        .maybeSingle();
+      if (error) {
+        failed = error.message;
+      } else if (createdAttendance) {
+        // PET 연동은 기다리지 않는다 (실패해도 참석 저장은 그대로) · 새로 들어간 경우만
         void notifyPetAttendances(meetingId, [createdAttendance]);
       }
     }
