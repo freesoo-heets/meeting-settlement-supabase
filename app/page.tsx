@@ -341,10 +341,25 @@ export default function Home() {
         return withHost.error?.code === "42703" ? await query("id,date,title,cost,created_at") : withHost;
       })(),
       (async () => {
-        const withOnline = await supabase.from("attendance").select("meeting_id,member_id,online");
-        return withOnline.error?.code === "42703"
-          ? await supabase.from("attendance").select("meeting_id,member_id")
-          : withOnline;
+        // ★ Supabase 는 한 번에 최대 1,000줄만 돌려준다. 참석 기록이 1,000건을 넘으면서
+        //   새로 체크한 참석이 다시 불러올 때 잘려 '체크가 빠지는' 것처럼 보였다 → 1,000줄씩 끝까지 읽는다
+        const readAll = async (columns: string) => {
+          const rows: unknown[] = [];
+          for (let from = 0; ; from += 1000) {
+            const page = await supabase
+              .from("attendance")
+              .select(columns)
+              .order("meeting_id", { ascending: true })
+              .order("member_id", { ascending: true })
+              .range(from, from + 999);
+            if (page.error) return { data: null, error: page.error };
+            rows.push(...(page.data ?? []));
+            if (!page.data || page.data.length < 1000) break;
+          }
+          return { data: rows, error: null };
+        };
+        const withOnline = await readAll("meeting_id,member_id,online");
+        return withOnline.error?.code === "42703" ? await readAll("meeting_id,member_id") : withOnline;
       })(),
       supabase
         .from("settlement_adjustments")
