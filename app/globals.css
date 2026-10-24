@@ -6007,3 +6007,26 @@ button.meetingMetricCard {
 .step51MultiGuide{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:12px 14px;background:rgba(105,81,166,.055);border-radius:12px;margin-bottom:12px}.step51MultiGuide span{font-size:12px;color:var(--muted,#697386)}
 .step51MultiEmpty{text-align:center;padding:22px 14px;background:rgba(105,81,166,.045);border-radius:12px;margin-top:12px}.step51MultiEmpty p{font-size:13px;color:var(--muted,#697386)}
 @media(max-width:700px){.step51CostActions{display:grid;grid-template-columns:minmax(0,1fr)}.step51CostActions input{max-width:none;width:100%}.step51CostActions button{width:100%}}
+
+/* STEP52_PRIVACY_AND_MEETING_UX: meeting management presentation only */
+.step52MeetingChooser{align-items:start;row-gap:12px}
+.step52MeetingChooser .step47Controls{width:100%;min-width:0}
+.step52MeetingChooser .step47Controls>.panel{width:100%;min-width:0}
+.step52MeetingChooser .step47Controls select{width:100%;min-height:44px}
+.step52MeetingChooser>.step52CreateCard{min-width:0;align-self:start}
+.step52CreateCard:not([open]){min-height:0}
+.step52CreateCard:not([open]) .step50DetailsSummary{min-height:54px}
+.step52CreateCard .inlineForm{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+.step52CreateCard .inlineForm input,.step52CreateCard .inlineForm button{width:100%;min-width:0;min-height:44px}
+.step52SelectedMeeting{grid-column:1/-1;min-width:0;margin-top:0!important}
+@media(min-width:900px){
+ .step52MeetingChooser{grid-template-columns:minmax(0,2fr) minmax(280px,1fr)!important;column-gap:16px!important}
+ .step52MeetingChooser>.step49Heading{grid-column:1/-1}
+ .step52MeetingChooser>.step47Controls{grid-column:1!important;display:block!important}
+ .step52MeetingChooser>.step52CreateCard{grid-column:2!important}
+ .step52MeetingChooser>.step52SelectedMeeting{grid-column:1/-1!important}
+}
+@media(max-width:899px){
+ .step52MeetingChooser{grid-template-columns:minmax(0,1fr)!important}
+ .step52MeetingChooser>.step47Controls,.step52MeetingChooser>.step52CreateCard,.step52MeetingChooser>.step52SelectedMeeting{grid-column:1!important;width:100%}
+}

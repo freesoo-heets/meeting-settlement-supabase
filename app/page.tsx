@@ -3567,7 +3567,8 @@ async function setAttendanceMembers(memberIds: string[]) {
         </div>
         <div className="myStatusItem">
           <span>벙비 합계</span>
-          <strong>{mainTab === "dashboard" && !showDashboardCosts ? "••••••원" : won(myMonthSummary.burden)}</strong>
+          {/* STEP52_PRIVACY_AND_MEETING_UX: hide personal total across every main menu. */}
+          <strong aria-label="벙비 합계 비공개">••••••원</strong>
         </div>
       </section>
 
@@ -3853,7 +3854,7 @@ async function setAttendanceMembers(memberIds: string[]) {
             </div>
           </section>
           {/* STEP49_MEETING_UX */}
-          <div className="step49Choose">
+          <div className="step49Choose step52MeetingChooser">
             <div className="step49Heading"><strong>① 관리할 모임 선택</strong></div>
           <section className="controlGrid step47Controls">
             <div className="panel standalonePanel">
@@ -3880,7 +3881,7 @@ async function setAttendanceMembers(memberIds: string[]) {
               </select>
             </div>
           </section>
-          <details className="panel standalonePanel step50CreateCard">
+          <details className="panel standalonePanel step50CreateCard step52CreateCard">
               <summary className="step50DetailsSummary">＋ 새 모임 추가 <span>필요할 때 펼치기</span></summary>
               <div className="inlineForm">
                 <input
@@ -3902,7 +3903,7 @@ async function setAttendanceMembers(memberIds: string[]) {
 
 
           {selectedMeeting && (
-            <section className="selectedStrip">
+            <section className="selectedStrip step52SelectedMeeting">
               <div>
                 <strong>{selectedMeeting.title}</strong>
                 <span>{selectedMeeting.date}</span>
