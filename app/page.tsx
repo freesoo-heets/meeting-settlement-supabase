@@ -238,6 +238,10 @@ export default function Home() {
   // STEP50_MEETING_UX: presentation-only controls.
   // Native details controls keep secondary actions accessible without extra state.
 
+  // STEP53_55_UX: operational convenience controls
+  const [historySearch, setHistorySearch] = useState("");
+  const [historyPage, setHistoryPage] = useState(1);
+  const [showOnlyUnsettled, setShowOnlyUnsettled] = useState(false);
   const [memberSearch, setMemberSearch] = useState("");
   const [memberFilter, setMemberFilter] = useState<MemberFilter>("all");
   const [memberSort, setMemberSort] = useState<MemberSort>("nickname_asc");
@@ -800,12 +804,27 @@ export default function Home() {
   }, [members, warningMembers]);
 
 
+  // STEP53_CHOSEONG_SEARCH: 한글 초성(ㅍㄷ → 퐁당) 및 기존 부분 문자열 검색.
+  const memberSearchMatches = (name: string, query: string): boolean => {
+    const normalizedName = name.normalize("NFC").toLowerCase();
+    const normalizedQuery = query.normalize("NFC").toLowerCase();
+    if (!normalizedQuery || normalizedName.includes(normalizedQuery)) return true;
+    const initials = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ";
+    const searchKey = Array.from(normalizedName, (char) => {
+      const code = char.charCodeAt(0);
+      return code >= 0xac00 && code <= 0xd7a3
+        ? initials[Math.floor((code - 0xac00) / 588)]
+        : char;
+    }).join("");
+    return searchKey.includes(normalizedQuery);
+  };
+
   const filteredMembers = useMemo(() => {
     const q = memberSearch.trim().toLowerCase();
 
     const rows = members.filter((member) => {
       if (member.is_guest) return false; // 게스트는 아래 '게스트 현황'에 따로
-      if (q && !member.name.toLowerCase().includes(q)) return false;
+      if (q && !memberSearchMatches(member.name, q)) return false;
       if (memberFilter === "active") {
         return member.active && !warningByMember[member.id]?.warning;
       }
@@ -3864,18 +3883,22 @@ async function setAttendanceMembers(memberIds: string[]) {
                   <p>{selectedMonth}</p>
                 </div>
               </div>
+              <label className="step53UnsettledFilter"><input type="checkbox" checked={showOnlyUnsettled} onChange={(e) => setShowOnlyUnsettled(e.target.checked)} /> 비용 미입력만 보기 ({monthMeetings.filter((m) => m.cost == null).length})</label>
               <select
                 value={selectedMeetingId}
                 onChange={(event) => {
+                  if (editingCostId && editingCost.trim() !== "" && editingCostId !== event.target.value && !window.confirm("입력 중인 총비용이 저장되지 않았습니다. 모임을 변경할까요?")) return;
+                  setEditingCostId("");
+                  setEditingCost("");
                   setSelectedMeetingId(event.target.value);
                   setMemberFixedDrafts({});
                   setGuestFixedDrafts({});
                 }}
               >
                 <option value="">모임 선택</option>
-                {monthMeetings.map((meeting) => (
+                {monthMeetings.filter((meeting) => !showOnlyUnsettled || meeting.cost == null || meeting.id === selectedMeetingId).map((meeting) => (
                   <option key={meeting.id} value={meeting.id}>
-                    {meeting.date} · {meeting.title}
+                    {meeting.cost == null ? "⚠ " : "✓ "}{meeting.date} · {meeting.title}
                   </option>
                 ))}
               </select>
@@ -3894,7 +3917,10 @@ async function setAttendanceMembers(memberIds: string[]) {
                   value={newMeetingTitle}
                   onChange={(event) => setNewMeetingTitle(event.target.value)}
                 />
-                <button className="smallButton" onClick={() => void addMeeting()}>
+                <button className="smallButton" onClick={() => {
+                  if (monthMeetings.some((m) => m.date === newMeetingDate && m.title.trim().toLowerCase() === newMeetingTitle.trim().toLowerCase()) && !window.confirm("같은 날짜와 이름의 모임이 있습니다. 그래도 추가할까요?")) return;
+                  void addMeeting();
+                }}>
                   추가
                 </button>
               </div>
@@ -4710,7 +4736,7 @@ async function setAttendanceMembers(memberIds: string[]) {
                 <input
                   className="searchInput"
                   type="search"
-                  placeholder="찾을 회원의 닉네임을 입력하세요"
+                  placeholder="닉네임 또는 초성 검색 (예: 퐁당, ㅍㄷ)"
                   value={memberSearch}
                   onChange={(event) => setMemberSearch(event.target.value)}
                 />
@@ -5326,8 +5352,9 @@ async function setAttendanceMembers(memberIds: string[]) {
                 <p>최근 20건 · 모든 역할에서 동일하게 확인</p>
               </div>
             </div>
+            <div className="step55HistorySearch"><input type="search" placeholder="변경 내용·담당자 검색" aria-label="변경 이력 검색" value={historySearch} onChange={(e) => {setHistorySearch(e.target.value);setHistoryPage(1);}} /></div>
             <div className="activityList">
-              {activityLogs.map((log) => (
+              {activityLogs.filter((log) => `${log.action} ${log.description} ${log.actor_nickname}`.toLowerCase().includes(historySearch.toLowerCase())).slice((historyPage - 1) * 20, historyPage * 20).map((log) => (
                 <div className="activityRow" key={log.id}>
                   <div>
                     <strong>{log.action}</strong>
