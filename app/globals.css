@@ -5999,3 +5999,11 @@ button.meetingMetricCard {
   .step49Choose > .step47Controls > .panel { width: 100%; max-width: none; }
   .step49Choose > .step50CreateCard, .step49Choose > .selectedStrip { grid-column: 1; width: 100%; }
 }
+
+/* STEP51_DIRECT_COST */
+.step51CostEditor{padding:16px;border:1px solid rgba(105,81,166,.22);background:rgba(105,81,166,.045);border-radius:14px;margin:0 0 18px}
+.step51CostHead{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}.step51CostHead span{font-size:12px;color:var(--muted,#697386)}
+.step51CostActions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.step51CostActions input{flex:1 1 190px;min-width:0;max-width:330px;min-height:44px}.step51CostActions button{min-height:44px}.step51CostAmount{font-size:19px;margin-right:auto}
+.step51MultiGuide{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:12px 14px;background:rgba(105,81,166,.055);border-radius:12px;margin-bottom:12px}.step51MultiGuide span{font-size:12px;color:var(--muted,#697386)}
+.step51MultiEmpty{text-align:center;padding:22px 14px;background:rgba(105,81,166,.045);border-radius:12px;margin-top:12px}.step51MultiEmpty p{font-size:13px;color:var(--muted,#697386)}
+@media(max-width:700px){.step51CostActions{display:grid;grid-template-columns:minmax(0,1fr)}.step51CostActions input{max-width:none;width:100%}.step51CostActions button{width:100%}}

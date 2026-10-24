@@ -3967,24 +3967,25 @@ async function setAttendanceMembers(memberIds: string[]) {
               <div><h2>🧾 여러 모임 통합 정산</h2><p>2개 이상의 모임을 선택하면 중복 참석자를 자동으로 합산합니다.</p></div>
               <span className="dashboardPanelBadge">{multiSettlementMeetings.length}개 선택</span>
             </div>
-            <div className="step49MultiHeading"><strong>① 정산할 모임 선택</strong><small>2개 이상 선택</small></div>
+            <div className="step49MultiHeading"><strong>① 정산할 모임 선택</strong><small>비용 입력 완료 모임 중 2개 이상</small></div>
+            <div className="step51MultiGuide"><strong>{multiSettlementMeetings.length}개 모임 선택</strong><span>선택하면 아래에서 참석자별 합산 결과를 바로 확인할 수 있습니다.</span></div>
             <div className="multiSettlementChoices">
               {monthMeetings.map((meeting) => (
                 <label className={`multiSettlementChoice ${multiSettlementIds.includes(meeting.id) ? 'selected' : ''}`} key={meeting.id}>
                   <input type="checkbox" checked={multiSettlementIds.includes(meeting.id)} disabled={meeting.cost == null} onChange={(event) => setMultiSettlementIds((current) => event.target.checked ? [...current, meeting.id] : current.filter((id) => id !== meeting.id))} />
-                  <span><strong>{meeting.title}</strong><small>{meeting.date} · {meeting.cost == null ? '비용 미입력' : `${meeting.attendeeIds.length + meeting.guests.length}명 · ${won(Number(meeting.cost))}`}</small></span>
+                  <span><strong>{meeting.title}</strong><small>{meeting.date} · {meeting.cost == null ? '⚠ 비용 미입력 · 일반 정산에서 입력' : `${meeting.attendeeIds.length + meeting.guests.length}명 · ${won(Number(meeting.cost))}`}</small></span>
                 </label>
               ))}
               {monthMeetings.length === 0 && <div className="empty">선택한 달에 모임이 없습니다.</div>}
             </div>
             <div className="multiSettlementToolbar">
-              <button className="smallButton ghost" onClick={() => setMultiSettlementIds(monthMeetings.filter((meeting) => meeting.cost != null).map((meeting) => meeting.id))}>비용 입력된 모임 전체 선택</button>
+              <button className="smallButton ghost" onClick={() => setMultiSettlementIds(monthMeetings.filter((meeting) => meeting.cost != null).map((meeting) => meeting.id))}>정산 가능한 모임 전체 선택</button>
               <button className="smallButton ghost" onClick={() => setMultiSettlementIds([])}>선택 해제</button>
             </div>
             {multiSettlementMeetings.length >= 2 ? (
               <div className="multiSettlementPreview step49MultiResult">
                 <div className="step49MultiHeading"><strong>② 통합 정산 결과</strong><small>참석 조합별 자동 합산</small></div>
-                <div className="multiSettlementPreviewHead"><strong>통합 정산 미리보기</strong><button className="smallButton" onClick={() => void copyMultiSettlement()}>📋 카카오톡 문구 복사</button></div>
+                <div className="multiSettlementPreviewHead"><strong>통합 정산 미리보기</strong><button className="smallButton" onClick={() => void copyMultiSettlement()}>📋 카카오톡 정산 복사</button></div>
                 {multiSettlementResult.map((section) => (
                   <div className="multiSettlementGroup" key={section.ids.join('|')}>
                     <h3>{section.label} <small>{section.rows.length}명</small></h3>
@@ -3993,7 +3994,7 @@ async function setAttendanceMembers(memberIds: string[]) {
                 ))}
                 <textarea className="multiSettlementText" readOnly value={multiSettlementText} aria-label="카카오톡 통합 정산 문구" />
               </div>
-            ) : <p className="multiSettlementHint">비용이 입력된 모임을 2개 이상 선택해주세요. 1번모임 / 1번+2번모임 / 2번모임처럼 참석 조합별로 분리됩니다.</p>}
+            ) : <div className="step51MultiEmpty"><strong>통합 정산할 모임을 2개 이상 선택해주세요.</strong><p>비용 미입력 모임은 일반 정산에서 총비용을 먼저 저장하세요.</p></div>}
           </section>
           {meetingUiTab !== "multi" && <section className="meetingOpsSummary panel standalonePanel step47Summary">
             <div className="meetingOpsSummaryTitle">
@@ -4343,6 +4344,24 @@ async function setAttendanceMembers(memberIds: string[]) {
                 )}
               </div>
 
+              {/* STEP51_DIRECT_COST: cost input available in settlement tab. */}
+              {selectedMeeting && (
+                <div className="step51CostEditor">
+                  <div className="step51CostHead"><strong>💰 모임 총비용</strong><span>{selectedMeeting.cost == null ? "입력 필요" : "입력 완료"}</span></div>
+                  {editingCostId === selectedMeeting.id ? (
+                    <div className="step51CostActions">
+                      <input type="number" min="0" inputMode="numeric" aria-label="모임 총비용" placeholder="총비용 (원)" value={editingCost} onChange={(event) => setEditingCost(event.target.value)} />
+                      <button type="button" className="smallButton" disabled={saving || editingCost.trim() === ""} onClick={() => void saveCost(selectedMeeting.id)}>비용 저장</button>
+                      <button type="button" className="smallButton ghost" onClick={() => {setEditingCostId("");setEditingCost("");}}>취소</button>
+                    </div>
+                  ) : (
+                    <div className="step51CostActions">
+                      <strong className="step51CostAmount">{selectedMeeting.cost == null ? "아직 입력되지 않았습니다" : won(Number(selectedMeeting.cost))}</strong>
+                      <button type="button" className="smallButton" onClick={() => {setEditingCostId(selectedMeeting.id);setEditingCost(selectedMeeting.cost == null ? "" : String(selectedMeeting.cost));}}>{selectedMeeting.cost == null ? "＋ 총비용 입력" : "✎ 총비용 수정"}</button>
+                    </div>
+                  )}
+                </div>
+              )}
               {!selectedMeeting ? (
                 <div className="empty">모임을 선택해주세요.</div>
               ) : selectedMeeting.cost == null ? (
