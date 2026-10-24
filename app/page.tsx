@@ -3875,6 +3875,109 @@ async function setAttendanceMembers(memberIds: string[]) {
               <button type="button" className="smallButton ghost" onClick={() => setMeetingSettingsExpanded((value) => !value)} aria-expanded={meetingSettingsExpanded}>{meetingSettingsExpanded ? "관리 도구 닫기" : "⚙ 관리 도구"}</button>
             </div>
           </section>
+          {/* STEP58_CALENDAR_PLACEMENT: calendar immediately follows its toggle */}
+          <div style={{display: meetingUiTab !== "multi" && meetingCalendarExpanded ? undefined : "none"}}>
+          <section className="panel standalonePanel appCalendarPanel meetingCalendarPanel">
+            <div className="calendarHeader">
+              <div>
+                <span className="memberControlEyebrow">CALENDAR</span>
+                <h2>벙 달력</h2>
+                <p>날짜별 예정·진행된 벙을 확인하고 바로 선택할 수 있습니다.</p>
+              </div>
+              <div className="calendarMonthNav">
+                <button
+                  type="button"
+                  aria-label="이전 달"
+                  onClick={() => setMeetingCalendarMonth((month) => shiftMonth(month, -1))}
+                >
+                  ‹
+                </button>
+                <strong>{meetingCalendarMonth.replace("-", "년 ")}월</strong>
+                <button
+                  type="button"
+                  aria-label="다음 달"
+                  onClick={() => setMeetingCalendarMonth((month) => shiftMonth(month, 1))}
+                >
+                  ›
+                </button>
+                {meetingCalendarMonth !== currentMonth && (
+                  <button
+                    type="button"
+                    className="calendarTodayButton"
+                    onClick={() => setMeetingCalendarMonth(currentMonth)}
+                  >
+                    이번 달
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="calendarWeekdays" aria-hidden="true">
+              {["일", "월", "화", "수", "목", "금", "토"].map((day) => (
+                <span key={day}>{day}</span>
+              ))}
+            </div>
+
+            <div className="calendarGrid">
+              {meetingCalendarCells.map((cell) => {
+                const dayMeetings = meetingsByDate.get(cell.date) ?? [];
+                const expanded = expandedDays.includes(cell.date);
+                return (
+                  <div
+                    className={`calendarDay ${cell.inMonth ? "" : "outside"} ${cell.date === today ? "today" : ""} ${cell.date === selectedCalendarDate ? "selectedDate" : ""}`}
+                    key={cell.date}
+                    onClick={() => setSelectedCalendarDate(cell.date)}
+                  >
+                    <div className="calendarDayNumber">
+                      <span>{cell.day}</span>
+                      {dayMeetings.length > 0 && <em>{dayMeetings.length}</em>}
+                    </div>
+                    <div className="calendarEvents">
+                      {(expanded ? dayMeetings : dayMeetings.slice(0, 3)).map((meeting) => (
+                        <button
+                          key={meeting.id}
+                          type="button"
+                          className={meeting.id === selectedMeetingId ? "calendarEvent selected" : "calendarEvent"}
+                          title={`${meeting.date} ${meeting.title}`}
+                          onClick={() => {
+                            setSelectedMeetingId(meeting.id);
+                            setMemberFixedDrafts({});
+                            setGuestFixedDrafts({});
+                          }}
+                        >
+                          {meeting.title}
+                        </button>
+                      ))}
+                      {dayMeetings.length > 3 && (
+                        <button
+                          type="button"
+                          className="calendarMoreEvents"
+                          aria-expanded={expanded}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            // 그 날짜 칸을 아래로 펼쳐 모든 벙을 보여준다 (다시 누르면 접기)
+                            setExpandedDays((current) =>
+                              expanded ? current.filter((day) => day !== cell.date) : [...current, cell.date],
+                            );
+                          }}
+                        >
+                          {expanded ? "접기 ▲" : `+${dayMeetings.length - 3}개 더 ▼`}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mobileCalendarDayList">
+              <div className="modalSectionHead"><strong>{selectedCalendarDate} 벙</strong><span>{selectedCalendarMeetings.length}건</span></div>
+              {selectedCalendarMeetings.map(meeting => <button key={meeting.id} onClick={() => setDetailMeetingId(meeting.id)}><div><strong>{meeting.title}</strong><span>{meeting.attendeeIds.length + meeting.guests.length}명 참석</span></div><em>›</em></button>)}
+              {selectedCalendarMeetings.length === 0 && <div className="empty">선택한 날짜에 등록된 벙이 없습니다.</div>}
+            </div>
+          </section>
+
+          </div>
+
           {/* STEP57_MEETING_REDESIGN */}
           <div className="step57Top">
             <div className="step57TopHeader">
@@ -4027,107 +4130,6 @@ async function setAttendanceMembers(memberIds: string[]) {
             </div>
           </section>}
 
-          <div style={{display: meetingUiTab !== "multi" && meetingCalendarExpanded ? undefined : "none"}}>
-          <section className="panel standalonePanel appCalendarPanel meetingCalendarPanel">
-            <div className="calendarHeader">
-              <div>
-                <span className="memberControlEyebrow">CALENDAR</span>
-                <h2>벙 달력</h2>
-                <p>날짜별 예정·진행된 벙을 확인하고 바로 선택할 수 있습니다.</p>
-              </div>
-              <div className="calendarMonthNav">
-                <button
-                  type="button"
-                  aria-label="이전 달"
-                  onClick={() => setMeetingCalendarMonth((month) => shiftMonth(month, -1))}
-                >
-                  ‹
-                </button>
-                <strong>{meetingCalendarMonth.replace("-", "년 ")}월</strong>
-                <button
-                  type="button"
-                  aria-label="다음 달"
-                  onClick={() => setMeetingCalendarMonth((month) => shiftMonth(month, 1))}
-                >
-                  ›
-                </button>
-                {meetingCalendarMonth !== currentMonth && (
-                  <button
-                    type="button"
-                    className="calendarTodayButton"
-                    onClick={() => setMeetingCalendarMonth(currentMonth)}
-                  >
-                    이번 달
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <div className="calendarWeekdays" aria-hidden="true">
-              {["일", "월", "화", "수", "목", "금", "토"].map((day) => (
-                <span key={day}>{day}</span>
-              ))}
-            </div>
-
-            <div className="calendarGrid">
-              {meetingCalendarCells.map((cell) => {
-                const dayMeetings = meetingsByDate.get(cell.date) ?? [];
-                const expanded = expandedDays.includes(cell.date);
-                return (
-                  <div
-                    className={`calendarDay ${cell.inMonth ? "" : "outside"} ${cell.date === today ? "today" : ""} ${cell.date === selectedCalendarDate ? "selectedDate" : ""}`}
-                    key={cell.date}
-                    onClick={() => setSelectedCalendarDate(cell.date)}
-                  >
-                    <div className="calendarDayNumber">
-                      <span>{cell.day}</span>
-                      {dayMeetings.length > 0 && <em>{dayMeetings.length}</em>}
-                    </div>
-                    <div className="calendarEvents">
-                      {(expanded ? dayMeetings : dayMeetings.slice(0, 3)).map((meeting) => (
-                        <button
-                          key={meeting.id}
-                          type="button"
-                          className={meeting.id === selectedMeetingId ? "calendarEvent selected" : "calendarEvent"}
-                          title={`${meeting.date} ${meeting.title}`}
-                          onClick={() => {
-                            setSelectedMeetingId(meeting.id);
-                            setMemberFixedDrafts({});
-                            setGuestFixedDrafts({});
-                          }}
-                        >
-                          {meeting.title}
-                        </button>
-                      ))}
-                      {dayMeetings.length > 3 && (
-                        <button
-                          type="button"
-                          className="calendarMoreEvents"
-                          aria-expanded={expanded}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            // 그 날짜 칸을 아래로 펼쳐 모든 벙을 보여준다 (다시 누르면 접기)
-                            setExpandedDays((current) =>
-                              expanded ? current.filter((day) => day !== cell.date) : [...current, cell.date],
-                            );
-                          }}
-                        >
-                          {expanded ? "접기 ▲" : `+${dayMeetings.length - 3}개 더 ▼`}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="mobileCalendarDayList">
-              <div className="modalSectionHead"><strong>{selectedCalendarDate} 벙</strong><span>{selectedCalendarMeetings.length}건</span></div>
-              {selectedCalendarMeetings.map(meeting => <button key={meeting.id} onClick={() => setDetailMeetingId(meeting.id)}><div><strong>{meeting.title}</strong><span>{meeting.attendeeIds.length + meeting.guests.length}명 참석</span></div><em>›</em></button>)}
-              {selectedCalendarMeetings.length === 0 && <div className="empty">선택한 날짜에 등록된 벙이 없습니다.</div>}
-            </div>
-          </section>
-
-          </div>
           {selectedMeeting && meetingUiTab !== "multi" && editingMeetingId === selectedMeeting.id && (
             <section className="panel meetingEditPanel">
               <div className="panelHead compactHead">
