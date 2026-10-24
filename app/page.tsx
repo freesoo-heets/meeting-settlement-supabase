@@ -235,6 +235,8 @@ export default function Home() {
   const [meetingUiTab, setMeetingUiTab] = useState<"attendees" | "cost" | "multi">("attendees");
   const [meetingCalendarExpanded, setMeetingCalendarExpanded] = useState(false);
   const [meetingSettingsExpanded, setMeetingSettingsExpanded] = useState(false);
+  // STEP57_MEETING_REDESIGN
+  const [showCreateMeeting, setShowCreateMeeting] = useState(false);
   // STEP50_MEETING_UX: presentation-only controls.
   // Native details controls keep secondary actions accessible without extra state.
 
@@ -2627,6 +2629,7 @@ async function setAttendanceMembers(memberIds: string[]) {
         `${newMeetingDate} · ${newMeetingTitle.trim()} 모임 생성`
       );
       setNewMeetingTitle("");
+      setShowCreateMeeting(false);
       setSelectedMonth(newMeetingDate.slice(0, 7));
       setSelectedMeetingId(data.id);
       await loadAll();
@@ -3872,62 +3875,48 @@ async function setAttendanceMembers(memberIds: string[]) {
               <button type="button" className="smallButton ghost" onClick={() => setMeetingSettingsExpanded((value) => !value)} aria-expanded={meetingSettingsExpanded}>{meetingSettingsExpanded ? "관리 도구 닫기" : "⚙ 관리 도구"}</button>
             </div>
           </section>
-          {/* STEP49_MEETING_UX */}
-          <div className="step49Choose step52MeetingChooser">
-            <div className="step49Heading"><strong>① 관리할 모임 선택</strong></div>
-          <section className="controlGrid step47Controls">
-            <div className="panel standalonePanel">
-              <div className="panelHead compactHead">
-                <div>
-                  <h2>모임 선택</h2>
-                  <p>{selectedMonth}</p>
-                </div>
+          {/* STEP57_MEETING_REDESIGN */}
+          <div className="step57Top">
+            <div className="step57TopHeader">
+              <div><h3>관리할 모임</h3><p>모임을 선택하고 참석자와 비용을 관리하세요.</p></div>
+              <button type="button" className="step57Add" onClick={() => setShowCreateMeeting(true)}>＋ 새 모임 추가</button>
+            </div>
+            <div className="step57SelectCard">
+              <div className="step57SelectHeader">
+                <label htmlFor="step57Select">모임 선택 <small>{selectedMonth}</small></label>
+                <label className="step57Filter"><input type="checkbox" checked={showOnlyUnsettled} onChange={(e) => setShowOnlyUnsettled(e.target.checked)}/><span>비용 미입력만 보기 ({monthMeetings.filter((m) => m.cost == null).length})</span></label>
               </div>
-              <label className="step53UnsettledFilter"><input type="checkbox" checked={showOnlyUnsettled} onChange={(e) => setShowOnlyUnsettled(e.target.checked)} /> 비용 미입력만 보기 ({monthMeetings.filter((m) => m.cost == null).length})</label>
-              <select
-                value={selectedMeetingId}
-                onChange={(event) => {
-                  if (editingCostId && editingCost.trim() !== "" && editingCostId !== event.target.value && !window.confirm("입력 중인 총비용이 저장되지 않았습니다. 모임을 변경할까요?")) return;
-                  setEditingCostId("");
-                  setEditingCost("");
-                  setSelectedMeetingId(event.target.value);
-                  setMemberFixedDrafts({});
-                  setGuestFixedDrafts({});
-                }}
-              >
-                <option value="">모임 선택</option>
+              <select id="step57Select" value={selectedMeetingId} onChange={(event) => {
+                if (editingCostId && editingCost.trim() !== "" && editingCostId !== event.target.value && !window.confirm("입력 중인 총비용이 저장되지 않았습니다. 모임을 변경할까요?")) return;
+                setEditingCostId(""); setEditingCost("");
+                setSelectedMeetingId(event.target.value);
+                setMemberFixedDrafts({}); setGuestFixedDrafts({});
+              }}>
+                <option value="">모임을 선택해주세요</option>
                 {monthMeetings.filter((meeting) => !showOnlyUnsettled || meeting.cost == null || meeting.id === selectedMeetingId).map((meeting) => (
-                  <option key={meeting.id} value={meeting.id}>
-                    {meeting.cost == null ? "⚠ " : "✓ "}{meeting.date} · {meeting.title}
-                  </option>
+                  <option key={meeting.id} value={meeting.id}>{meeting.cost == null ? "⚠ " : "✓ "}{meeting.date} · {meeting.title}</option>
                 ))}
               </select>
+              <div className="step57Legend">✓ 비용 입력 완료　 ·　 ⚠ 비용 입력 필요</div>
             </div>
-          </section>
-          <details className="panel standalonePanel step50CreateCard step52CreateCard">
-              <summary className="step50DetailsSummary">＋ 새 모임 추가 <span>필요할 때 펼치기</span></summary>
-              <div className="inlineForm">
-                <input
-                  type="date"
-                  value={newMeetingDate}
-                  onChange={(event) => setNewMeetingDate(event.target.value)}
-                />
-                <input
-                  placeholder="모임명"
-                  value={newMeetingTitle}
-                  onChange={(event) => setNewMeetingTitle(event.target.value)}
-                />
-                <button className="smallButton" onClick={() => {
+          </div>
+          {showCreateMeeting && (
+            <div className="step57Overlay" onMouseDown={(e) => {if(e.target === e.currentTarget && !saving) setShowCreateMeeting(false);}}>
+              <section role="dialog" aria-modal="true" aria-labelledby="step57DialogTitle" className="step57Dialog" onKeyDown={(e) => {if(e.key === "Escape" && !saving) setShowCreateMeeting(false);}}>
+                <div className="step57DialogHead"><div><h2 id="step57DialogTitle">새 모임 만들기</h2><p>날짜와 모임 이름을 입력해주세요.</p></div><button type="button" aria-label="닫기" onClick={() => setShowCreateMeeting(false)} disabled={saving}>×</button></div>
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!newMeetingDate || !newMeetingTitle.trim() || saving) return;
                   if (monthMeetings.some((m) => m.date === newMeetingDate && m.title.trim().toLowerCase() === newMeetingTitle.trim().toLowerCase()) && !window.confirm("같은 날짜와 이름의 모임이 있습니다. 그래도 추가할까요?")) return;
                   void addMeeting();
                 }}>
-                  추가
-                </button>
-              </div>
-            </details>
-
-
-
+                  <label className="step57Field"><span>모임 날짜</span><input type="date" required value={newMeetingDate} onChange={(e) => setNewMeetingDate(e.target.value)}/></label>
+                  <label className="step57Field"><span>모임 이름</span><input type="text" required autoFocus maxLength={100} placeholder="예: 금요일 저녁 맛집 벙" value={newMeetingTitle} onChange={(e) => setNewMeetingTitle(e.target.value)}/></label>
+                  <div className="step57DialogActions"><button type="button" onClick={() => setShowCreateMeeting(false)} disabled={saving}>취소</button><button type="submit" disabled={saving || !newMeetingDate || !newMeetingTitle.trim()}>{saving ? "생성 중…" : "모임 만들기"}</button></div>
+                </form>
+              </section>
+            </div>
+          )}
           {selectedMeeting && (
             <section className="selectedStrip step52SelectedMeeting">
               <div>
@@ -3975,7 +3964,6 @@ async function setAttendanceMembers(memberIds: string[]) {
             </section>
           )}
 
-          </div>
           <div className="step50ModeBar">
             <button type="button" className={meetingUiTab === "multi" ? "step50ModeButton" : "step50ModeButton active"} aria-pressed={meetingUiTab !== "multi"} onClick={() => setMeetingUiTab("attendees")}>📋 일반 모임 정산</button>
             <button type="button" className={meetingUiTab === "multi" ? "step50ModeButton active" : "step50ModeButton"} aria-pressed={meetingUiTab === "multi"} onClick={() => setMeetingUiTab("multi")}>🧾 여러 모임 통합 정산{multiSettlementIds.length ? ` (${multiSettlementIds.length})` : ""}</button>
@@ -4392,7 +4380,7 @@ async function setAttendanceMembers(memberIds: string[]) {
               {!selectedMeeting ? (
                 <div className="empty">모임을 선택해주세요.</div>
               ) : selectedMeeting.cost == null ? (
-                <div className="empty">아래에서 모임 비용을 먼저 입력해주세요.</div>
+                <div className="empty">위의 ‘모임 총비용’에서 금액을 입력하고 저장해주세요.</div>
               ) : selectedMeeting.attendeeIds.length + selectedMeeting.guests.length === 0 ? (
                 <div className="empty">참석자 또는 게스트를 추가해주세요.</div>
               ) : (

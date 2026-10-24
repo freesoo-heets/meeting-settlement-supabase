@@ -6030,3 +6030,33 @@ button.meetingMetricCard {
  .step52MeetingChooser{grid-template-columns:minmax(0,1fr)!important}
  .step52MeetingChooser>.step47Controls,.step52MeetingChooser>.step52CreateCard,.step52MeetingChooser>.step52SelectedMeeting{grid-column:1!important;width:100%}
 }
+
+/* STEP53_55_UX */
+.step53UnsettledFilter{display:flex;align-items:center;gap:8px;font-size:13px;margin:8px 0 12px}.step53UnsettledFilter input{width:17px;height:17px}.step55HistorySearch{margin:12px 0}.step55HistorySearch input{width:100%;max-width:460px;min-height:44px;padding:10px 12px;border-radius:10px;border:1px solid #ddd}
+
+/* STEP57_MEETING_REDESIGN */
+.step57Top{display:grid;gap:15px;margin:20px 0 15px}
+.step57TopHeader{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
+.step57TopHeader h3{font-size:20px;margin:0 0 5px}.step57TopHeader p{font-size:13px;color:#777383;margin:0}
+.step57Add{min-height:46px;padding:0 20px;border:0;border-radius:12px;background:#7437ec;color:#fff;font-weight:800;cursor:pointer;box-shadow:0 6px 16px #7437ec22}
+.step57SelectCard{background:#fff;border:1px solid #e8e5ef;border-radius:17px;padding:19px;box-shadow:0 4px 15px #21163108}
+.step57SelectHeader{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:13px}
+.step57SelectHeader>label:first-child{font-weight:800}.step57SelectHeader small{font-size:12px;color:#898391;font-weight:500;margin-left:8px}
+.step57Filter{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer}
+.step57Filter input{appearance:none;width:19px;height:19px;border:1.5px solid #b9b0c8;border-radius:6px;margin:0;cursor:pointer}
+.step57Filter input:checked{background:#7437ec;border-color:#7437ec}
+.step57Filter input:checked:after{content:'✓';display:block;color:#fff;text-align:center;font-weight:900;line-height:16px}
+.step57SelectCard select{width:100%;min-height:48px;border:1px solid #dedbe8;border-radius:10px;padding:0 13px;font-size:15px}
+.step57Legend{font-size:12px;color:#8b8795;margin-top:10px}
+.step57Overlay{position:fixed;inset:0;z-index:9999;background:#15122388;display:flex;align-items:center;justify-content:center;padding:18px}
+.step57Dialog{width:min(100%,480px);max-height:calc(100dvh - 36px);overflow:auto;background:#fff;border-radius:22px;padding:25px;box-shadow:0 22px 70px #0003}
+.step57DialogHead{display:flex;justify-content:space-between;gap:15px;margin-bottom:23px}
+.step57DialogHead h2{font-size:23px;margin:0 0 7px}.step57DialogHead p{font-size:13px;color:#807b8a;margin:0}
+.step57DialogHead button{width:35px;height:35px;flex:none;border:0;border-radius:9px;background:#f0eef4;font-size:23px;cursor:pointer}
+.step57Field{display:grid;gap:8px;margin-bottom:17px;font-weight:750;font-size:14px}
+.step57Field input{width:100%;box-sizing:border-box;min-height:48px;border:1px solid #e1dce9;border-radius:10px;padding:0 13px;font-size:15px}
+.step57DialogActions{display:grid;grid-template-columns:1fr 1.6fr;gap:10px;margin-top:22px}
+.step57DialogActions button{min-height:48px;border:0;border-radius:10px;font-weight:800;cursor:pointer;background:#efedf3}
+.step57DialogActions button[type=submit]{background:#7437ec;color:#fff}
+.step57DialogActions button:disabled{opacity:.55;cursor:not-allowed}
+@media(max-width:650px){.step57TopHeader{align-items:stretch}.step57Add{width:100%}.step57SelectCard{padding:15px}.step57SelectHeader{align-items:flex-start;flex-direction:column}.step57Dialog{padding:19px}}
