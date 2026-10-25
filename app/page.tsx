@@ -36,7 +36,8 @@ type MeetingRow = {
   title: string;
   cost: number | string | null;
   created_at: string;
-  host_member?: string | null; // 벙주 (벙포 지급 대상)
+  host_member?: string | null; // 벙주 (모임 생성자, 벙포 지급 대상)
+  created_by?: string | null; // 모임 생성자의 auth 사용자 ID
 };
 
 type AttendanceRow = {
@@ -343,7 +344,7 @@ export default function Home() {
       (async () => {
         // 벙주 칸(host_member)이 DB 에 아직 없으면 빼고 다시 불러온다
         const query = (columns: string) => supabase.from("meetings").select(columns).order("date", { ascending: false });
-        const withHost = await query("id,date,title,cost,created_at,host_member");
+        const withHost = await query("id,date,title,cost,created_at,host_member,created_by");
         return withHost.error?.code === "42703" ? await query("id,date,title,cost,created_at") : withHost;
       })(),
       (async () => {
@@ -2616,6 +2617,7 @@ async function setAttendanceMembers(memberIds: string[]) {
         date: newMeetingDate,
         title: newMeetingTitle.trim(),
         cost: null,
+        host_member: currentProfile?.member_id ?? null,
       })
       .select("id")
       .single();
@@ -2661,6 +2663,7 @@ async function setAttendanceMembers(memberIds: string[]) {
         date: copiedDate,
         title: meeting.title,
         cost: null,
+        host_member: currentProfile?.member_id ?? null,
       })
       .select("id")
       .single();
