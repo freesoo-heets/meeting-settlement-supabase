@@ -4265,6 +4265,8 @@ async function setAttendanceMembers(memberIds: string[]) {
                                 type="button"
                                 className="hostPick"
                                 aria-pressed={isHost}
+                                disabled={!isAdmin}
+                                title={isAdmin ? "벙주 변경" : "벙주 변경은 관리자만 가능합니다"}
                                 onClick={() => void setMeetingHost(isHost ? null : memberId)}
                               >
                                 {isHost ? "👑 " : ""}{member.name}
@@ -4274,6 +4276,7 @@ async function setAttendanceMembers(memberIds: string[]) {
                                 className={`hostOnline ${online ? "on" : ""}`}
                                 aria-pressed={online}
                                 title="온라인 참석"
+                                disabled={!canManageMeeting(selectedMeeting)}
                                 onClick={() => void toggleOnline(memberId)}
                               >
                                 💻
@@ -4315,7 +4318,7 @@ async function setAttendanceMembers(memberIds: string[]) {
                             if (event.key === "Enter") void addGuest();
                           }}
                         />
-                        <button className="smallButton" onClick={() => void addGuest()}>
+                        <button className="smallButton" disabled={!canManageMeeting(selectedMeeting)} onClick={() => void addGuest()}>
                           게스트 추가
                         </button>
                       </div>
@@ -4375,13 +4378,13 @@ async function setAttendanceMembers(memberIds: string[]) {
                   {editingCostId === selectedMeeting.id ? (
                     <div className="step51CostActions">
                       <input type="number" min="0" inputMode="numeric" aria-label="모임 총비용" placeholder="총비용 (원)" value={editingCost} onChange={(event) => setEditingCost(event.target.value)} />
-                      <button type="button" className="smallButton" disabled={saving || editingCost.trim() === ""} onClick={() => void saveCost(selectedMeeting.id)}>비용 저장</button>
+                      <button type="button" className="smallButton" disabled={saving || editingCost.trim() === "" || !canManageMeeting(selectedMeeting)} onClick={() => void saveCost(selectedMeeting.id)}>비용 저장</button>
                       <button type="button" className="smallButton ghost" onClick={() => {setEditingCostId("");setEditingCost("");}}>취소</button>
                     </div>
                   ) : (
                     <div className="step51CostActions">
                       <strong className="step51CostAmount">{selectedMeeting.cost == null ? "아직 입력되지 않았습니다" : won(Number(selectedMeeting.cost))}</strong>
-                      <button type="button" className="smallButton" onClick={() => {setEditingCostId(selectedMeeting.id);setEditingCost(selectedMeeting.cost == null ? "" : String(selectedMeeting.cost));}}>{selectedMeeting.cost == null ? "＋ 총비용 입력" : "✎ 총비용 수정"}</button>
+                      <button type="button" className="smallButton" disabled={!canManageMeeting(selectedMeeting)} onClick={() => {setEditingCostId(selectedMeeting.id);setEditingCost(selectedMeeting.cost == null ? "" : String(selectedMeeting.cost));}}>{selectedMeeting.cost == null ? "＋ 총비용 입력" : "✎ 총비용 수정"}</button>
                     </div>
                   )}
                 </div>
@@ -4627,7 +4630,7 @@ async function setAttendanceMembers(memberIds: string[]) {
                         placeholder="총 비용"
                         onChange={(event) => setEditingCost(event.target.value)}
                       />
-                      <button className="tinyButton" onClick={() => void saveCost(meeting.id)}>
+                      <button className="tinyButton" disabled={!canManageMeeting(meeting)} onClick={() => void saveCost(meeting.id)}>
                         저장
                       </button>
                       <button
@@ -4643,6 +4646,7 @@ async function setAttendanceMembers(memberIds: string[]) {
                   ) : (
                     <button
                       className="costButton"
+                      disabled={!canManageMeeting(meeting)}
                       onClick={() => {
                         setEditingCostId(meeting.id);
                         setEditingCost(meeting.cost == null ? "" : String(meeting.cost));
