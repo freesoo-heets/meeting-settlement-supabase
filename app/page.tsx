@@ -571,6 +571,7 @@ export default function Home() {
   }, [applySignedInUser, loadAll]);
 
   const isAdmin = currentRole === "owner" || currentRole === "admin";
+  const canManageMeeting = (meeting: MeetingRow) => isAdmin || Boolean(currentUserId && meeting.created_by === currentUserId);
   const lastChats = useLastChats(Boolean(currentRole)); // 이름 → 마지막 채팅 시각 (카톡 봇)
   const isOwner = currentRole === "owner";
 
@@ -2710,12 +2711,14 @@ async function setAttendanceMembers(memberIds: string[]) {
   }
 
   function beginMeetingEdit(meeting: Meeting) {
+    if (!canManageMeeting(meeting)) { setNotice("벙주 또는 관리자만 수정할 수 있습니다."); return; }
     setEditingMeetingId(meeting.id);
     setEditingMeetingTitle(meeting.title);
     setEditingMeetingDate(meeting.date);
   }
 
   async function saveMeetingInfo(meeting: Meeting) {
+    if (!canManageMeeting(meeting)) { setNotice("벙주 또는 관리자만 수정할 수 있습니다."); return; }
     const title = editingMeetingTitle.trim();
     const date = editingMeetingDate;
 
@@ -2754,6 +2757,7 @@ async function setAttendanceMembers(memberIds: string[]) {
   }
 
   async function deleteMeeting(meeting: Meeting) {
+    if (!canManageMeeting(meeting)) { setNotice("벙주 또는 관리자만 수정할 수 있습니다."); return; }
     const ok = window.confirm(
       `"${meeting.title}" (${meeting.date}) 모임을 삭제할까요?\n\n참석자, 게스트, 비용배분 데이터도 함께 삭제됩니다.`
     );
@@ -2792,7 +2796,7 @@ async function setAttendanceMembers(memberIds: string[]) {
 
   // 👑 벙주 지정 (벙포 지급 대상)
   async function setMeetingHost(memberId: string | null) {
-    if (!selectedMeeting) return;
+    if (!selectedMeeting || !isAdmin) { setNotice("벙주 변경은 관리자만 가능합니다."); return; }
     const meetingId = selectedMeeting.id;
     const before = selectedMeeting.host_member ?? null;
     setMeetings((current) => current.map((meeting) => (meeting.id === meetingId ? { ...meeting, host_member: memberId } : meeting)));
@@ -4043,7 +4047,7 @@ async function setAttendanceMembers(memberIds: string[]) {
                 >
                   상세
                 </button>
-                <details className="step50ActionMenu">
+                {canManageMeeting(selectedMeeting) && <details className="step50ActionMenu">
                   <summary>⋯ 모임 관리</summary>
                 <button
                   className="stripActionButton"
@@ -4065,7 +4069,7 @@ async function setAttendanceMembers(memberIds: string[]) {
                 >
                   삭제
                 </button>
-                </details>
+                </details>}
               </div>
             </section>
           )}
@@ -4589,7 +4593,7 @@ async function setAttendanceMembers(memberIds: string[]) {
                     >
                       상세
                     </button>
-                    <button
+                    {canManageMeeting(meeting) && <button
                       className="tinyButton ghost"
                       onClick={() => {
                         setSelectedMeetingId(meeting.id);
@@ -4597,7 +4601,7 @@ async function setAttendanceMembers(memberIds: string[]) {
                       }}
                     >
                       수정
-                    </button>
+                    </button>}
                     <button
                       className="tinyButton ghost"
                       onClick={() => void copyMeeting(meeting)}
@@ -4605,13 +4609,13 @@ async function setAttendanceMembers(memberIds: string[]) {
                     >
                       복사
                     </button>
-                    <button
+                    {canManageMeeting(meeting) && <button
                       className="tinyButton dangerText"
                       onClick={() => void deleteMeeting(meeting)}
                       disabled={saving}
                     >
                       삭제
-                    </button>
+                    </button>}
                   </div>
 
                   {editingCostId === meeting.id ? (
