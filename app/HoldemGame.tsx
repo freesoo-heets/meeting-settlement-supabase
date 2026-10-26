@@ -90,11 +90,36 @@ export default function HoldemGame({ onClose, onBack, myName }: { onClose: () =>
   const [boardShown, setBoardShown] = useState(0);
   const [revealed, setRevealed] = useState(0);
   const [revealDone, setRevealDone] = useState(true);
+  // ★ 처음 카드 받기: 딜러 다음 자리부터 한 장씩 돌려 나눠 주고(2바퀴), 내 카드는 뒤집힌 채 받은 뒤 한 장씩 천천히 쪼아 본다
+  const [dealt, setDealt] = useState(0);
+  const [myPeek, setMyPeek] = useState(0);
   useEffect(() => {
     setBoardShown(0);
     setRevealed(0);
     setRevealDone(false);
+    setDealt(0);
+    setMyPeek(0);
   }, [table.handNo]);
+  const dealOrder = useMemo(() => {
+    const seats = table.players.filter((p) => p.hole.length > 0).map((p) => p.id);
+    const start = seats.findIndex((id) => id > table.dealer);
+    const rotated = start < 0 ? seats : [...seats.slice(start), ...seats.slice(0, start)];
+    return [...rotated, ...rotated]; // 두 바퀴
+  }, [table.handNo]); // eslint-disable-line react-hooks/exhaustive-deps
+  const dealTotal = table.handNo > 0 ? dealOrder.length : 0;
+  useEffect(() => {
+    if (dealt < dealTotal) {
+      const timer = window.setTimeout(() => setDealt((n) => n + 1), dealt === 0 ? 500 : 230);
+      return () => window.clearTimeout(timer);
+    }
+    if (dealTotal > 0 && myPeek < 2) {
+      // 다 받은 뒤 잠깐 멈췄다가 첫 장, 조금 더 뜸 들여 두 번째 장
+      const timer = window.setTimeout(() => setMyPeek((n) => n + 1), myPeek === 0 ? 800 : 1100);
+      return () => window.clearTimeout(timer);
+    }
+  }, [dealt, dealTotal, myPeek]);
+  const dealtTo = (id: number) => dealOrder.slice(0, dealt).filter((x) => x === id).length;
+  const dealDone = dealt >= dealTotal && (dealTotal === 0 || myPeek >= 2);
   useEffect(() => {
     if (boardShown >= table.board.length) return;
     // 플랍 첫 장 0.7초, 플랍 나머지 0.45초씩, 턴 · 리버는 1.4초 뜸
@@ -130,7 +155,7 @@ export default function HoldemGame({ onClose, onBack, myName }: { onClose: () =>
     table.players[id].chips - (table.stage === "showdown" && contested && !(boardShown >= table.board.length && revealed >= showdownSeats.length && revealDone) ? wonAmount(id) : 0);
 
   const me = table.players[0];
-  const myTurn = table.stage !== "showdown" && table.turn === 0 && boardReady;
+  const myTurn = table.stage !== "showdown" && table.turn === 0 && boardReady && dealDone;
   const handOver = table.stage === "showdown";
   // 결과(승자 · 칩)는 모두 공개된 뒤에만. 모두 폴드한 판은 바로
   const resultShown = handOver && (!contested || (boardReady && revealed >= showdownSeats.length && revealDone));
@@ -146,10 +171,10 @@ export default function HoldemGame({ onClose, onBack, myName }: { onClose: () =>
 
   // 봇 차례면 잠깐 생각한 뒤 행동
   useEffect(() => {
-    if (handOver || table.turn < 0 || !table.players[table.turn].bot || !boardReady) return;
+    if (handOver || table.turn < 0 || !table.players[table.turn].bot || !boardReady || !dealDone) return;
     const timer = window.setTimeout(() => setTable((t) => (t.turn >= 0 && t.players[t.turn].bot ? act(t, botAction(t)) : t)), 750);
     return () => window.clearTimeout(timer);
-  }, [table, handOver, boardReady]);
+  }, [table, handOver, boardReady, dealDone]);
 
   // 쿼터 · 하프 · 풀(팟): 콜 금액 + 팟의 1/4 · 1/2 · 전부만큼 올린다
   const sized = (frac: number) => {
@@ -225,10 +250,12 @@ export default function HoldemGame({ onClose, onBack, myName }: { onClose: () =>
               const status = p.out ? "탈락" : p.folded ? "폴드" : p.allIn ? "올인" : "";
               const role = roleOf(p.id);
               return (
-                <div key={p.id} className={`hdSeat ${SEAT_POS[i]} ${table.turn === p.id && !handOver ? "turn" : ""} ${p.folded || p.out ? "folded" : ""} ${win ? "win" : ""}`}>
+                <div key={p.id} className={`hdSeat ${SEAT_POS[i]} ${table.turn === p.id && !handOver && dealDone ? "turn" : ""} ${p.folded || p.out ? "folded" : ""} ${win ? "win" : ""}`}>
                   <div className={`hdSeatCards ${isRevealed(p.id) ? "open" : ""}`}>
-                    {p.hole.map((c, k) => (
-                      <CardView key={`${k}-${isRevealed(p.id)}`} card={c} hidden={!isRevealed(p.id)} size={isRevealed(p.id) ? "md" : "sm"} />
+                    {p.hole.slice(0, handOver ? 2 : dealtTo(p.id)).map((c, k) => (
+                      <span key={`${table.handNo}-${k}`} className="hdDealIn from-center">
+                        <CardView key={`${k}-${isRevealed(p.id)}`} card={c} hidden={!isRevealed(p.id)} size={isRevealed(p.id) ? "md" : "sm"} />
+                      </span>
                     ))}
                   </div>
                   <div className="hdPill">
@@ -262,7 +289,15 @@ export default function HoldemGame({ onClose, onBack, myName }: { onClose: () =>
           {/* 나 */}
           <div className={`hdMe ${myTurn ? "turn" : ""} ${resultShown && table.winners.some((w) => w.id === 0) ? "win" : ""}`}>
             <div className="hdMyCards">
-              {me.hole.map((c, i) => <CardView key={`${table.handNo}-${i}`} card={c} size="lg" lit={resultShown && inBest(c)} />)}
+              {me.hole.slice(0, handOver ? 2 : dealtTo(0)).map((c, i) => (
+                <span key={`${table.handNo}-${i}`} className="hdDealIn mine">
+                  {myPeek > i || handOver ? (
+                    <span className="hdPeek"><CardView card={c} size="lg" lit={resultShown && inBest(c)} /></span>
+                  ) : (
+                    <CardView card={c} size="lg" hidden />
+                  )}
+                </span>
+              ))}
             </div>
             <div className="hdPill me">
               <span className="hdAvatar">{me.name.slice(0, 1)}</span>
@@ -298,7 +333,7 @@ export default function HoldemGame({ onClose, onBack, myName }: { onClose: () =>
             )
           ) : (
             <span className="hdWait">
-              {handOver ? "카드를 공개하는 중" : !boardReady ? "카드를 까는 중" : table.turn >= 0 ? `${table.players[table.turn].name.replace("🤖 ", "")} 생각 중` : ""}
+              {handOver ? "카드를 공개하는 중" : !dealDone ? (dealt < dealTotal ? "카드를 나눠 주는 중" : "내 카드 확인 중") : !boardReady ? "카드를 까는 중" : table.turn >= 0 ? `${table.players[table.turn].name.replace("🤖 ", "")} 생각 중` : ""}
               <i className="hdDots" aria-hidden="true" />
             </span>
           )}

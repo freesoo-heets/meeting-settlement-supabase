@@ -6239,3 +6239,23 @@ button.meetingMetricCard {
   .hdBar { gap: 4px; } .hdBar button { font-size: 13px; padding: 10px 0; }
 }
 @media (prefers-reduced-motion: reduce) { .hdCard.face.flipIn, .hdSuspense, .hdChip, .hdDots::after { animation: none; } }
+
+/* 홀덤: 카드 나눠 주기 · 내 카드 쪼기 */
+.hdDealIn { display: inline-flex; }
+.hdDealIn.from-center { animation: hdDealSeat .32s cubic-bezier(.2, .8, .3, 1) both; }
+.hdDealIn.mine { animation: hdDealMine .42s cubic-bezier(.2, .8, .3, 1) both; }
+@keyframes hdDealSeat { from { transform: translateY(60px) scale(.5) rotate(25deg); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes hdDealMine { from { transform: translateY(-170px) scale(.55) rotate(-30deg); opacity: 0; } to { transform: none; opacity: 1; } }
+/* 쪼기: 카드 아래쪽부터 천천히 들춰 보는 느낌 */
+.hdPeek { display: inline-flex; animation: hdPeek .9s cubic-bezier(.3, .1, .2, 1) both; transform-origin: 50% 100%; }
+@keyframes hdPeek {
+  0% { transform: perspective(500px) rotateX(70deg) translateY(6px); filter: brightness(.4); }
+  55% { transform: perspective(500px) rotateX(28deg); filter: brightness(.8); }
+  100% { transform: none; filter: none; }
+}
+.hdMyCards .hdDealIn:first-child .hdCard { transform: rotate(-6deg) translateX(6px); }
+.hdMyCards .hdDealIn:last-child .hdCard { transform: rotate(5deg); }
+.hdMyCards .hdDealIn:first-child:last-child .hdCard { transform: rotate(-6deg) translateX(6px); }
+.hdSeatCards .hdDealIn:first-child .hdCard.sm { transform: rotate(-6deg); }
+.hdSeatCards .hdDealIn:last-child .hdCard.sm { transform: rotate(6deg); }
+@media (prefers-reduced-motion: reduce) { .hdDealIn.from-center, .hdDealIn.mine, .hdPeek { animation: none; } }
