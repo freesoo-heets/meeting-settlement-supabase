@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 const KEY = "gameSoundOn";
 let ctx: AudioContext | null = null;
 
-function audio() {
+export function audio() {
   if (typeof window === "undefined") return null;
   if (!ctx) {
     const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;

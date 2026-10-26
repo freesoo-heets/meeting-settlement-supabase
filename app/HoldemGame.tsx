@@ -1,8 +1,12 @@
 "use client";
 
 // 🃏 텍사스 홀덤 — 테이블 화면(연습판 · 온라인 공용) + 🤖 연습판
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useGameViewport } from "./useGameViewport";
+import { useGameSound } from "./gameSound";
+import {
+  sndBoard, sndDeal, sndFlip, sndForLog, sndHurry, sndLose, sndMyTurn, sndPot, sndShowdown, sndWin,
+} from "./holdemSound";
 import {
   act,
   bestHand,
@@ -287,6 +291,60 @@ export function HoldemTableView({
     table.handNo === 0 ? "" : table.dealer === id ? "D" : !handOver && sbSeat === id ? "SB" : !handOver && bbSeat === id ? "BB" : "";
   const isWin = (id: number) => resultShown && table.winners.some((w) => w.id === id);
 
+  // ── 🔊 효과음 (오목 · 알까기와 같은 켜기/끄기 · 이 기기에 저장) ──
+  const sound = useGameSound();
+  const soundOn = useRef(sound.on);
+  soundOn.current = sound.on;
+  const sfx = (fn: () => void, delay = 0) => {
+    if (!soundOn.current) return;
+    if (delay) window.setTimeout(() => soundOn.current && fn(), delay);
+    else fn();
+  };
+  useEffect(() => {
+    if (dealt > 0 && dealt <= dealTotal) sfx(sndDeal);
+  }, [dealt]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (myPeek > 0) sfx(sndFlip);
+  }, [myPeek]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (boardShown > 0) sfx(sndBoard);
+  }, [boardShown]); // eslint-disable-line react-hooks/exhaustive-deps
+  // 행동(체크 · 콜 · 레이즈 · 올인 · 폴드): 새로 생긴 기록 줄로 안다 (처음 열 때 · 새 판 첫 줄은 소리 없음)
+  const seenLog = useRef<{ hand: number; lines: string[] } | null>(null);
+  useEffect(() => {
+    const prev = seenLog.current;
+    seenLog.current = { hand: table.handNo, lines: table.log };
+    if (!prev || prev.hand !== table.handNo) return;
+    let overlap = 0;
+    for (let m = Math.min(prev.lines.length, table.log.length); m > 0; m -= 1) {
+      if (prev.lines.slice(prev.lines.length - m).join("\n") === table.log.slice(0, m).join("\n")) {
+        overlap = m;
+        break;
+      }
+    }
+    table.log.slice(overlap).forEach((line, k) => sfx(() => sndForLog(line), k * 160));
+  }, [table.log, table.handNo]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (myTurn) sfx(sndMyTurn);
+  }, [myTurn]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (myTurn && secondsLeft !== null && secondsLeft > 0 && secondsLeft <= 5) sfx(sndHurry);
+  }, [secondsLeft]); // eslint-disable-line react-hooks/exhaustive-deps
+  const suspense = handOver && !revealDone && contested && boardReady;
+  useEffect(() => {
+    if (suspense) sfx(sndShowdown);
+  }, [suspense]); // eslint-disable-line react-hooks/exhaustive-deps
+  // 결과: 팟이 승자에게 → 내가 이겼으면 승리, 끝까지 가서 졌으면 패배 (열자마자 보이는 지난 결과는 소리 없음)
+  const mountedResult = useRef(resultShown ? table.handNo : -1);
+  useEffect(() => {
+    if (!resultShown || table.handNo === 0 || mountedResult.current === table.handNo || table.winners.length === 0) return;
+    sfx(sndPot);
+    if (seated && me && !me.out) {
+      if (isWin(meIndex)) sfx(sndWin, 450);
+      else if (contested && !me.folded) sfx(sndLose, 450);
+    }
+  }, [resultShown, table.handNo]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // 버튼 위: 얼마를 거는지 (+) / 폴드하면 얼마를 잃는지 (−)
   const cost = (amount: number, lose = false) => (
     <em className={`hdCost ${lose ? "lose" : ""}`}>{amount === 0 ? "0" : `${lose ? "−" : "+"}${fmt(amount)}`}</em>
@@ -307,6 +365,9 @@ export function HoldemTableView({
             <span>{subtitle}</span>
           </div>
           {headerExtra}
+          <button className="hdIconBtn hdSound" onClick={sound.toggle} aria-label={sound.on ? "소리 끄기" : "소리 켜기"} title={sound.on ? "소리 끄기" : "소리 켜기"}>
+            {sound.on ? "🔊" : "🔇"}
+          </button>
           <button className="hdRanksBtn" onClick={() => setRanksOpen((v) => !v)} aria-expanded={ranksOpen}>족보</button>
           <button className="hdIconBtn" onClick={onClose} aria-label="닫기">×</button>
         </header>
