@@ -17,135 +17,175 @@ import {
   type Table,
 } from "../lib/holdem";
 
-function CardView({ card, hidden, small }: { card?: Card; hidden?: boolean; small?: boolean }) {
-  if (!card || hidden) return <span className={`hdCard back ${small ? "small" : ""}`} aria-label="뒤집힌 카드" />;
+// 카드 앞면: 왼쪽 위 숫자 · 무늬, 가운데 큰 무늬. ♥♦ 빨강, ♠♣ 검정
+function CardView({ card, hidden, size = "md", lit }: { card?: Card; hidden?: boolean; size?: "sm" | "md" | "lg"; lit?: boolean }) {
+  if (!card) return <div className={`hdCard empty ${size}`} aria-hidden="true" />;
+  if (hidden) return <div className={`hdCard back ${size}`} aria-label="뒤집힌 카드" />;
   const red = card.s === "h" || card.s === "d";
   return (
-    <span className={`hdCard ${red ? "red" : ""} ${small ? "small" : ""}`} aria-label={`${SUIT_ICON[card.s]} ${rankText(card.r)}`}>
-      <b>{rankText(card.r)}</b>
-      <i>{SUIT_ICON[card.s]}</i>
-    </span>
+    <div className={`hdCard face ${red ? "red" : "black"} ${size} ${lit ? "lit" : ""}`} aria-label={`${SUIT_ICON[card.s]} ${rankText(card.r)}`}>
+      <div className="hdCorner">
+        <b>{rankText(card.r)}</b>
+        <i>{SUIT_ICON[card.s]}</i>
+      </div>
+      <div className="hdPip">{SUIT_ICON[card.s]}</div>
+    </div>
   );
 }
+
+const fmt = (n: number) => n.toLocaleString("ko-KR");
+const SEAT_POS = ["me", "left", "top", "right"] as const; // 0=나(아래), 1=왼쪽, 2=위, 3=오른쪽
 
 export default function HoldemGame({ onClose, onBack, myName }: { onClose: () => void; onBack?: () => void; myName: string }) {
   useGameViewport();
   const [table, setTable] = useState<Table>(() => newTable(myName));
-  const [raiseTo, setRaiseTo] = useState(0);
 
   const me = table.players[0];
   const myTurn = table.stage !== "showdown" && table.turn === 0;
+  const handOver = table.stage === "showdown";
   const pot = table.players.reduce((s, p) => s + p.total, 0);
   const info = myTurn ? legal(table) : null;
-  const myHand = useMemo(
-    () => (me.hole.length === 2 && table.board.length >= 3 ? HAND_NAME[bestHand([...me.hole, ...table.board]).score[0]] : ""),
+  const best = useMemo(
+    () => (me.hole.length === 2 && table.board.length >= 3 ? bestHand([...me.hole, ...table.board]) : null),
     [me.hole, table.board],
   );
+  // 내 족보에 쓰인 카드에 테두리
+  const inBest = (c: Card) => !!best?.cards.some((b) => b.r === c.r && b.s === c.s);
 
   // 봇 차례면 잠깐 생각한 뒤 행동
   useEffect(() => {
-    if (table.stage === "showdown" || table.turn < 0 || !table.players[table.turn].bot) return;
-    const timer = window.setTimeout(() => setTable((t) => (t.turn >= 0 && t.players[t.turn].bot ? act(t, botAction(t)) : t)), 700);
+    if (handOver || table.turn < 0 || !table.players[table.turn].bot) return;
+    const timer = window.setTimeout(() => setTable((t) => (t.turn >= 0 && t.players[t.turn].bot ? act(t, botAction(t)) : t)), 750);
     return () => window.clearTimeout(timer);
-  }, [table]);
+  }, [table, handOver]);
 
-  useEffect(() => {
-    if (info) setRaiseTo(info.minRaiseTo);
-  }, [table.turn, table.currentBet, table.stage]); // eslint-disable-line react-hooks/exhaustive-deps
+  // 쿼터 · 하프 · 풀(팟): 콜 금액 + 팟의 1/4 · 1/2 · 전부만큼 올린다
+  const sized = (frac: number) => {
+    if (!info) return 0;
+    const to = table.currentBet + Math.round(((pot + info.toCall) * frac) / 10) * 10;
+    return Math.min(info.maxTo, Math.max(info.minRaiseTo, to));
+  };
+  const raise = (to: number) => setTable((t) => act(t, to >= (info?.maxTo ?? 0) ? { type: "allin" } : { type: "raise", to }));
 
   const alive = table.players.filter((p) => p.chips > 0).length;
-  const handOver = table.stage === "showdown";
   const gameOver = handOver && (me.chips <= 0 || alive < 2);
+  const sbSeat = (() => {
+    const seated = table.players.filter((p) => !p.out).map((p) => p.id);
+    if (seated.length === 2) return table.dealer;
+    const i = seated.indexOf(table.dealer);
+    return seated[(i + 1) % seated.length];
+  })();
+  const bbSeat = (() => {
+    const seated = table.players.filter((p) => !p.out).map((p) => p.id);
+    const i = seated.indexOf(sbSeat);
+    return seated[(i + 1) % seated.length];
+  })();
 
   return (
     <div className="meetingModalBackdrop gameBackdrop" role="presentation">
       <section className="meetingModal gameModal hdModal" role="dialog" aria-modal="true" aria-label="텍사스 홀덤">
-        <div className="meetingModalHeader">
-          <div>
-            <span>🧪 관리자 테스트 · 봇 3명과 연습 · 점수·티켓과 무관</span>
-            <h2>🃏 텍사스 홀덤</h2>
-          </div>
+        <div className="hdTop">
+          <span className="hdBlind">SB {table.sb} · BB {table.bb} · {table.handNo}번째 판</span>
+          <span className="hdTag">🧪 관리자 테스트 · 연습 칩</span>
           <div className="gameHeaderActions">
             {onBack && <button className="smallButton ghost" onClick={onBack}>← 게임</button>}
             <button className="modalCloseButton" onClick={onClose}>×</button>
           </div>
         </div>
 
-        <div className="hdTable">
-          <div className="hdSeats">
-            {table.players.slice(1).map((p) => {
-              const win = table.winners.find((w) => w.id === p.id);
+        <div className="hdFelt">
+          <div className="hdRail">
+            {/* 가운데: 팟 · 공용 카드 */}
+            <div className="hdCenter">
+              <div className="hdPot">
+                <span className="hdChipStack" aria-hidden="true"><i /><i /><i /></span>
+                <b>{fmt(pot)}</b>
+              </div>
+              <div className="hdCommunity">
+                {Array.from({ length: 5 }, (_, i) => (
+                  <CardView key={i} card={table.board[i]} lit={!!table.board[i] && inBest(table.board[i])} />
+                ))}
+              </div>
+              {handOver && table.winners.length > 0 && (
+                <div className="hdWinner">
+                  🏆 {table.winners.map((w) => `${table.players[w.id].name} +${fmt(w.amount)} (${w.hand})`).join(" · ")}
+                </div>
+              )}
+            </div>
+
+            {/* 자리 */}
+            {table.players.map((p, i) => {
+              if (i === 0) return null;
+              const win = table.winners.some((w) => w.id === p.id);
+              const badge = p.out ? "탈락" : p.folded ? "폴드" : p.allIn ? "올인" : "";
               return (
-                <div key={p.id} className={`hdSeat ${table.turn === p.id ? "turn" : ""} ${p.folded ? "folded" : ""} ${win ? "win" : ""}`}>
-                  <strong>{p.name}{table.dealer === p.id ? " Ⓓ" : ""}</strong>
-                  <span>💰 {p.chips}</span>
-                  <div className="hdHole">
-                    {p.hole.map((c, i) => <CardView key={i} card={c} hidden={!handOver || p.folded} small />)}
+                <div key={p.id} className={`hdSeat ${SEAT_POS[i]} ${table.turn === p.id ? "turn" : ""} ${p.folded ? "folded" : ""} ${win ? "win" : ""}`}>
+                  <div className={`hdAvatar ${badge ? `badge ${badge === "올인" ? "allin" : ""}` : ""}`}>{badge || p.name.slice(0, 2)}</div>
+                  <div className="hdPlate">
+                    <span>{p.name.replace("🤖 ", "")}</span>
+                    <b>{fmt(p.chips)}</b>
                   </div>
-                  <em>{p.out ? "탈락" : p.folded ? "폴드" : p.allIn ? "올인" : p.bet ? `베팅 ${p.bet}` : " "}</em>
+                  <div className="hdSeatCards">
+                    {p.hole.map((c, k) => <CardView key={k} card={c} hidden={!handOver || p.folded} size="sm" />)}
+                  </div>
+                  {p.bet > 0 && <div className="hdBet">{fmt(p.bet)}</div>}
+                  {table.dealer === p.id && <span className="hdMarker d">D</span>}
+                  {!handOver && sbSeat === p.id && <span className="hdMarker sb">SB</span>}
+                  {!handOver && bbSeat === p.id && <span className="hdMarker bb">BB</span>}
                 </div>
               );
             })}
           </div>
 
-          <div className="hdBoard">
-            <div className="hdPot">팟 {pot}</div>
-            <div className="hdCommunity">
-              {Array.from({ length: 5 }, (_, i) => <CardView key={i} card={table.board[i]} hidden={!table.board[i]} />)}
-            </div>
-          </div>
-
+          {/* 나 */}
           <div className={`hdMe ${myTurn ? "turn" : ""} ${table.winners.some((w) => w.id === 0) ? "win" : ""}`}>
-            <div className="hdHole">{me.hole.map((c, i) => <CardView key={i} card={c} />)}</div>
-            <div>
-              <strong>{me.name}{table.dealer === 0 ? " Ⓓ" : ""}</strong>
-              <span>💰 {me.chips}{me.bet ? ` · 베팅 ${me.bet}` : ""}{myHand ? ` · ${myHand}` : ""}</span>
+            <div className="hdMyCards">
+              {me.hole.map((c, i) => <CardView key={i} card={c} size="lg" lit={inBest(c)} />)}
+            </div>
+            <div className="hdMyInfo">
+              {best && <span className="hdHandName">♠ {HAND_NAME[best.score[0]]}</span>}
+              <b>{fmt(me.chips)}</b>
+              {me.bet > 0 && <em>베팅 {fmt(me.bet)}</em>}
+              {table.dealer === 0 && <span className="hdMarker d inline">D</span>}
             </div>
           </div>
+        </div>
 
-          {myTurn && info && (
-            <div className="hdActions">
-              <button className="smallButton ghost danger" onClick={() => setTable((t) => act(t, { type: "fold" }))}>폴드</button>
-              <button className="smallButton" onClick={() => setTable((t) => act(t, { type: info.canCheck ? "check" : "call" }))}>
-                {info.canCheck ? "체크" : `콜 ${Math.min(info.toCall, me.chips)}`}
-              </button>
-              {info.minRaiseTo < info.maxTo && (
-                <span className="hdRaise">
-                  <input
-                    type="range"
-                    min={info.minRaiseTo}
-                    max={info.maxTo}
-                    step={10}
-                    value={raiseTo}
-                    onChange={(e) => setRaiseTo(Number(e.target.value))}
-                    aria-label="레이즈 금액"
-                  />
-                  <button className="primaryButton" onClick={() => setTable((t) => act(t, { type: "raise", to: raiseTo }))}>레이즈 {raiseTo}</button>
-                </span>
-              )}
-              <button className="smallButton ghost" onClick={() => setTable((t) => act(t, { type: "allin" }))}>올인</button>
-            </div>
-          )}
-
-          {handOver && (
-            <div className="hdNext">
-              {gameOver ? (
+        {/* 아래 행동 버튼 (카지노 앱처럼 한 줄) */}
+        <div className="hdBar">
+          {myTurn && info ? (
+            <>
+              {info.minRaiseTo < info.maxTo ? (
                 <>
-                  <strong>{me.chips > 0 ? "🎉 모두 이겼어요!" : "😢 칩을 다 잃었어요"}</strong>
-                  <button className="primaryButton" onClick={() => setTable(startHand(newTable(myName)))}>처음부터 다시</button>
+                  <button onClick={() => raise(sized(0.25))}>쿼터</button>
+                  <button onClick={() => raise(sized(0.5))}>하프</button>
                 </>
               ) : (
-                <button className="primaryButton" onClick={() => setTable((t) => startHand(t))}>
-                  {table.handNo === 0 ? "▶ 게임 시작" : "▶ 다음 판"}
-                </button>
+                <><button disabled>쿼터</button><button disabled>하프</button></>
               )}
-            </div>
+              <button className="call" onClick={() => setTable((t) => act(t, { type: info.canCheck ? "check" : "call" }))}>
+                {info.canCheck ? "체크" : `콜 ${fmt(Math.min(info.toCall, me.chips))}`}
+              </button>
+              {info.minRaiseTo < info.maxTo ? <button onClick={() => raise(sized(1))}>풀</button> : <button disabled>풀</button>}
+              <button className="allin" onClick={() => setTable((t) => act(t, { type: "allin" }))}>올인</button>
+              <button className="fold" onClick={() => setTable((t) => act(t, { type: "fold" }))}>폴드</button>
+            </>
+          ) : handOver ? (
+            gameOver ? (
+              <button className="next" onClick={() => setTable(startHand(newTable(myName)))}>
+                {me.chips > 0 ? "🎉 모두 이겼어요! 처음부터 다시" : "😢 칩을 다 잃었어요 · 처음부터 다시"}
+              </button>
+            ) : (
+              <button className="next" onClick={() => setTable((t) => startHand(t))}>{table.handNo === 0 ? "▶ 게임 시작" : "▶ 다음 판"}</button>
+            )
+          ) : (
+            <span className="hdWait">{table.turn >= 0 ? `${table.players[table.turn].name.replace("🤖 ", "")} 생각 중…` : ""}</span>
           )}
-
-          <ol className="hdLog" aria-label="진행 기록">
-            {table.log.slice(-8).map((line, i) => <li key={i}>{line}</li>)}
-          </ol>
         </div>
+
+        <ol className="hdLog" aria-label="진행 기록">
+          {table.log.slice(-6).map((line, i) => <li key={i}>{line}</li>)}
+        </ol>
       </section>
     </div>
   );
