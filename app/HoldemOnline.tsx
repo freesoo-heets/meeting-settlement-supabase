@@ -39,10 +39,21 @@ type SeatRow = {
   fee: number | null;
   created_at: string;
   left_at: string | null;
+  rebuy_state?: string;
+  rebuy_note?: string | null;
+  rebuy_want?: number | null;
+  rebuy_total?: number;
 };
 
 const TABLE_COLUMNS = "id,status,host_member,host_name,is_friendly,max_seats,view,hand_no,turn_deadline,next_hand_at,created_at";
-const SEAT_COLUMNS = "id,table_id,member_id,name,status,buy_in,is_friendly,escrow_state,escrow_note,cash_out,hands,settle_state,payout,fee,created_at,left_at";
+const SEAT_BASE = "id,table_id,member_id,name,status,buy_in,is_friendly,escrow_state,escrow_note,cash_out,hands,settle_state,payout,fee,created_at,left_at";
+const SEAT_COLUMNS = `${SEAT_BASE},rebuy_state,rebuy_note,rebuy_want,rebuy_total`;
+// 자리 기록 읽기 (충전 칸이 아직 DB에 없으면 그 칸 없이)
+async function readSeats(build: (columns: string) => PromiseLike<{ data: unknown; error: { code?: string } | null }>) {
+  const first = await build(SEAT_COLUMNS);
+  const result = first.error?.code === "42703" ? await build(SEAT_BASE) : first;
+  return ((result.data ?? []) as SeatRow[]);
+}
 const WIN_FEE = 0.05; // 봇(holdem_bridge.py HOLDEM_FEE)과 같아야 한다
 const fmt = (n: number) => n.toLocaleString("ko-KR");
 
@@ -66,10 +77,11 @@ async function callHoldem(payload: Record<string, unknown>) {
 
 // 일어날 때 받는 점수 (친선은 점수 없음)
 export function seatResult(seat: SeatRow) {
+  const paid = seat.buy_in + (seat.rebuy_total ?? 0); // 바이인 + 충전
   const out = seat.cash_out ?? 0;
-  const fee = seat.fee ?? Math.floor(Math.max(0, out - seat.buy_in) * WIN_FEE);
+  const fee = seat.fee ?? (seat.hands > 0 ? Math.floor(Math.max(0, out - paid) * WIN_FEE) : 0);
   const back = seat.payout ?? out - fee;
-  return { out, fee, back, net: back - seat.buy_in };
+  return { paid, out, fee, back, net: back - paid };
 }
 
 const signed = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : "±"}${fmt(Math.abs(n))}`;
@@ -129,14 +141,14 @@ function HoldemLobby({
   const load = useCallback(async () => {
     const [t, r, m, a] = await Promise.all([
       supabase.from("holdem_tables").select(TABLE_COLUMNS).in("status", ["waiting", "playing"]).order("created_at", { ascending: false }).limit(20),
-      supabase.from("holdem_seats").select(SEAT_COLUMNS).eq("status", "left").eq("is_friendly", false).order("left_at", { ascending: false }).limit(30),
-      supabase.from("holdem_seats").select(SEAT_COLUMNS).eq("status", "left").eq("is_friendly", false).eq("member_id", currentMemberId).order("left_at", { ascending: false }).limit(200),
-      supabase.from("holdem_seats").select(SEAT_COLUMNS).eq("member_id", currentMemberId).in("status", ["escrow", "seated"]).limit(1),
+      readSeats((c) => supabase.from("holdem_seats").select(c).eq("status", "left").eq("is_friendly", false).order("left_at", { ascending: false }).limit(30)),
+      readSeats((c) => supabase.from("holdem_seats").select(c).eq("status", "left").eq("is_friendly", false).eq("member_id", currentMemberId).order("left_at", { ascending: false }).limit(200)),
+      readSeats((c) => supabase.from("holdem_seats").select(c).eq("member_id", currentMemberId).in("status", ["escrow", "seated"]).limit(1)),
     ]);
     setTables((t.data ?? []) as TableRow[]);
-    setRecords((r.data ?? []) as SeatRow[]);
-    setMine((m.data ?? []) as SeatRow[]);
-    setMyActive(((a.data ?? []) as SeatRow[])[0] ?? null);
+    setRecords(r);
+    setMine(m);
+    setMyActive(a[0] ?? null);
   }, [currentMemberId]);
   useEffect(() => {
     void load();
@@ -290,7 +302,7 @@ function RecordRow({ seat, showName }: { seat: SeatRow; showName?: boolean }) {
         {seat.hands === 0 ? <b>환불</b> : <b className={r.net >= 0 ? "hdPlus" : "hdMinus"}>{signed(r.net)}점</b>}
       </span>
       <em>
-        💎 {fmt(seat.buy_in)} → {fmt(r.out)} · {seat.hands}판{r.fee > 0 ? ` · 수수료 ${fmt(r.fee)}` : ""}
+        💎 {fmt(r.paid)} → {fmt(r.out)} · {seat.hands}판{r.fee > 0 ? ` · 수수료 ${fmt(r.fee)}` : ""}
         <br />
         {timeText(seat.left_at)}
       </em>
@@ -312,10 +324,10 @@ function HoldemRoom({
   const load = useCallback(async () => {
     const [t, s] = await Promise.all([
       supabase.from("holdem_tables").select(TABLE_COLUMNS).eq("id", tableId).maybeSingle(),
-      supabase.from("holdem_seats").select(SEAT_COLUMNS).eq("table_id", tableId).order("created_at", { ascending: false }).limit(60),
+      readSeats((c) => supabase.from("holdem_seats").select(c).eq("table_id", tableId).order("created_at", { ascending: false }).limit(60)),
     ]);
     if (t.data) setRow(t.data as TableRow);
-    setSeats((s.data ?? []) as SeatRow[]);
+    setSeats(s);
   }, [tableId]);
 
   // 실시간 반영 (+ 끊겨도 5초마다)
@@ -437,22 +449,47 @@ function HoldemRoom({
     return null;
   };
 
-  const headerExtra = me ? (
-    me.leaving ? (
-      <button className="hdRanksBtn stand" disabled={busy} onClick={() => void run({ action: "back" })}>계속하기</button>
-    ) : (
-      <button
-        className="hdRanksBtn stand"
-        disabled={busy}
-        onClick={() => {
-          const inPlay = !me.folded && !me.out && view.stage !== "showdown";
-          if (inPlay && !window.confirm("지금 판은 자동으로 폴드되고, 남은 칩을 점수로 돌려받습니다. 일어날까요?")) return;
-          void run({ action: "leave" }, () => setInfo("🚪 일어났어요. 남은 칩은 봇이 점수로 돌려줍니다."));
-        }}
-      >
-        일어나기
-      </button>
-    )
+  // 내 자리 버튼: 충전 · 나가기 예약 · 지금 일어나기
+  const myChips = me ? me.chips + (me.pendingChips ?? 0) : 0;
+  const rebuyBusy = mySeat?.rebuy_state === "requested" || mySeat?.rebuy_state === "locking";
+  const seatTools = me ? (
+    <div className="hdSeatTools">
+      {me.leaving ? (
+        <button className="smallButton" disabled={busy} onClick={() => void run({ action: "back" })}>↩ 계속하기</button>
+      ) : (
+        <>
+          <button
+            className="smallButton rebuy"
+            disabled={busy || rebuyBusy || myChips >= BUY_IN}
+            onClick={() => {
+              const want = BUY_IN - myChips;
+              if (!window.confirm(`칩을 ${fmt(BUY_IN)}개까지 채울까요?\n💎 ${fmt(want)}점이 듭니다. (점수가 모자라면 남은 점수 전부)\n판에 참여 중이면 이번 판이 끝난 뒤 들어와요.`)) return;
+              void run({ action: "rebuy" }, () => setInfo("💎 충전을 신청했어요. 봇이 점수를 확인하면 칩이 들어옵니다."));
+            }}
+          >
+            {rebuyBusy ? "충전 확인 중…" : myChips >= BUY_IN ? "💎 충전" : `💎 충전 +${fmt(BUY_IN - myChips)}`}
+          </button>
+          <button
+            className={`smallButton ${me.standAfter ? "" : "ghost"}`}
+            disabled={busy}
+            onClick={() => void run({ action: "reserve" })}
+          >
+            {me.standAfter ? "⏳ 예약 취소" : "⏳ 나가기 예약"}
+          </button>
+          <button
+            className="smallButton ghost stand"
+            disabled={busy}
+            onClick={() => {
+              const inPlay = !me.folded && !me.out && view.stage !== "showdown";
+              if (inPlay && !window.confirm("지금 판은 자동으로 폴드되고, 남은 칩을 점수로 돌려받습니다. 바로 일어날까요?\n(이번 판을 끝까지 하려면 '나가기 예약')")) return;
+              void run({ action: "leave" }, () => setInfo("🚪 일어났어요. 남은 칩은 봇이 점수로 돌려줍니다."));
+            }}
+          >
+            🚪 지금 일어나기
+          </button>
+        </>
+      )}
+    </div>
   ) : null;
 
   const lastLeftResult = lastLeft && !mySeat ? seatResult(lastLeft) : null;
@@ -460,10 +497,14 @@ function HoldemRoom({
     <div className="hdNotice">
       {message && <div className="omokMessage">{message}</div>}
       {info && !message && <div className="omokMessage info">{info}</div>}
+      {seatTools}
+      {me?.standAfter && <div className="omokMessage info">⏳ 나가기 예약 · 이번 판이 끝나면 일어나고 남은 칩을 점수로 돌려받아요.</div>}
+      {me && (me.pendingChips ?? 0) > 0 && <div className="omokMessage info">💎 충전한 칩 {fmt(me.pendingChips ?? 0)}개는 이번 판이 끝나면 들어와요.</div>}
+      {mySeat?.rebuy_state === "failed" && mySeat.rebuy_note && <div className="omokMessage">충전 실패: {mySeat.rebuy_note}</div>}
       {lastFailed && !mySeat && !me && <div className="omokMessage">자리 신청 실패: {lastFailed.escrow_note}</div>}
       {lastLeft && lastLeftResult && !me && (
         <div className="omokMessage info">
-          지난 자리 · {lastLeft.hands === 0 ? "한 판도 안 해서 💎 점수 · 🎫 티켓 모두 환불" : lastLeft.is_friendly ? `칩 ${fmt(lastLeftResult.out)} (친선)` : `💎 ${fmt(lastLeft.buy_in)} → ${fmt(lastLeftResult.out)} · ${signed(lastLeftResult.net)}점${lastLeftResult.fee ? ` (수수료 ${fmt(lastLeftResult.fee)})` : ""}`}
+          지난 자리 · {lastLeft.hands === 0 ? "한 판도 안 해서 💎 점수 · 🎫 티켓 모두 환불" : lastLeft.is_friendly ? `칩 ${fmt(lastLeftResult.out)} (친선)` : `💎 ${fmt(lastLeftResult.paid)} → ${fmt(lastLeftResult.out)} · ${signed(lastLeftResult.net)}점${lastLeftResult.fee ? ` (수수료 ${fmt(lastLeftResult.fee)})` : ""}`}
           {lastLeft.settle_state !== "done" && !lastLeft.is_friendly && " · 봇이 지급 중"}
         </div>
       )}
@@ -481,7 +522,6 @@ function HoldemRoom({
       deadline={row.turn_deadline ? new Date(row.turn_deadline).getTime() : null}
       title={`${row.is_friendly ? "🤝 " : ""}${row.host_name}님의 홀덤`}
       subtitle={`${money} · 블라인드 ${view.sb}/${view.bb}${handNo ? ` · ${handNo}번째 판` : ""} · ${seatedCount}/${row.max_seats}명${meIndex < 0 ? " · 관전 중" : ""}`}
-      headerExtra={headerExtra}
       idleBar={idleBar}
       notice={notice}
       onClose={onClose}

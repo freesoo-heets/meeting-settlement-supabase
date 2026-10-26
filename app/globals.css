@@ -6453,3 +6453,22 @@ button.meetingMetricCard {
 .hdMinus { color: #dc2626 !important; font-weight: 800; }
 .recentMore { margin-left: 8px; padding: 2px 10px; font-size: 12px; }
 .hdTitle span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* 홀덤: 내 자리 버튼 (충전 · 나가기 예약 · 지금 일어나기) */
+.hdSeatTools { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+.hdModal .hdSeatTools .smallButton { font-size: 12.5px; padding: 6px 12px; }
+.hdSeatTools .rebuy:not(:disabled) { background: linear-gradient(#f5c451, #d99a1f); color: #1c1405; border: 0; }
+.hdSeatTools .stand { color: #fca5a5; border-color: rgba(248, 113, 113, .45); }
+
+/* 홀덤 휴대폰: 옆자리 카드는 이름판 아래로, 베팅은 이름판 옆으로 → 가운데 공용 카드를 가리지 않게 */
+@media (max-width: 520px) {
+  .hdSeat.left .hdSeatCards, .hdSeat.right .hdSeatCards { left: 50%; right: auto; top: calc(100% + 3px); transform: translateX(-50%); flex-direction: row; }
+  .hdSeat.left .hdBet { left: calc(100% + 4px); right: auto; top: 50%; transform: translateY(-50%); flex-direction: row; }
+  .hdSeat.right .hdBet { right: calc(100% + 4px); left: auto; top: 50%; transform: translateY(-50%); flex-direction: row-reverse; }
+  .hdSeat.left .hdBet .hdChips.bet, .hdSeat.right .hdBet .hdChips.bet { display: none; }
+  .hdSeat.left.high, .hdSeat.right.high { top: 15%; }
+  .hdSeat.left.low, .hdSeat.right.low { top: 68%; }
+  .hdSeat.left:not(.high):not(.low), .hdSeat.right:not(.high):not(.low) { top: 24%; }
+  .hdSeat.left.high { --dx: 110px; --dy: 130px; } .hdSeat.right.high { --dx: -110px; --dy: 130px; }
+  .hdSeat.left.low { --dx: 110px; --dy: -40px; } .hdSeat.right.low { --dx: -110px; --dy: -40px; }
+}

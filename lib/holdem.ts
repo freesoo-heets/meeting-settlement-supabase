@@ -90,6 +90,9 @@ export type Player = {
   leaving?: boolean;  // 이번 판 끝나면 일어남 (차례가 오면 자동 폴드)
   strikes?: number;   // 연속 시간 초과
   hands?: number;     // 앉은 뒤 참여한 판 수
+  standAfter?: boolean;   // 나가기 예약: 이번 판을 끝까지 하고 일어남
+  rebuys?: number;        // 반영한 충전 횟수 (holdem_seats.rebuy_count 와 비교)
+  pendingChips?: number;  // 충전했지만 판이 끝나야 들어오는 칩
 };
 
 export type Stage = "preflop" | "flop" | "turn" | "river" | "showdown";

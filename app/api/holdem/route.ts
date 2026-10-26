@@ -54,18 +54,22 @@ async function isBotKey(key: string) {
   }
 }
 
+const SEAT_BASE = "id,table_id,member_id,name,status,buy_in,escrow_state";
 async function load(admin: Admin, tableId: string) {
-  const [table, secret, seats] = await Promise.all([
+  const seatQuery = (columns: string) => admin.from("holdem_seats").select(columns).eq("table_id", tableId).in("status", SEAT_ACTIVE);
+  const [table, secret, first] = await Promise.all([
     admin.from("holdem_tables").select("id,status,host_member,host_name,is_friendly,max_seats,version,turn_deadline,next_hand_at,updated_at").eq("id", tableId).maybeSingle(),
     admin.from("holdem_secrets").select("state,version").eq("table_id", tableId).maybeSingle(),
-    admin.from("holdem_seats").select("id,table_id,member_id,name,status,buy_in,escrow_state").eq("table_id", tableId).in("status", SEAT_ACTIVE),
+    seatQuery(`${SEAT_BASE},rebuy_state,rebuy_count,last_rebuy`),
   ]);
-  if (!table.data || !secret.data) return null;
+  // 충전 칸이 아직 DB에 없으면(SQL 실행 전) 그 칸 없이
+  const seats = first.error?.code === "42703" ? await seatQuery(SEAT_BASE) : first;
+  if (!table.data || !secret.data || seats.error) return null;
   return {
     row: table.data as TableRow,
     state: secret.data.state as Table,
     version: secret.data.version as number,
-    seats: (seats.data ?? []) as SeatRow[],
+    seats: (seats.data ?? []) as unknown as SeatRow[],
   };
 }
 
@@ -249,11 +253,52 @@ export async function POST(request: Request) {
       step(ctx, seats, now);
       const me = ctx.t.players.find((p) => p.member === memberId && !p.empty);
       if (!me) return null;
+      const seat = seats.find((s) => s.id === me.seatId);
+      if (seat?.rebuy_state === "requested" || seat?.rebuy_state === "locking") return "충전을 처리하는 중이에요. 몇 초 뒤에 다시 눌러 주세요.";
       me.leaving = true;
       step(ctx, seats, now);
       return null;
     });
     return result.ok ? NextResponse.json(result) : fail(result.error);
+  }
+
+  if (action === "reserve") {
+    // 나가기 예약 (다시 누르면 취소): 이번 판을 끝까지 하고 일어난다
+    const result = await mutate(admin, tableId, (ctx, seats, now) => {
+      step(ctx, seats, now);
+      const me = ctx.t.players.find((p) => p.member === memberId && !p.empty);
+      if (!me) return "자리에 앉아 있지 않습니다.";
+      me.standAfter = !me.standAfter;
+      ctx.t.log.push(me.standAfter ? `⏳ ${me.name} 나가기 예약` : `↩ ${me.name} 나가기 예약 취소`);
+      step(ctx, seats, now);
+      return null;
+    });
+    return result.ok ? NextResponse.json(result) : fail(result.error);
+  }
+
+  if (action === "rebuy") {
+    // 충전: 칩을 1,000개까지 다시 채운다 (점수가 모자라면 남은 점수 전부) — 봇이 차감한 뒤 판이 끝나면 들어온다
+    const loaded = await load(admin, tableId);
+    if (!loaded) return fail("테이블을 찾지 못했습니다.");
+    const me = loaded.state.players.find((p) => p.member === memberId && !p.empty);
+    const seat = loaded.seats.find((s) => s.id === me?.seatId && s.status === "seated");
+    if (!me || !seat) return fail("자리에 앉아 있지 않습니다.");
+    if (me.leaving) return fail("일어나는 중에는 충전할 수 없습니다.");
+    if (seat.rebuy_state === "requested" || seat.rebuy_state === "locking") return fail("이미 충전을 처리하는 중이에요.");
+    const now = me.chips + (me.pendingChips ?? 0);
+    if (now >= BUY_IN) return fail(`칩이 ${fmt(BUY_IN)}개 이상이면 충전할 수 없어요.`);
+    const player = await loadPlayer(admin, memberId);
+    if ("error" in player) return fail(player.error);
+    if (player.exp < 1) return fail("충전할 점수가 없습니다.");
+    const { data, error } = await admin
+      .from("holdem_seats")
+      .update({ rebuy_state: "requested", rebuy_want: BUY_IN - now, rebuy_note: null, updated_at: new Date().toISOString() })
+      .eq("id", seat.id)
+      .eq("status", "seated")
+      .not("rebuy_state", "in", "(requested,locking)")
+      .select("id");
+    if (error || (data ?? []).length !== 1) return fail(`충전 요청 실패${error ? `: ${error.message}` : ""}`);
+    return NextResponse.json({ ok: true, want: Math.min(BUY_IN - now, player.exp) });
   }
 
   if (action === "back") {

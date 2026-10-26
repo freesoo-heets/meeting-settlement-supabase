@@ -18,7 +18,14 @@ export type SeatRow = {
   status: string;
   buy_in: number;
   escrow_state: string;
+  rebuy_state?: string;   // 충전: none | requested | locking | locked | failed
+  rebuy_count?: number;   // 봇이 처리한 충전 횟수
+  last_rebuy?: number;    // 마지막 충전 칩
 };
+
+// 봇이 아직 충전을 처리 중인 자리 (그동안은 정산하지 않는다 — 차감한 점수가 사라지지 않게)
+const rebuyPending = (seats: SeatRow[], p: Player) =>
+  seats.some((s) => s.id === p.seatId && (s.rebuy_state === "requested" || s.rebuy_state === "locking"));
 export type Ctx = {
   t: Table;
   status: TableStatus;
@@ -60,6 +67,7 @@ export function apply(ctx: Ctx, action: Action, now: number) {
 
 // 일어남: 남은 칩을 기록하고 자리를 비운다 (이번 판에 낸 금액 total 은 팟 계산용으로 남겨 둔다)
 function cashOut(ctx: Ctx, p: Player, now: number) {
+  p.chips += p.pendingChips ?? 0;
   if (p.seatId) {
     ctx.seatUpdates.set(p.seatId, { status: "left", cash_out: p.chips, hands: p.hands ?? 0, left_at: iso(now) });
     ctx.t.leftSeats = [...(ctx.t.leftSeats ?? []), p.seatId].slice(-60);
@@ -68,6 +76,7 @@ function cashOut(ctx: Ctx, p: Player, now: number) {
   Object.assign(p, {
     name: "", chips: 0, hole: [], out: true, folded: true, allIn: false, empty: true,
     seatId: undefined, member: undefined, leaving: false, strikes: 0, hands: 0,
+    standAfter: false, rebuys: 0, pendingChips: 0,
   });
 }
 
@@ -87,9 +96,25 @@ export function step(ctx: Ctx, seats: SeatRow[], now: number) {
       name: seat.name, bot: false, chips: seat.buy_in, hole: [], bet: 0, total: 0,
       folded: true, allIn: false, acted: false, out: true, empty: false,
       seatId: seat.id, member: seat.member_id, leaving: false, strikes: 0, hands: 0,
+      standAfter: false, rebuys: seat.rebuy_count ?? 0, pendingChips: 0,
     });
     ctx.t.log.push(`💺 ${seat.name} 착석 · 칩 ${fmt(seat.buy_in)}`);
     if (ctx.status === "closed") ctx.status = "waiting";
+  }
+
+  // 1-2) 충전: 봇이 점수를 차감했으면 칩을 준다 (판에 참여 중이면 판이 끝난 뒤)
+  for (const seat of seats) {
+    const p = ctx.t.players.find((q) => q.seatId === seat.id && !q.empty);
+    if (!p || (seat.rebuy_count ?? 0) <= (p.rebuys ?? 0)) continue;
+    p.rebuys = seat.rebuy_count ?? 0;
+    p.pendingChips = (p.pendingChips ?? 0) + (seat.last_rebuy ?? 0);
+    ctx.t.log.push(`💎 ${p.name} 충전 +${fmt(seat.last_rebuy ?? 0)}`);
+  }
+  for (const p of ctx.t.players) {
+    if (!p.empty && p.pendingChips && (ctx.t.stage === "showdown" || p.out || p.folded)) {
+      p.chips += p.pendingChips;
+      p.pendingChips = 0;
+    }
   }
 
   // 2) 차례인 사람이 시간 초과 · 일어남 · 빈자리 → 자동 (체크 가능하면 체크, 아니면 폴드)
@@ -115,12 +140,15 @@ export function step(ctx: Ctx, seats: SeatRow[], now: number) {
 
   // 4) 진행 중인 판에서 이미 빠진(폴드) 사람이 일어나면 바로 정산
   if (ctx.t.stage !== "showdown") {
-    for (const p of ctx.t.players) if (!p.empty && p.leaving && (p.folded || p.out)) cashOut(ctx, p, now);
+    for (const p of ctx.t.players) if (!p.empty && p.leaving && (p.folded || p.out) && !rebuyPending(seats, p)) cashOut(ctx, p, now);
   }
 
   // 5) 판이 끝났고 결과를 보여 줄 시간이 지났으면: 일어날 사람 · 칩 없는 사람 정리 → 다음 판
   if (ctx.t.stage === "showdown" && (ctx.nextHandAt === null || now >= ctx.nextHandAt)) {
-    for (const p of ctx.t.players) if (!p.empty && (p.leaving || p.chips <= 0)) cashOut(ctx, p, now);
+    // 나가기 예약 · 일어남 · 칩 없음 (단, 충전 처리 중이면 기다린다)
+    for (const p of ctx.t.players) {
+      if (!p.empty && (p.leaving || p.standAfter || p.chips <= 0) && !rebuyPending(seats, p)) cashOut(ctx, p, now);
+    }
     const ready = ctx.t.players.filter((p) => !p.empty && p.chips > 0);
     if (ready.length >= 2) {
       const before = snap(ctx.t);
