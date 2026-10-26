@@ -150,7 +150,8 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
         onBack={back}
         initialTableId={active.id || undefined}
         currentMemberId={currentMemberId}
-        myName={myName}
+        myPoints={myPoints}
+        myTickets={myTickets}
       />
     );
   }
@@ -262,35 +263,6 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
         {testError && <div className="omokMessage">{testError}</div>}
         {cleanNote && <div className="omokMessage info">{cleanNote}</div>}
         <div className="gameHubGrid">
-          <article className="gameHubCard holdem">
-            <div className="gameHubHead">
-              <span className="gameHubIcon" aria-hidden="true">🃏</span>
-              <div>
-                <strong>텍사스 홀덤</strong>
-                <span>바이인 1,000점 · 2~6명 · 자유 입퇴장</span>
-              </div>
-              <button className="smallButton" onClick={() => setActive({ kind: "holdem", id: "" })}>입장</button>
-            </div>
-            <div className="gameHubRooms">
-              {holdemTables.length === 0 && <span className="muted">열린 테이블이 없습니다. (입장 → 만들기 · 봇과 연습)</span>}
-              {holdemTables.map((table) => {
-                const players = (table.view?.players ?? []).filter((p) => !p.empty);
-                return (
-                  <button
-                    key={table.id}
-                    className={`gameHubRoom ${table.status === "waiting" ? "hot" : ""}`}
-                    onClick={() => setActive({ kind: "holdem", id: table.id })}
-                  >
-                    <span>
-                      <b>{table.host_name}님의 테이블 · {table.status === "playing" ? `진행 중 ${table.hand_no}판째` : "대기 중"}</b>
-                      <em>{table.is_friendly ? "🤝 친선" : "💎 1,000점"} · 👥 {players.length}/{table.max_seats}</em>
-                    </span>
-                    <i>{players.length < table.max_seats ? "참가 →" : "관전 →"}</i>
-                  </button>
-                );
-              })}
-            </div>
-          </article>
           {GAMES.map((game) => {
             const rows = sections[game.kind];
             return (
@@ -338,6 +310,35 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
               </article>
             );
           })}
+          <article className="gameHubCard holdem">
+            <div className="gameHubHead">
+              <span className="gameHubIcon" aria-hidden="true">🃏</span>
+              <div>
+                <strong>텍사스 홀덤</strong>
+                <span>바이인 1,000점 · 점수 내기 · 2~6명</span>
+              </div>
+              <button className="smallButton" onClick={() => setActive({ kind: "holdem", id: "" })}>방 만들기</button>
+            </div>
+            <div className="gameHubRooms">
+              {holdemTables.length === 0 && <span className="muted">열린 방이 없습니다.</span>}
+              {holdemTables.map((table) => {
+                const players = (table.view?.players ?? []).filter((p) => !p.empty);
+                return (
+                  <button
+                    key={table.id}
+                    className={`gameHubRoom ${table.status === "waiting" ? "hot" : ""}`}
+                    onClick={() => setActive({ kind: "holdem", id: table.id })}
+                  >
+                    <span>
+                      <b>{table.host_name}님의 테이블 · {table.status === "playing" ? `진행 중 ${table.hand_no}판째` : "대기 중"}</b>
+                      <em>💎 바이인 1,000점 · 👥 {players.length}/{table.max_seats}</em>
+                    </span>
+                    <i>{players.length < table.max_seats ? "참가 →" : "관전 →"}</i>
+                  </button>
+                );
+              })}
+            </div>
+          </article>
         </div>
       </section>
     </div>

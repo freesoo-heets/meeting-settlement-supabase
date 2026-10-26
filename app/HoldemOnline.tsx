@@ -1,14 +1,13 @@
 "use client";
 
-// 🃏 텍사스 홀덤 — 온라인 (점수 내기 · 자유 입퇴장 · 2~6명)
+// 🃏 텍사스 홀덤 (점수 내기 · 자유 입퇴장 · 2~6명)
 // 앉을 때 봇이 💎 1,000점 · 🎫 1장을 차감하고, 일어나면 남은 칩을 점수로 돌려준다 (딴 금액의 5% 수수료)
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { BUY_IN, type Action, type Card, type Table } from "../lib/holdem";
-import { friendlyTicketText } from "../lib/friendlyTime";
 import { copyInviteLink } from "./copyInvite";
 import { useGameViewport } from "./useGameViewport";
-import HoldemGame, { HoldemTableView } from "./HoldemGame";
+import { HoldemTableView } from "./HoldemGame";
 
 type TableRow = {
   id: string;
@@ -84,32 +83,39 @@ type Props = {
   onClose: () => void;
   onBack: () => void;
   currentMemberId: string;
-  myName: string;
+  myPoints: number | null;
+  myTickets: number | null;
   initialTableId?: string;
 };
 
-export default function HoldemOnline({ onClose, onBack, currentMemberId, myName, initialTableId }: Props) {
+export default function HoldemOnline({ onClose, onBack, currentMemberId, myPoints, myTickets, initialTableId }: Props) {
   const [tableId, setTableId] = useState(initialTableId ?? "");
-  const [practice, setPractice] = useState(false);
-  if (practice) return <HoldemGame onClose={onClose} onBack={() => setPractice(false)} myName={myName} />;
   if (tableId) {
     return <HoldemRoom key={tableId} tableId={tableId} currentMemberId={currentMemberId} onClose={onClose} onBack={() => setTableId("")} />;
   }
   return (
     <HoldemLobby
       currentMemberId={currentMemberId}
+      myPoints={myPoints}
+      myTickets={myTickets}
       onClose={onClose}
       onBack={onBack}
       onOpen={setTableId}
-      onPractice={() => setPractice(true)}
     />
   );
 }
 
-// ───────── 로비: 테이블 목록 · 만들기 · 기록 ─────────
+// ───────── 로비: 오목 · 알까기와 같은 모양 ─────────
 function HoldemLobby({
-  currentMemberId, onClose, onBack, onOpen, onPractice,
-}: { currentMemberId: string; onClose: () => void; onBack: () => void; onOpen: (id: string) => void; onPractice: () => void }) {
+  currentMemberId, myPoints, myTickets, onClose, onBack, onOpen,
+}: {
+  currentMemberId: string;
+  myPoints: number | null;
+  myTickets: number | null;
+  onClose: () => void;
+  onBack: () => void;
+  onOpen: (id: string) => void;
+}) {
   useGameViewport();
   const [tables, setTables] = useState<TableRow[]>([]);
   const [records, setRecords] = useState<SeatRow[]>([]);
@@ -117,12 +123,14 @@ function HoldemLobby({
   const [myActive, setMyActive] = useState<SeatRow | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [info, setInfo] = useState("");
+  const [showAll, setShowAll] = useState(false);
 
   const load = useCallback(async () => {
     const [t, r, m, a] = await Promise.all([
       supabase.from("holdem_tables").select(TABLE_COLUMNS).in("status", ["waiting", "playing"]).order("created_at", { ascending: false }).limit(20),
-      supabase.from("holdem_seats").select(SEAT_COLUMNS).eq("status", "left").order("left_at", { ascending: false }).limit(15),
-      supabase.from("holdem_seats").select(SEAT_COLUMNS).eq("status", "left").eq("member_id", currentMemberId).order("left_at", { ascending: false }).limit(200),
+      supabase.from("holdem_seats").select(SEAT_COLUMNS).eq("status", "left").eq("is_friendly", false).order("left_at", { ascending: false }).limit(30),
+      supabase.from("holdem_seats").select(SEAT_COLUMNS).eq("status", "left").eq("is_friendly", false).eq("member_id", currentMemberId).order("left_at", { ascending: false }).limit(200),
       supabase.from("holdem_seats").select(SEAT_COLUMNS).eq("member_id", currentMemberId).in("status", ["escrow", "seated"]).limit(1),
     ]);
     setTables((t.data ?? []) as TableRow[]);
@@ -136,85 +144,137 @@ function HoldemLobby({
     return () => window.clearInterval(timer);
   }, [load]);
 
-  async function create(friendly: boolean) {
+  async function run(payload: Record<string, unknown>, done?: (id?: string) => void) {
     setBusy(true);
     setMessage("");
-    const result = await callHoldem({ action: "create", friendly });
+    const result = await callHoldem(payload);
     setBusy(false);
-    if (result.ok && result.id) onOpen(result.id);
-    else setMessage(result.error ?? "테이블을 만들지 못했습니다.");
+    if (result.ok) done?.(result.id);
+    else setMessage(result.error ?? "처리하지 못했습니다.");
+    void load();
   }
 
-  const scored = mine.filter((seat) => !seat.is_friendly);
-  const myNet = scored.reduce((sum, seat) => sum + seatResult(seat).net, 0);
+  const playersOf = (table: TableRow) => (table.view?.players ?? []).filter((p) => !p.empty);
+  const waiting = tables.filter((table) => table.status === "waiting");
+  const playing = tables.filter((table) => table.status === "playing");
+  const myNet = mine.reduce((sum, seat) => sum + seatResult(seat).net, 0);
+  const shown = records.slice(0, showAll ? records.length : 8);
+
+  const tableCard = (table: TableRow) => {
+    const players = playersOf(table);
+    const full = players.length >= table.max_seats;
+    const mineHere = myActive?.table_id === table.id;
+    return (
+      <div className="omokCard" key={table.id}>
+        <div>
+          <strong>{table.host_name}님의 테이블</strong>
+          <span>
+            👥 {players.length}/{table.max_seats}명
+            {table.status === "playing" ? ` · ${table.hand_no}번째 판` : ""}
+            {players.length > 0 ? ` · ${players.map((p) => p.name).join(", ")}` : ""}
+          </span>
+        </div>
+        <button
+          className={`smallButton ${full && !mineHere ? "ghost" : ""}`}
+          onClick={() => onOpen(table.id)}
+        >
+          {mineHere ? "입장" : full || myActive ? "관전" : "참가"}
+        </button>
+      </div>
+    );
+  };
 
   return (
-    <div className="meetingModalBackdrop gameBackdrop" role="presentation">
-      <section className="meetingModal gameModal hdLobby" role="dialog" aria-modal="true" aria-label="텍사스 홀덤">
+    <div
+      className="meetingModalBackdrop gameBackdrop"
+      role="presentation"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <section className="meetingModal omokModal gameModal" role="dialog" aria-modal="true">
         <div className="meetingModalHeader">
           <div>
-            <span>바이인 💎 {fmt(BUY_IN)}점 · 🎫 1장 · 2~6명 · 자유 입퇴장</span>
+            <span>바이인 {fmt(BUY_IN)}점 · 2~6명 · 티켓 1장씩</span>
             <h2>🃏 텍사스 홀덤</h2>
           </div>
-          <button className="smallButton ghost" onClick={onBack}>‹ 게임 목록</button>
-          <button className="modalCloseButton" onClick={onClose}>×</button>
+          <div className="gameHeaderActions">
+            <button className="smallButton ghost" onClick={onBack}>← 게임</button>
+            <button className="modalCloseButton" onClick={onClose}>×</button>
+          </div>
         </div>
 
         {message && <div className="omokMessage">{message}</div>}
+        {info && !message && <div className="omokMessage info">{info}</div>}
 
-        {myActive && (
-          <button className="gameHubRoom hot" onClick={() => onOpen(myActive.table_id)}>
-            <span>
-              <b>내 자리로 돌아가기</b>
-              <em>{myActive.status === "escrow" ? "봇이 점수 확인 중" : "앉아 있는 중"}</em>
-            </span>
-            <i>입장 →</i>
-          </button>
-        )}
+        <div className="omokLobby">
+          <div className="omokMine">
+            <span>내 점수 <strong>💎 {myPoints !== null ? fmt(myPoints) : "-"}</strong></span>
+            <span>티켓 <strong>🎫 {myTickets ?? "-"}</strong></span>
+          </div>
 
-        <div className="hdLobbyActions">
-          <button className="smallButton" disabled={busy || !!myActive} onClick={() => void create(false)}>
-            ➕ 테이블 만들기 <small>💎 {fmt(BUY_IN)}점 · 🎫 1장</small>
-          </button>
-          <button className="smallButton ghost" disabled={busy || !!myActive} onClick={() => void create(true)}>
-            🤝 친선 테이블 <small>점수 없음 · {friendlyTicketText().replace("🎫 ", "")}</small>
-          </button>
-          <button className="smallButton ghost" onClick={onPractice}>🤖 봇과 연습 <small>점수 · 티켓 없음</small></button>
-        </div>
+          {myActive && (
+            <div className="omokCard highlight">
+              <div>
+                <strong>{myActive.status === "escrow" ? "봇이 점수·티켓 확인 중…" : "테이블에 앉아 있어요"}</strong>
+                <span>💎 바이인 {fmt(myActive.buy_in)}점</span>
+              </div>
+              <div className="omokCardActions">
+                <button className="smallButton" onClick={() => onOpen(myActive.table_id)}>테이블 보기</button>
+                <button className="smallButton inviteButton" disabled={busy} onClick={() => void run({ action: "invite", tableId: myActive.table_id }, () => setInfo("📣 카톡방에 초대 메시지를 보냈어요. (봇이 몇 초 안에 올립니다)"))}>
+                  📣 카톡방
+                </button>
+                <button className="smallButton ghost" onClick={() => void copyInviteLink("holdem", myActive.table_id).then(setInfo)}>🔗 링크</button>
+              </div>
+            </div>
+          )}
 
-        <div className="omokSection">
-          <strong>열린 테이블</strong>
-          {tables.length === 0 && <span className="muted">열린 테이블이 없습니다. 하나 만들어 보세요!</span>}
-          {tables.map((table) => {
-            const players = (table.view?.players ?? []).filter((p) => !p.empty);
-            return (
-              <button key={table.id} className={`gameHubRoom ${table.status === "waiting" ? "hot" : ""}`} onClick={() => onOpen(table.id)}>
-                <span>
-                  <b>
-                    {table.is_friendly ? "🤝 " : "💎 "}
-                    {table.host_name}님의 테이블 · {table.status === "playing" ? `진행 중 ${table.hand_no}판째` : "대기 중"}
-                  </b>
-                  <em>👥 {players.length}/{table.max_seats} · {players.map((p) => p.name).join(", ") || "아직 없음"}</em>
-                </span>
-                <i>{players.length < table.max_seats ? "참가 →" : "관전 →"}</i>
+          {!myActive && (
+            <div className="omokCreate">
+              <strong>새 테이블</strong>
+              <button className="primaryButton" disabled={busy} onClick={() => void run({ action: "create", friendly: false }, (id) => id && onOpen(id))}>
+                테이블 만들기 · 💎 {fmt(BUY_IN)}점 · 🎫 1장
               </button>
-            );
-          })}
-        </div>
+              <small>
+                앉을 때 {fmt(BUY_IN)}점 · 티켓 1장을 내고 칩 {fmt(BUY_IN)}개로 시작해요. 아무 때나 일어나면 남은 칩을 점수로
+                돌려받습니다 (딴 금액의 5% 수수료). 티켓은 돌려받지 않습니다.
+              </small>
+            </div>
+          )}
 
-        <div className="omokSection">
-          <strong>
-            내 기록 · {mine.length}번 앉음
-            {scored.length > 0 && <> · 누적 <b className={myNet >= 0 ? "hdPlus" : "hdMinus"}>{signed(myNet)}점</b></>}
-          </strong>
-          {mine.slice(0, 5).map((seat) => <RecordRow key={seat.id} seat={seat} />)}
-          {mine.length === 0 && <span className="muted">아직 기록이 없습니다.</span>}
-        </div>
+          <div className="omokSection">
+            <strong>대기 중인 테이블</strong>
+            {waiting.length === 0 && <span className="muted">열린 테이블이 없습니다.</span>}
+            {waiting.map(tableCard)}
+          </div>
 
-        <div className="omokSection">
-          <strong>최근 기록</strong>
-          {records.length === 0 && <span className="muted">아직 기록이 없습니다.</span>}
-          {records.map((seat) => <RecordRow key={seat.id} seat={seat} showName />)}
+          {playing.length > 0 && (
+            <div className="omokSection">
+              <strong>진행 중</strong>
+              {playing.map(tableCard)}
+            </div>
+          )}
+
+          <div className="omokSection">
+            <strong>
+              내 기록 · {mine.length}번
+              {mine.length > 0 && <> · 누적 <b className={myNet >= 0 ? "hdPlus" : "hdMinus"}>{signed(myNet)}점</b></>}
+            </strong>
+            {mine.length === 0 && <span className="muted">아직 기록이 없습니다.</span>}
+            {mine.slice(0, 5).map((seat) => <RecordRow key={seat.id} seat={seat} />)}
+          </div>
+
+          {records.length > 0 && (
+            <div className="omokSection">
+              <strong>
+                최근 결과
+                {!showAll && records.length > 8 && (
+                  <button className="smallButton ghost recentMore" onClick={() => setShowAll(true)}>더 보기</button>
+                )}
+              </strong>
+              {shown.map((seat) => <RecordRow key={seat.id} seat={seat} showName />)}
+            </div>
+          )}
         </div>
       </section>
     </div>
@@ -224,13 +284,13 @@ function HoldemLobby({
 function RecordRow({ seat, showName }: { seat: SeatRow; showName?: boolean }) {
   const r = seatResult(seat);
   return (
-    <div className="hdRecord">
+    <div className="omokResultRow hdRecordRow">
       <span>
-        {showName && <b>{seat.name}</b>}
-        {seat.is_friendly ? "🤝 친선" : `💎 ${fmt(seat.buy_in)} → ${fmt(r.out)}`} · {seat.hands}판
+        {showName ? `${r.net > 0 ? "🏆 " : ""}${seat.name} ` : ""}
+        <b className={r.net >= 0 ? "hdPlus" : "hdMinus"}>{signed(r.net)}점</b>
       </span>
-      <em className={seat.is_friendly ? "" : r.net >= 0 ? "hdPlus" : "hdMinus"}>
-        {seat.is_friendly ? `칩 ${fmt(r.out)}` : `${signed(r.net)}점${r.fee > 0 ? ` (수수료 ${fmt(r.fee)})` : ""}`}
+      <em>
+        💎 {fmt(seat.buy_in)} → {fmt(r.out)} · {seat.hands}판{r.fee > 0 ? ` · 수수료 ${fmt(r.fee)}` : ""}
         <br />
         {timeText(seat.left_at)}
       </em>
@@ -358,7 +418,7 @@ function HoldemRoom({
     if (!mySeat && !me) {
       return (
         <button className="next" disabled={busy || full} onClick={() => void run({ action: "sit" }, () => setInfo("🪑 자리를 신청했어요. 봇이 점수를 확인하면 앉습니다."))}>
-          {full ? "자리가 다 찼어요 (관전 중)" : `앉기 · ${row.is_friendly ? friendlyTicketText() : `💎 ${fmt(BUY_IN)}점 · 🎫 1장`}`}
+          {full ? "자리가 다 찼어요 (관전 중)" : `앉기 · 💎 ${fmt(BUY_IN)}점 · 🎫 1장`}
         </button>
       );
     }
