@@ -198,6 +198,13 @@ export default function HoldemGame({ onClose, onBack, myName }: { onClose: () =>
     return seated[(i + 1) % seated.length];
   })();
 
+  // 쇼다운 때 각자 어떤 메이드인지 (공개된 사람만)
+  const madeOf = (id: number) => {
+    const p = table.players[id];
+    if (!handOver || !contested || p.folded || p.out || p.hole.length < 2 || table.board.length < 5) return "";
+    if (id !== 0 && !isRevealed(id) && !resultShown) return "";
+    return HAND_NAME[bestHand([...p.hole, ...table.board]).score[0]];
+  };
   const lastLine = table.log.filter((line) => resultShown || !line.startsWith("🏆")).slice(-1)[0] ?? "";
   const roleOf = (id: number) =>
     table.dealer === id ? "D" : !handOver && sbSeat === id ? "SB" : !handOver && bbSeat === id ? "BB" : "";
@@ -247,14 +254,20 @@ export default function HoldemGame({ onClose, onBack, myName }: { onClose: () =>
             {table.players.map((p, i) => {
               if (i === 0) return null;
               const win = resultShown && table.winners.some((w) => w.id === p.id);
+              const lost = resultShown && contested && !win && !p.folded && !p.out;
+              const made = madeOf(p.id);
               const status = p.out ? "탈락" : p.folded ? "폴드" : p.allIn ? "올인" : "";
               const role = roleOf(p.id);
               return (
-                <div key={p.id} className={`hdSeat ${SEAT_POS[i]} ${table.turn === p.id && !handOver && dealDone ? "turn" : ""} ${p.folded || p.out ? "folded" : ""} ${win ? "win" : ""}`}>
+                <div key={p.id} className={`hdSeat ${SEAT_POS[i]} ${table.turn === p.id && !handOver && dealDone ? "turn" : ""} ${p.folded || p.out ? "folded" : ""} ${win ? "win" : ""} ${lost ? "lost" : ""}`}>
+                  <div className="hdTags">
+                    {win && <span className="hdWinTag">👑 WIN +{fmt(wonAmount(p.id))}</span>}
+                    {made && <span className={`hdMade ${win ? "win" : ""}`}>{made}</span>}
+                  </div>
                   <div className={`hdSeatCards ${isRevealed(p.id) ? "open" : ""}`}>
                     {p.hole.slice(0, handOver ? 2 : dealtTo(p.id)).map((c, k) => (
                       <span key={`${table.handNo}-${k}`} className="hdDealIn from-center">
-                        <CardView key={`${k}-${isRevealed(p.id)}`} card={c} hidden={!isRevealed(p.id)} size={isRevealed(p.id) ? "md" : "sm"} />
+                        <CardView key={`${k}-${isRevealed(p.id)}`} card={c} hidden={!isRevealed(p.id)} size="sm" />
                       </span>
                     ))}
                   </div>
@@ -287,7 +300,11 @@ export default function HoldemGame({ onClose, onBack, myName }: { onClose: () =>
           </div>
 
           {/* 나 */}
-          <div className={`hdMe ${myTurn ? "turn" : ""} ${resultShown && table.winners.some((w) => w.id === 0) ? "win" : ""}`}>
+          <div className={`hdMe ${myTurn ? "turn" : ""} ${resultShown && table.winners.some((w) => w.id === 0) ? "win" : ""} ${resultShown && contested && !table.winners.some((w) => w.id === 0) && !me.folded ? "lost" : ""}`}>
+            <div className="hdTags me">
+              {resultShown && table.winners.some((w) => w.id === 0) && <span className="hdWinTag">👑 WIN +{fmt(wonAmount(0))}</span>}
+              {madeOf(0) && resultShown && <span className={`hdMade ${table.winners.some((w) => w.id === 0) ? "win" : ""}`}>{madeOf(0)}</span>}
+            </div>
             <div className="hdMyCards">
               {me.hole.slice(0, handOver ? 2 : dealtTo(0)).map((c, i) => (
                 <span key={`${table.handNo}-${i}`} className="hdDealIn mine">

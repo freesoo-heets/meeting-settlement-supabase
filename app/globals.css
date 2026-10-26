@@ -6259,3 +6259,33 @@ button.meetingMetricCard {
 .hdSeatCards .hdDealIn:first-child .hdCard.sm { transform: rotate(-6deg); }
 .hdSeatCards .hdDealIn:last-child .hdCard.sm { transform: rotate(6deg); }
 @media (prefers-reduced-motion: reduce) { .hdDealIn.from-center, .hdDealIn.mine, .hdPeek { animation: none; } }
+
+/* 홀덤: 화면 크기 고정 (내용이 바뀌어도 창이 출렁이지 않게) */
+@media (min-width: 521px) {
+  .hdModal { height: min(760px, calc(var(--vvh, 100dvh) - 24px)); display: flex; flex-direction: column; overflow: hidden; }
+  .hdModal .hdFelt { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; }
+}
+.hdSeatCards { height: 34px; align-items: flex-end; }
+.hdCenterNote { height: 24px; }
+.hdBar { height: 46px; }
+.hdLastLine { height: 16px; }
+.hdSeatCards.open .hdCard.sm { width: 30px; height: 42px; margin-top: -8px; }
+.hdSeatCards.open .hdCard.sm .hdCorner { display: flex; top: 2px; left: 3px; }
+.hdSeatCards.open .hdCard.sm .hdCorner b { font-size: 12px; }
+.hdSeatCards.open .hdCard.sm .hdCorner i { font-size: 9px; }
+.hdSeatCards.open .hdCard.sm .hdPip { font-size: 15px; right: 3px; bottom: 2px; transform: none; }
+
+/* 홀덤: 결과 — 메이드 이름 · 승자 표시 */
+.hdTags { position: absolute; bottom: calc(100% + 2px); left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 3px; pointer-events: none; white-space: nowrap; z-index: 4; }
+.hdSeat .hdTags { bottom: calc(100% - 4px); }
+.hdTags.me { position: relative; bottom: auto; left: auto; transform: none; min-height: 0; margin-bottom: 4px; }
+.hdMade { font-size: 12px; font-weight: 800; color: #e2e8f0; background: rgba(8, 12, 28, .9); border: 1px solid rgba(148, 163, 184, .4); border-radius: 999px; padding: 2px 10px; animation: hdTagIn .35s ease-out both; }
+.hdMade.win { color: #1c1405; background: linear-gradient(#fde68a, #f5c451); border-color: #f5c451; }
+.hdWinTag { font: 900 13px/1 system-ui, sans-serif; letter-spacing: .04em; color: #1c1405; background: linear-gradient(#fff3c4, #f5c451 60%, #d99a1f); border-radius: 8px; padding: 5px 10px; box-shadow: 0 0 0 2px rgba(255, 255, 255, .6), 0 0 22px rgba(245, 196, 81, .85); animation: hdWinPop .5s cubic-bezier(.3, 1.5, .5, 1) both, hdWinGlow 1.2s ease-in-out .5s infinite alternate; }
+@keyframes hdTagIn { from { transform: translateY(6px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes hdWinPop { from { transform: scale(.4); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes hdWinGlow { from { box-shadow: 0 0 0 2px rgba(255,255,255,.6), 0 0 10px rgba(245,196,81,.5); } to { box-shadow: 0 0 0 2px rgba(255,255,255,.9), 0 0 26px rgba(245,196,81,1); } }
+.hdSeat.win .hdPill, .hdMe.win .hdPill { border-color: #f5c451; box-shadow: 0 0 0 2px #f5c451, 0 0 24px rgba(245, 196, 81, .75); }
+.hdSeat.win .hdAvatar, .hdMe.win .hdAvatar { background: linear-gradient(135deg, #fde68a, #d99a1f); color: #1c1405; }
+.hdSeat.lost .hdPill, .hdMe.lost .hdPill, .hdSeat.lost .hdSeatCards { opacity: .45; filter: grayscale(.6); }
+@media (prefers-reduced-motion: reduce) { .hdMade, .hdWinTag { animation: none; } }
