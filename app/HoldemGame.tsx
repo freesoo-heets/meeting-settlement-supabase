@@ -173,62 +173,72 @@ export default function HoldemGame({ onClose, onBack, myName }: { onClose: () =>
     return seated[(i + 1) % seated.length];
   })();
 
+  const lastLine = table.log.filter((line) => resultShown || !line.startsWith("🏆")).slice(-1)[0] ?? "";
+  const roleOf = (id: number) =>
+    table.dealer === id ? "D" : !handOver && sbSeat === id ? "SB" : !handOver && bbSeat === id ? "BB" : "";
+
   return (
     <div className="meetingModalBackdrop gameBackdrop" role="presentation">
       <section className="meetingModal gameModal hdModal" role="dialog" aria-modal="true" aria-label="텍사스 홀덤">
-        <div className="hdTop">
-          <span className="hdBlind">SB {table.sb} · BB {table.bb} · {table.handNo}번째 판</span>
-          <span className="hdTag">🧪 관리자 테스트 · 연습 칩</span>
-          <div className="gameHeaderActions">
-            {onBack && <button className="smallButton ghost" onClick={onBack}>← 게임</button>}
-            <button className="modalCloseButton" onClick={onClose}>×</button>
+        <header className="hdTop">
+          {onBack && <button className="hdIconBtn" onClick={onBack} aria-label="게임 목록으로">‹</button>}
+          <div className="hdTitle">
+            <strong>텍사스 홀덤</strong>
+            <span>블라인드 {table.sb}/{table.bb}{table.handNo ? ` · ${table.handNo}번째 판` : ""} · 연습 칩</span>
           </div>
-        </div>
+          <button className="hdIconBtn" onClick={onClose} aria-label="닫기">×</button>
+        </header>
 
         <div className="hdFelt">
           <div className="hdRail">
             {/* 가운데: 팟 · 공용 카드 */}
             <div className="hdCenter">
-              <div className="hdPot">
-                <b>{fmt(pot)}</b>
-              </div>
+              <div className="hdPot"><span>POT</span><b>{fmt(pot)}</b></div>
               <div className="hdPotArea">
                 {!resultShown && <ChipPile amount={pot - table.players.reduce((sum, q) => sum + q.bet, 0)} className="pot" />}
                 <div className="hdCommunity">
-                {Array.from({ length: 5 }, (_, i) => (
-                  <CardView
-                    key={`${table.handNo}-${i}-${i < boardShown}`}
-                    card={i < boardShown ? table.board[i] : undefined}
-                    slow={i >= 3}
-                    lit={i < boardShown && resultShown && inBest(table.board[i])}
-                  />
-                ))}
+                  {Array.from({ length: 5 }, (_, i) => (
+                    <CardView
+                      key={`${table.handNo}-${i}-${i < boardShown}`}
+                      card={i < boardShown ? table.board[i] : undefined}
+                      slow={i >= 3}
+                      lit={i < boardShown && resultShown && inBest(table.board[i])}
+                    />
+                  ))}
                 </div>
               </div>
-              {handOver && !revealDone && contested && boardReady && <div className="hdSuspense">쇼다운…</div>}
-              {resultShown && table.winners.length > 0 && (
-                <div className="hdWinner">
-                  🏆 {table.winners.map((w) => `${table.players[w.id].name} +${fmt(w.amount)} (${w.hand})`).join(" · ")}
-                </div>
-              )}
+              <div className="hdCenterNote">
+                {handOver && !revealDone && contested && boardReady ? (
+                  <span className="hdSuspense">SHOWDOWN</span>
+                ) : resultShown && table.winners.length > 0 ? (
+                  <span className="hdWinner">
+                    {table.winners.map((w) => `${table.players[w.id].name.replace("🤖 ", "")} +${fmt(w.amount)} · ${w.hand}`).join("  /  ")}
+                  </span>
+                ) : null}
+              </div>
             </div>
 
-            {/* 자리 */}
+            {/* 상대 자리 */}
             {table.players.map((p, i) => {
               if (i === 0) return null;
               const win = resultShown && table.winners.some((w) => w.id === p.id);
-              const badge = p.out ? "탈락" : p.folded ? "폴드" : p.allIn ? "올인" : "";
+              const status = p.out ? "탈락" : p.folded ? "폴드" : p.allIn ? "올인" : "";
+              const role = roleOf(p.id);
               return (
-                <div key={p.id} className={`hdSeat ${SEAT_POS[i]} ${table.turn === p.id ? "turn" : ""} ${p.folded ? "folded" : ""} ${win ? "win" : ""}`}>
-                  <div className={`hdAvatar ${badge ? `badge ${badge === "올인" ? "allin" : ""}` : ""}`}>{badge || p.name.slice(0, 2)}</div>
-                  <div className="hdPlate">
-                    <span>{p.name.replace("🤖 ", "")}</span>
-                    <b>{fmt(chipsShown(p.id))}</b>
-                  </div>
+                <div key={p.id} className={`hdSeat ${SEAT_POS[i]} ${table.turn === p.id && !handOver ? "turn" : ""} ${p.folded || p.out ? "folded" : ""} ${win ? "win" : ""}`}>
                   <div className={`hdSeatCards ${isRevealed(p.id) ? "open" : ""}`}>
                     {p.hole.map((c, k) => (
                       <CardView key={`${k}-${isRevealed(p.id)}`} card={c} hidden={!isRevealed(p.id)} size={isRevealed(p.id) ? "md" : "sm"} />
                     ))}
+                  </div>
+                  <div className="hdPill">
+                    <span className="hdAvatar">{p.name.replace("🤖 ", "").slice(0, 1)}</span>
+                    <span className="hdPillText">
+                      <span>{p.name.replace("🤖 ", "")}</span>
+                      <b>{fmt(chipsShown(p.id))}</b>
+                    </span>
+                    {role && <span className={`hdRole ${role.toLowerCase()}`}>{role}</span>}
+                    {status && <span className={`hdStatus ${status === "올인" ? "allin" : ""}`}>{status}</span>}
                   </div>
                   {p.bet > 0 && (
                     <div className="hdBet">
@@ -236,12 +246,17 @@ export default function HoldemGame({ onClose, onBack, myName }: { onClose: () =>
                       <span>{fmt(p.bet)}</span>
                     </div>
                   )}
-                  {table.dealer === p.id && <span className="hdMarker d">D</span>}
-                  {!handOver && sbSeat === p.id && <span className="hdMarker sb">SB</span>}
-                  {!handOver && bbSeat === p.id && <span className="hdMarker bb">BB</span>}
                 </div>
               );
             })}
+
+            {/* 내 베팅 (테이블 안쪽 아래) */}
+            {me.bet > 0 && (
+              <div className="hdBet mine">
+                <ChipPile amount={me.bet} className="bet" />
+                <span>{fmt(me.bet)}</span>
+              </div>
+            )}
           </div>
 
           {/* 나 */}
@@ -249,57 +264,46 @@ export default function HoldemGame({ onClose, onBack, myName }: { onClose: () =>
             <div className="hdMyCards">
               {me.hole.map((c, i) => <CardView key={`${table.handNo}-${i}`} card={c} size="lg" lit={resultShown && inBest(c)} />)}
             </div>
-            <div className="hdMyInfo">
-              {best && <span className="hdHandName">♠ {HAND_NAME[best.score[0]]}</span>}
-              <b>{fmt(chipsShown(0))}</b>
-              {me.bet > 0 && (
-                <div className="hdBet mine">
-                  <ChipPile amount={me.bet} className="bet" />
-                  <span>{fmt(me.bet)}</span>
-                </div>
-              )}
-              {table.dealer === 0 && <span className="hdMarker d inline">D</span>}
+            <div className="hdPill me">
+              <span className="hdAvatar">{me.name.slice(0, 1)}</span>
+              <span className="hdPillText">
+                <span>{best ? HAND_NAME[best.score[0]] : me.name}</span>
+                <b>{fmt(chipsShown(0))}</b>
+              </span>
+              {roleOf(0) && <span className={`hdRole ${roleOf(0).toLowerCase()}`}>{roleOf(0)}</span>}
             </div>
           </div>
         </div>
 
-        {/* 아래 행동 버튼 (카지노 앱처럼 한 줄) */}
+        {/* 행동 버튼 */}
         <div className="hdBar">
           {myTurn && info ? (
             <>
-              {info.minRaiseTo < info.maxTo ? (
-                <>
-                  <button onClick={() => raise(sized(0.25))}>쿼터</button>
-                  <button onClick={() => raise(sized(0.5))}>하프</button>
-                </>
-              ) : (
-                <><button disabled>쿼터</button><button disabled>하프</button></>
-              )}
-              <button className="call" onClick={() => setTable((t) => act(t, { type: info.canCheck ? "check" : "call" }))}>
-                {info.canCheck ? "체크" : `콜 ${fmt(Math.min(info.toCall, me.chips))}`}
-              </button>
-              {info.minRaiseTo < info.maxTo ? <button onClick={() => raise(sized(1))}>풀</button> : <button disabled>풀</button>}
-              <button className="allin" onClick={() => setTable((t) => act(t, { type: "allin" }))}>올인</button>
               <button className="fold" onClick={() => setTable((t) => act(t, { type: "fold" }))}>폴드</button>
+              <button className="call" onClick={() => setTable((t) => act(t, { type: info.canCheck ? "check" : "call" }))}>
+                {info.canCheck ? "체크" : <>콜 <small>{fmt(Math.min(info.toCall, me.chips))}</small></>}
+              </button>
+              <button disabled={info.minRaiseTo >= info.maxTo} onClick={() => raise(sized(0.25))}>쿼터</button>
+              <button disabled={info.minRaiseTo >= info.maxTo} onClick={() => raise(sized(0.5))}>하프</button>
+              <button disabled={info.minRaiseTo >= info.maxTo} onClick={() => raise(sized(1))}>풀</button>
+              <button className="allin" onClick={() => setTable((t) => act(t, { type: "allin" }))}>올인</button>
             </>
           ) : handOver && resultShown ? (
             gameOver ? (
               <button className="next" onClick={() => setTable(startHand(newTable(myName)))}>
-                {me.chips > 0 ? "🎉 모두 이겼어요! 처음부터 다시" : "😢 칩을 다 잃었어요 · 처음부터 다시"}
+                {me.chips > 0 ? "모두 이겼어요 · 처음부터 다시" : "칩을 다 잃었어요 · 처음부터 다시"}
               </button>
             ) : (
-              <button className="next" onClick={() => setTable((t) => startHand(t))}>{table.handNo === 0 ? "▶ 게임 시작" : "▶ 다음 판"}</button>
+              <button className="next" onClick={() => setTable((t) => startHand(t))}>{table.handNo === 0 ? "게임 시작" : "다음 판"}</button>
             )
           ) : (
             <span className="hdWait">
-              {handOver ? "카드를 공개하는 중…" : !boardReady ? "카드를 까는 중…" : table.turn >= 0 ? `${table.players[table.turn].name.replace("🤖 ", "")} 생각 중…` : ""}
+              {handOver ? "카드를 공개하는 중" : !boardReady ? "카드를 까는 중" : table.turn >= 0 ? `${table.players[table.turn].name.replace("🤖 ", "")} 생각 중` : ""}
+              <i className="hdDots" aria-hidden="true" />
             </span>
           )}
         </div>
-
-        <ol className="hdLog" aria-label="진행 기록">
-          {table.log.filter((line) => resultShown || !line.startsWith("🏆")).slice(-6).map((line, i) => <li key={i}>{line}</li>)}
-        </ol>
+        <p className="hdLastLine" aria-live="polite">{lastLine}</p>
       </section>
     </div>
   );
