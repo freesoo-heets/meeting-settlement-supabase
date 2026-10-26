@@ -43,7 +43,7 @@ type SeatRow = {
 
 const TABLE_COLUMNS = "id,status,host_member,host_name,is_friendly,max_seats,view,hand_no,turn_deadline,next_hand_at,created_at";
 const SEAT_COLUMNS = "id,table_id,member_id,name,status,buy_in,is_friendly,escrow_state,escrow_note,cash_out,hands,settle_state,payout,fee,created_at,left_at";
-const WIN_FEE = 0.05; // 봇(omok_bridge.py HOLDEM_FEE)과 같아야 한다
+const WIN_FEE = 0.05; // 봇(holdem_bridge.py HOLDEM_FEE)과 같아야 한다
 const fmt = (n: number) => n.toLocaleString("ko-KR");
 
 async function callHoldem(payload: Record<string, unknown>) {
