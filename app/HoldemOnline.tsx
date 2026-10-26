@@ -237,7 +237,7 @@ function HoldemLobby({
               </button>
               <small>
                 앉을 때 {fmt(BUY_IN)}점 · 티켓 1장을 내고 칩 {fmt(BUY_IN)}개로 시작해요. 아무 때나 일어나면 남은 칩을 점수로
-                돌려받습니다 (딴 금액의 5% 수수료). 티켓은 돌려받지 않습니다.
+                돌려받습니다 (딴 금액의 5% 수수료). 한 판도 안 하고 일어나면 점수 · 티켓 모두 환불돼요.
               </small>
             </div>
           )}
@@ -287,7 +287,7 @@ function RecordRow({ seat, showName }: { seat: SeatRow; showName?: boolean }) {
     <div className="omokResultRow hdRecordRow">
       <span>
         {showName ? `${r.net > 0 ? "🏆 " : ""}${seat.name} ` : ""}
-        <b className={r.net >= 0 ? "hdPlus" : "hdMinus"}>{signed(r.net)}점</b>
+        {seat.hands === 0 ? <b>환불</b> : <b className={r.net >= 0 ? "hdPlus" : "hdMinus"}>{signed(r.net)}점</b>}
       </span>
       <em>
         💎 {fmt(seat.buy_in)} → {fmt(r.out)} · {seat.hands}판{r.fee > 0 ? ` · 수수료 ${fmt(r.fee)}` : ""}
@@ -463,7 +463,7 @@ function HoldemRoom({
       {lastFailed && !mySeat && !me && <div className="omokMessage">자리 신청 실패: {lastFailed.escrow_note}</div>}
       {lastLeft && lastLeftResult && !me && (
         <div className="omokMessage info">
-          지난 자리 · {lastLeft.is_friendly ? `칩 ${fmt(lastLeftResult.out)} (친선)` : `💎 ${fmt(lastLeft.buy_in)} → ${fmt(lastLeftResult.out)} · ${signed(lastLeftResult.net)}점${lastLeftResult.fee ? ` (수수료 ${fmt(lastLeftResult.fee)})` : ""}`}
+          지난 자리 · {lastLeft.hands === 0 ? "한 판도 안 해서 💎 점수 · 🎫 티켓 모두 환불" : lastLeft.is_friendly ? `칩 ${fmt(lastLeftResult.out)} (친선)` : `💎 ${fmt(lastLeft.buy_in)} → ${fmt(lastLeftResult.out)} · ${signed(lastLeftResult.net)}점${lastLeftResult.fee ? ` (수수료 ${fmt(lastLeftResult.fee)})` : ""}`}
           {lastLeft.settle_state !== "done" && !lastLeft.is_friendly && " · 봇이 지급 중"}
         </div>
       )}
