@@ -103,14 +103,6 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
     void callCatchCleanup(false).then(() => load());
   }, [load]);
 
-  const [cleanNote, setCleanNote] = useState("");
-  async function cleanNow() {
-    if (!window.confirm("한 명만 남아 있는 캐치마인드 대기방을 모두 닫을까요?")) return;
-    const result = await callCatchCleanup(true);
-    setCleanNote(result.ok ? `🧹 빈 방 ${result.closed ?? 0}개를 닫았습니다.` : result.error ?? "정리하지 못했습니다.");
-    await load();
-  }
-
   useEffect(() => {
     if (active) return;
     void load();
@@ -261,7 +253,6 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
         {showRating && <RatingBoard onClose={() => setShowRating(false)} />}
 
         {testError && <div className="omokMessage">{testError}</div>}
-        {cleanNote && <div className="omokMessage info">{cleanNote}</div>}
         <div className="gameHubGrid">
           {GAMES.map((game) => {
             const rows = sections[game.kind];
@@ -284,11 +275,6 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
                     onClick={() => void startTest(game.kind)}
                   >
                     🧪 {game.kind === "catch" ? "테스트 방 (혼자 시작 · 출제자도 정답 입력)" : "테스트 대국 (혼자 양쪽 · 점수 없음)"}
-                  </button>
-                )}
-                {isAdmin && game.kind === "catch" && (
-                  <button className="smallButton ghost gameHubTest" onClick={() => void cleanNow()}>
-                    🧹 빈 방 정리 (혼자 남은 대기방 닫기)
                   </button>
                 )}
                 <div className="gameHubRooms">

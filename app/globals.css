@@ -5046,6 +5046,7 @@ button.meetingMetricCard {
 .gameHubCard.omok { border-left: 4px solid #0f172a; }
 .gameHubCard.alkkagi { border-left: 4px solid #b45309; }
 .gameHubCard.catch { border-left: 4px solid #7c3aed; }
+.gameHubCard.holdem { border-left: 4px solid #eab308; }
 .gameHubHead { display: flex; align-items: center; gap: 10px; }
 .gameHubHead > div { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
 .gameHubHead strong { font-size: 16px; }
