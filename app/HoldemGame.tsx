@@ -35,6 +35,51 @@ function CardView({ card, hidden, size = "md", lit, slow }: { card?: Card; hidde
 
 const fmt = (n: number) => n.toLocaleString("ko-KR");
 
+// ── 족보 순위표 ──
+// 예시 카드: 앞의 key 장이 족보를 이루는 카드, 나머지는 흐리게
+const RANK_EXAMPLES: Array<{ rank: number; cards: string; key: number }> = [
+  { rank: 8, cards: "9h 8h 7h 6h 5h", key: 5 },
+  { rank: 7, cards: "13s 13h 13d 13c 7s", key: 4 },
+  { rank: 6, cards: "12s 12h 12d 9c 9s", key: 5 },
+  { rank: 5, cards: "14d 11d 8d 6d 3d", key: 5 },
+  { rank: 4, cards: "10c 9d 8s 7h 6c", key: 5 },
+  { rank: 3, cards: "7s 7h 7d 13c 2s", key: 3 },
+  { rank: 2, cards: "11s 11h 4d 4c 14s", key: 4 },
+  { rank: 1, cards: "14s 14h 13d 8c 4s", key: 2 },
+  { rank: 0, cards: "14c 12d 9s 6h 3c", key: 1 },
+];
+function HandRanks({ current, onClose }: { current?: number; onClose?: () => void }) {
+  return (
+    <aside className="hdRanks" aria-label="족보 순위">
+      <div className="hdRanksHead">
+        <strong>족보 순위</strong>
+        <span>위가 더 강해요</span>
+        {onClose && <button className="hdIconBtn sm" onClick={onClose} aria-label="족보 닫기">×</button>}
+      </div>
+      <ol>
+        {RANK_EXAMPLES.map((row, i) => (
+          <li key={row.rank} className={current === row.rank ? "mine" : ""}>
+            <span className="hdRankNo">{i + 1}</span>
+            <span className="hdRankName">{HAND_NAME[row.rank]}</span>
+            <span className="hdMinis">
+              {row.cards.split(" ").map((code, k) => {
+                const suit = code.slice(-1) as Card["s"];
+                const red = suit === "h" || suit === "d";
+                return (
+                  <i key={k} className={`hdMini ${red ? "red" : ""} ${k >= row.key ? "kicker" : ""}`}>
+                    <b>{rankText(Number(code.slice(0, -1)))}</b>
+                    {SUIT_ICON[suit]}
+                  </i>
+                );
+              })}
+            </span>
+          </li>
+        ))}
+      </ol>
+    </aside>
+  );
+}
+
 // ── 칩 그림 ──
 // 금액을 칩 종류별로 나눠 기둥(최대 8개)으로 쌓는다. 새로 생긴 칩만 위에서 떨어지듯 내려앉는다.
 const CHIP_KINDS = [
@@ -85,6 +130,7 @@ const SEAT_POS = ["me", "left", "top", "right"] as const; // 0=나(아래), 1=�
 export default function HoldemGame({ onClose, onBack, myName }: { onClose: () => void; onBack?: () => void; myName: string }) {
   useGameViewport();
   const [table, setTable] = useState<Table>(() => newTable(myName));
+  const [ranksOpen, setRanksOpen] = useState(false); // 휴대폰: 족보표 펼치기
 
   // ★ 긴장감: 공용 카드는 한 장씩 천천히(턴 · 리버는 더 뜸 들여서), 쇼다운은 한 명씩 공개
   const [boardShown, setBoardShown] = useState(0);
@@ -218,9 +264,12 @@ export default function HoldemGame({ onClose, onBack, myName }: { onClose: () =>
             <strong>텍사스 홀덤</strong>
             <span>블라인드 {table.sb}/{table.bb}{table.handNo ? ` · ${table.handNo}번째 판` : ""} · 연습 칩</span>
           </div>
+          <button className="hdRanksBtn" onClick={() => setRanksOpen((v) => !v)} aria-expanded={ranksOpen}>족보</button>
           <button className="hdIconBtn" onClick={onClose} aria-label="닫기">×</button>
         </header>
 
+        <div className="hdBody">
+        <div className="hdMain">
         <div className="hdFelt">
           <div className="hdRail">
             {/* 가운데: 팟 · 공용 카드 */}
@@ -308,11 +357,12 @@ export default function HoldemGame({ onClose, onBack, myName }: { onClose: () =>
             <div className="hdMyCards">
               {me.hole.slice(0, handOver ? 2 : dealtTo(0)).map((c, i) => (
                 <span key={`${table.handNo}-${i}`} className="hdDealIn mine">
-                  {myPeek > i || handOver ? (
-                    <span className="hdPeek"><CardView card={c} size="lg" lit={resultShown && inBest(c)} /></span>
-                  ) : (
-                    <CardView card={c} size="lg" hidden />
-                  )}
+                  <span className="hdFan">
+                    <span className={`hdFlipCard ${myPeek > i || handOver ? "open" : ""}`}>
+                      <CardView card={c} size="lg" hidden />
+                      <span className="hdFlipFront"><CardView card={c} size="lg" lit={resultShown && inBest(c)} /></span>
+                    </span>
+                  </span>
                 </span>
               ))}
             </div>
@@ -356,6 +406,11 @@ export default function HoldemGame({ onClose, onBack, myName }: { onClose: () =>
           )}
         </div>
         <p className="hdLastLine" aria-live="polite">{lastLine}</p>
+        </div>
+        <div className={`hdRanksWrap ${ranksOpen ? "open" : ""}`}>
+          <HandRanks current={best?.score[0]} onClose={() => setRanksOpen(false)} />
+        </div>
+        </div>
       </section>
     </div>
   );

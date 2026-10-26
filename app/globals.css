@@ -6289,3 +6289,114 @@ button.meetingMetricCard {
 .hdSeat.win .hdAvatar, .hdMe.win .hdAvatar { background: linear-gradient(135deg, #fde68a, #d99a1f); color: #1c1405; }
 .hdSeat.lost .hdPill, .hdMe.lost .hdPill, .hdSeat.lost .hdSeatCards { opacity: .45; filter: grayscale(.6); }
 @media (prefers-reduced-motion: reduce) { .hdMade, .hdWinTag { animation: none; } }
+
+/* 홀덤: 다음 판 버튼은 마우스를 올려도 금색 유지 */
+.hdBar button.next:hover:not(:disabled) { background: linear-gradient(#ffd978, #e8a92a); color: #1c1405; filter: brightness(1.05); }
+.hdBar button.call:hover:not(:disabled) { background: #3b82f6; }
+
+/* 홀덤: 휴대폰에서 옆으로 밀리지 않게 (가로 스크롤 막기) */
+.hdModal { position: relative; overflow-x: hidden; }
+@media (max-width: 520px) {
+  .hdSeat.left .hdTags { left: 0; transform: none; align-items: flex-start; }
+  .hdSeat.right .hdTags { left: auto; right: 0; transform: none; align-items: flex-end; }
+}
+
+/* 홀덤: 족보 순위표 — PC 는 오른쪽에 늘 보이고, 휴대폰은 '족보' 버튼으로 펼친다 */
+.hdBody { display: flex; gap: 14px; min-height: 0; }
+.hdMain { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.hdRanksBtn { height: 34px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--hd-line); background: rgba(255, 255, 255, .04); color: var(--hd-ink); font-size: 13px; font-weight: 700; cursor: pointer; }
+.hdRanksBtn:hover { background: rgba(255, 255, 255, .1); }
+.hdIconBtn.sm { width: 26px; height: 26px; font-size: 16px; border-radius: 8px; margin-left: auto; }
+.hdRanks { background: rgba(8, 12, 28, .7); border: 1px solid var(--hd-line); border-radius: 14px; padding: 10px 10px 8px; }
+.hdRanksHead { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+.hdRanksHead strong { font-size: 13.5px; }
+.hdRanksHead span { font-size: 11px; color: var(--hd-dim); }
+.hdRanks ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.hdRanks li { display: grid; grid-template-columns: 16px 1fr; grid-template-rows: auto auto; column-gap: 6px; padding: 5px 6px; border-radius: 9px; border: 1px solid transparent; }
+.hdRanks li.mine { border-color: var(--hd-gold); background: rgba(245, 196, 81, .12); }
+.hdRankNo { grid-row: span 2; align-self: center; font: 800 11px/1 system-ui, sans-serif; color: var(--hd-dim); text-align: center; }
+.hdRanks li.mine .hdRankNo, .hdRanks li.mine .hdRankName { color: var(--hd-gold); }
+.hdRankName { font-size: 12px; font-weight: 800; margin-bottom: 3px; }
+.hdMinis { display: flex; gap: 2px; }
+.hdMini { width: 22px; height: 28px; border-radius: 4px; background: #fff; color: #111; font-style: normal; font-size: 10px; line-height: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; box-shadow: 0 1px 2px rgba(0, 0, 0, .4); }
+.hdMini b { font-size: 11px; font-weight: 800; }
+.hdMini.red { color: #d0021b; }
+.hdMini.kicker { opacity: .4; }
+.hdRanksWrap .hdIconBtn.sm { display: none; }
+@media (min-width: 521px) {
+  .hdModal { max-width: 920px; }
+  .hdModal .hdBody { flex: 1; }
+  .hdModal .hdMain .hdFelt { flex: 1; min-height: 0; }
+  .hdRanksWrap { width: 186px; flex: none; align-self: center; }
+  .hdRanksBtn { display: none; }
+}
+@media (min-width: 521px) and (max-width: 860px) {
+  .hdRanksWrap { display: none; }
+  .hdRanksWrap.open { display: block; }
+  .hdRanksBtn { display: inline-block; }
+}
+@media (max-width: 860px) {
+  .hdRanksWrap.open { position: absolute; z-index: 20; top: 52px; right: 10px; width: 200px; display: block; animation: hdTagIn .2s ease-out both; }
+  .hdRanksWrap.open .hdRanks { background: rgba(8, 12, 28, .97); box-shadow: 0 16px 40px rgba(0, 0, 0, .6); }
+  .hdRanksWrap.open .hdIconBtn.sm { display: grid; place-items: center; }
+  .hdRanksWrap:not(.open) { display: none; }
+}
+
+/* 홀덤: 자리 배치 — 이름판은 테이블 가장자리에 걸치고, 카드는 테이블 안쪽(가운데 방향)에 */
+.hdSeat .hdSeatCards { position: absolute; margin: 0; z-index: 0; }
+.hdSeat.left .hdSeatCards { left: calc(100% + 6px); top: 50%; transform: translateY(-50%); }
+.hdSeat.right .hdSeatCards { right: calc(100% + 6px); top: 50%; transform: translateY(-50%); flex-direction: row-reverse; }
+.hdSeat.top .hdSeatCards { top: calc(100% + 6px); left: 50%; transform: translateX(-50%); }
+.hdSeat.left .hdBet { left: calc(100% + 76px); top: 50%; transform: translateY(-50%); }
+.hdSeat.right .hdBet { right: calc(100% + 76px); top: 50%; transform: translateY(-50%); }
+.hdSeat.top .hdBet { top: calc(100% + 56px); }
+.hdSeat.left { left: -48px; top: 46%; }
+.hdSeat.right { right: -48px; top: 46%; }
+.hdSeat.top { top: -22px; }
+.hdSeat .hdTags { bottom: calc(100% + 4px); }
+@media (max-width: 520px) {
+  .hdSeat.left { left: -34px; top: 31%; } .hdSeat.right { right: -34px; top: 31%; }
+  .hdSeat.left .hdBet, .hdSeat.right .hdBet { left: 50%; right: auto; top: calc(100% + 4px); transform: translateX(-50%); }
+}
+
+/* 홀덤: 카드 받기 — 테이블 가운데(딜러 자리)에서 각자에게 미끄러져 가며 돈다 */
+.hdSeat.left { --dx: 150px; --dy: 10px; }
+.hdSeat.right { --dx: -150px; --dy: 10px; }
+.hdSeat.top { --dx: 0px; --dy: 130px; }
+@media (max-width: 520px) { .hdSeat.left { --dx: 110px; --dy: 70px; } .hdSeat.right { --dx: -110px; --dy: 70px; } }
+.hdDealIn.from-center { animation: hdDealSeat2 .5s cubic-bezier(.16, .8, .3, 1) both; }
+.hdDealIn.mine { animation: hdDealMine2 .55s cubic-bezier(.16, .8, .3, 1) both; }
+@keyframes hdDealSeat2 {
+  0% { transform: translate(var(--dx), var(--dy)) rotate(-160deg) scale(.75); opacity: 0; }
+  20% { opacity: 1; }
+  100% { transform: none; opacity: 1; }
+}
+@keyframes hdDealMine2 {
+  0% { transform: translate(0, -190px) rotate(150deg) scale(.6); opacity: 0; }
+  20% { opacity: 1; }
+  100% { transform: none; opacity: 1; }
+}
+
+/* 내 카드: 받은 뒤 부채꼴로 살짝 벌어지고, 한 장씩 실제로 뒤집힌다 */
+.hdMyCards .hdCard { transform: none !important; animation: none !important; }
+.hdMyCards .hdDealIn:first-child .hdCard, .hdMyCards .hdDealIn:last-child .hdCard { transform: none !important; }
+.hdFan { display: inline-flex; transition: transform .45s cubic-bezier(.3, .7, .3, 1); }
+.hdMyCards .hdDealIn:nth-child(1) .hdFan { transform: rotate(-7deg) translate(8px, 2px); }
+.hdMyCards .hdDealIn:nth-child(2) .hdFan { transform: rotate(6deg) translate(-4px, 0); animation: hdFanOut .5s cubic-bezier(.3, .7, .3, 1) .35s both; }
+@keyframes hdFanOut { from { transform: rotate(-7deg) translate(-40px, 2px); } to { transform: rotate(6deg) translate(-4px, 0); } }
+.hdFlipCard { position: relative; display: inline-flex; transform-style: preserve-3d; transition: transform .7s cubic-bezier(.35, .1, .25, 1); }
+.hdFlipCard > .hdCard, .hdFlipFront { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.hdFlipFront { position: absolute; inset: 0; transform: rotateY(180deg); display: flex; }
+.hdFlipCard.open { transform: rotateY(180deg); }
+.hdFlipCard:not(.open) { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  .hdDealIn.from-center, .hdDealIn.mine, .hdMyCards .hdDealIn:nth-child(2) .hdFan { animation: none; }
+  .hdFlipCard { transition: none; }
+}
+
+/* 홀덤: PC 는 족보표까지 들어가게 넓게, 옆자리 베팅은 카드 아래로 */
+@media (min-width: 521px) {
+  .meetingModal.hdModal { width: min(920px, 100%); }
+}
+.hdSeat.left .hdBet { left: calc(100% + 10px); top: calc(50% + 30px); transform: none; }
+.hdSeat.right .hdBet { right: calc(100% + 10px); top: calc(50% + 30px); transform: none; }
