@@ -6,6 +6,7 @@ import { supabase } from "../lib/supabase";
 import OmokGame, { type Opponent } from "./OmokGame";
 import AlkkagiGame from "./AlkkagiGame";
 import CatchMindGame from "./CatchMindGame";
+import HoldemGame from "./HoldemGame";
 import RatingBoard from "./RatingBoard";
 
 export type GameKind = "omok" | "alkkagi" | "catch";
@@ -115,6 +116,7 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
   }, [load, active]);
 
   const back = () => setActive(null);
+  const [holdemOpen, setHoldemOpen] = useState(false); // 🃏 홀덤 (관리자 테스트판)
 
   // 관리자 테스트: 바로 만들어 그 판으로 들어간다
   const [testing, setTesting] = useState(false);
@@ -137,6 +139,10 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
     setTesting(false);
     if (result.ok && result.id) setActive({ kind, id: result.id });
     else setTestError(result.error ?? `테스트를 시작하지 못했습니다. (응답: ${JSON.stringify(result).slice(0, 120)})`);
+  }
+
+  if (holdemOpen) {
+    return <HoldemGame onClose={onClose} onBack={() => setHoldemOpen(false)} myName={myName} />;
   }
 
   if (active?.kind === "omok") {
@@ -246,6 +252,18 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
         {testError && <div className="omokMessage">{testError}</div>}
         {cleanNote && <div className="omokMessage info">{cleanNote}</div>}
         <div className="gameHubGrid">
+          {isAdmin && (
+            <article className="gameHubCard holdem">
+              <div className="gameHubHead">
+                <span className="gameHubIcon" aria-hidden="true">🃏</span>
+                <div>
+                  <strong>텍사스 홀덤</strong>
+                  <span>🧪 관리자 테스트 · 봇 3명과 연습</span>
+                </div>
+                <button className="smallButton" onClick={() => setHoldemOpen(true)}>시작</button>
+              </div>
+            </article>
+          )}
           {GAMES.map((game) => {
             const rows = sections[game.kind];
             return (

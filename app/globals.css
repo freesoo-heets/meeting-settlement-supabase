@@ -6097,3 +6097,34 @@ button.meetingMetricCard {
 }
 .step57Filter{display:inline-flex !important;align-items:center !important;gap:8px;min-height:24px}
 .meetingCalendarPanel{margin:14px 0 20px;scroll-margin-top:16px}
+
+/* 🃏 텍사스 홀덤 (관리자 테스트) */
+.hdModal { max-width: 640px; }
+.hdTable { display: flex; flex-direction: column; gap: 10px; background: #14532d; border-radius: 16px; padding: 12px; color: #f8fafc; }
+.hdSeats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.hdSeat, .hdMe { background: rgba(0, 0, 0, .25); border: 2px solid transparent; border-radius: 12px; padding: 8px; display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
+.hdSeat strong, .hdMe strong { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.hdSeat span, .hdMe span { font-size: 12px; color: #d1fae5; }
+.hdSeat em { font-style: normal; font-size: 11px; color: #fde68a; min-height: 15px; }
+.hdSeat.turn, .hdMe.turn { border-color: #facc15; }
+.hdSeat.win, .hdMe.win { border-color: #fb923c; box-shadow: 0 0 12px rgba(251, 146, 60, .6); }
+.hdSeat.folded { opacity: .45; }
+.hdBoard { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 0; }
+.hdPot { font-weight: 800; color: #fde68a; }
+.hdCommunity, .hdHole { display: flex; gap: 6px; justify-content: center; }
+.hdMe { flex-direction: row; justify-content: center; gap: 12px; }
+.hdMe > div:last-child { display: flex; flex-direction: column; }
+.hdCard { width: 42px; height: 58px; border-radius: 7px; background: #fff; color: #0f172a; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 800; box-shadow: 0 2px 4px rgba(0,0,0,.3); line-height: 1; }
+.hdCard b { font-size: 17px; }
+.hdCard i { font-style: normal; font-size: 18px; }
+.hdCard.red { color: #dc2626; }
+.hdCard.small { width: 30px; height: 42px; }
+.hdCard.small b { font-size: 12px; }
+.hdCard.small i { font-size: 13px; }
+.hdCard.back { background: repeating-linear-gradient(45deg, #1d4ed8, #1d4ed8 4px, #2563eb 4px, #2563eb 8px); border: 2px solid #fff; }
+.hdActions { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; align-items: center; }
+.hdRaise { display: flex; align-items: center; gap: 6px; flex: 1 1 220px; min-width: 0; }
+.hdRaise input { flex: 1; min-width: 0; accent-color: #facc15; }
+.hdNext { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.hdLog { margin: 0; padding: 8px 10px 8px 26px; background: rgba(0,0,0,.2); border-radius: 10px; font-size: 12px; color: #d1fae5; max-height: 150px; overflow-y: auto; }
+@media (max-width: 420px) { .hdCard { width: 36px; height: 50px; } .hdCard b { font-size: 15px; } }
