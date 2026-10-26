@@ -75,6 +75,14 @@ async function callHoldem(payload: Record<string, unknown>) {
   };
 }
 
+// 멈춘 테이블 정리 요청 (로비 · 게임 목록을 열어 둔 사람 누구든, 20초에 한 번)
+let lastSweep = 0;
+export function sweepHoldem() {
+  if (Date.now() - lastSweep < 20000) return;
+  lastSweep = Date.now();
+  void callHoldem({ action: "sweep" });
+}
+
 // 일어날 때 받는 점수 (친선은 점수 없음)
 export function seatResult(seat: SeatRow) {
   const paid = seat.buy_in + (seat.rebuy_total ?? 0); // 바이인 + 충전
@@ -139,6 +147,7 @@ function HoldemLobby({
   const [showAll, setShowAll] = useState(false);
 
   const load = useCallback(async () => {
+    sweepHoldem();
     const [t, r, m, a] = await Promise.all([
       supabase.from("holdem_tables").select(TABLE_COLUMNS).in("status", ["waiting", "playing"]).order("created_at", { ascending: false }).limit(20),
       readSeats((c) => supabase.from("holdem_seats").select(c).eq("status", "left").eq("is_friendly", false).order("left_at", { ascending: false }).limit(30)),

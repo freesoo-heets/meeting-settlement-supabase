@@ -110,7 +110,7 @@ export type Table = {
   bb: number;
   log: string[];
   handNo: number;
-  winners: Array<{ id: number; amount: number; hand: string }>;
+  winners: Array<{ id: number; amount: number; hand: string; name?: string }>;
   leftSeats?: string[]; // 온라인: 이미 정산(일어남)한 자리 — 다시 앉히지 않게
 };
 
@@ -292,7 +292,7 @@ function finish(t: Table, everyoneFolded: boolean): Table {
     const p = t.players[id];
     p.chips += amount;
     const hand = everyoneFolded ? "모두 폴드" : handOf.get(id)?.name ?? "";
-    t.winners.push({ id, amount, hand });
+    t.winners.push({ id, amount, hand, name: p.name });
     t.log.push(`🏆 ${p.name} +${amount} (${hand})`);
   }
   for (const p of t.players) p.bet = 0;

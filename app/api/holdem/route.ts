@@ -10,7 +10,7 @@ import {
   type Admin,
 } from "../../../lib/gameServer";
 import { BUY_IN, emptyTable, legal, publicView, type Action, type Table } from "../../../lib/holdem";
-import { SEAT_ACTIVE, apply, step, type Ctx, type SeatRow, type TableStatus } from "../../../lib/holdemTable";
+import { IDLE_MINUTES, SEAT_ACTIVE, apply, step, type Ctx, type SeatRow, type TableStatus } from "../../../lib/holdemTable";
 
 /*
  * 텍사스 홀덤 API (모든 쓰기는 여기서만 한다)
@@ -187,6 +187,19 @@ export async function POST(request: Request) {
   const auth = await requireMemberId(request, admin);
   if ("error" in auth) return fail(auth.error, auth.status);
   const memberId = auth.memberId;
+
+  if (action === "sweep") {
+    const nowIso = new Date().toISOString();
+    const late = new Date(Date.now() - 3000).toISOString();
+    const idle = new Date(Date.now() - (IDLE_MINUTES * 60 + 30) * 1000).toISOString();
+    const { data: stale } = await admin
+      .from("holdem_tables")
+      .select("id")
+      .or(`and(status.eq.playing,turn_deadline.lt.${late}),and(status.in.(playing,waiting),next_hand_at.lt.${late}),and(status.eq.waiting,updated_at.lt.${idle})`)
+      .limit(5);
+    for (const table of stale ?? []) await mutate(admin, table.id, (ctx, seats, now) => (step(ctx, seats, now), null));
+    return NextResponse.json({ ok: true, swept: (stale ?? []).length, at: nowIso });
+  }
 
   if (action === "create") {
     const { data: member } = await admin.from("members").select("name,active").eq("id", memberId).maybeSingle();

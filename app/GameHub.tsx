@@ -6,7 +6,7 @@ import { supabase } from "../lib/supabase";
 import OmokGame, { type Opponent } from "./OmokGame";
 import AlkkagiGame from "./AlkkagiGame";
 import CatchMindGame from "./CatchMindGame";
-import HoldemOnline from "./HoldemOnline";
+import HoldemOnline, { sweepHoldem } from "./HoldemOnline";
 import RatingBoard from "./RatingBoard";
 
 export type GameKind = "omok" | "alkkagi" | "catch" | "holdem";
@@ -87,6 +87,7 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
       supabase.from("holdem_tables").select("id,status,host_name,is_friendly,max_seats,hand_no,view").in("status", ["waiting", "playing"]).order("created_at", { ascending: false }).limit(20),
     ]);
     setHoldemTables((h.data ?? []) as typeof holdemTables);
+    if ((h.data ?? []).length > 0) sweepHoldem(); // 멈춘 홀덤 테이블 정리
     // 테스트 판은 만든 관리자에게만 보인다
     const mineOrReal = (row: StakeRow) => !row.is_test || row.host_member === currentMemberId;
     setOmok(((o.data ?? []) as StakeRow[]).filter(mineOrReal));

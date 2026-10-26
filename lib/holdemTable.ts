@@ -143,6 +143,18 @@ export function step(ctx: Ctx, seats: SeatRow[], now: number) {
     for (const p of ctx.t.players) if (!p.empty && p.leaving && (p.folded || p.out) && !rebuyPending(seats, p)) cashOut(ctx, p, now);
   }
 
+  // 4-2) 판이 끝난 뒤 '일어나기' 한 사람은 결과를 기다리지 않고 바로 정산.
+  //      모두 나갔으면 바로 닫는다 (누가 화면을 켜 두지 않아도 방이 남지 않게)
+  if (ctx.t.stage === "showdown") {
+    for (const p of ctx.t.players) if (!p.empty && p.leaving && !rebuyPending(seats, p)) cashOut(ctx, p, now);
+    if (ctx.t.players.every((p) => p.empty) && !seats.some((s) => s.status === "escrow")) {
+      ctx.status = "closed";
+      ctx.nextHandAt = null;
+      ctx.turnDeadline = null;
+      return;
+    }
+  }
+
   // 5) 판이 끝났고 결과를 보여 줄 시간이 지났으면: 일어날 사람 · 칩 없는 사람 정리 → 다음 판
   if (ctx.t.stage === "showdown" && (ctx.nextHandAt === null || now >= ctx.nextHandAt)) {
     // 나가기 예약 · 일어남 · 칩 없음 (단, 충전 처리 중이면 기다린다)

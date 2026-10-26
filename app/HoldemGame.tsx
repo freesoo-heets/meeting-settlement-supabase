@@ -336,7 +336,7 @@ export function HoldemTableView({
                   <span className="hdSuspense">SHOWDOWN</span>
                 ) : resultShown && table.winners.length > 0 ? (
                   <span className="hdWinner">
-                    {table.winners.map((w) => `${shortName(table.players[w.id].name)} +${fmt(w.amount)} · ${w.hand}`).join("  /  ")}
+                    {table.winners.map((w) => `${shortName(w.name ?? table.players[w.id].name)} +${fmt(w.amount)} · ${w.hand}`).join("  /  ")}
                   </span>
                 ) : null}
               </div>
