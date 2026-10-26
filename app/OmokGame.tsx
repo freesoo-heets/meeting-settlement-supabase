@@ -63,6 +63,7 @@ type Props = {
   opponents: Opponent[];
 };
 
+const RECENT_MAX = 30; // 최근 결과 (더 보기)
 const COLUMNS =
   "id,status,stake,host_member,host_name,guest_member,guest_name,target_member,black,moves,turn_deadline,winner,end_reason,escrow_state,escrow_note,settle_state,is_test,is_friendly,undo,created_at,started_at,finished_at";
 const STAKE_PRESETS = [100, 300, 500, 1000];
@@ -242,6 +243,7 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
   const lastEmoteAt = useRef(0);
   const [emotes, setEmotes] = useState<ShownEmote[]>([]);
   const [emoteCooldownUntil, setEmoteCooldownUntil] = useState(0);
+  const [showAllRecent, setShowAllRecent] = useState(false);
 
   const load = useCallback(async () => {
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -257,6 +259,15 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
     if (error?.code === "42703") ({ data, error } = await query(COLUMNS.replace(",undo", "")));
     if (error) return;
     const rows = (data ?? []) as unknown as OmokRow[];
+    // ★ 지난 결과는 시간과 상관없이 최근 것부터 (예전엔 24시간이 지나면 목록에서 사라졌다)
+    const history = await supabase
+      .from("omok_games")
+      .select(error ? COLUMNS.replace(",undo", "") : COLUMNS)
+      .eq("status", "finished")
+      .eq("is_test", false)
+      .order("finished_at", { ascending: false })
+      .limit(RECENT_MAX);
+    for (const old of (history.data ?? []) as unknown as OmokRow[]) if (!rows.some((row) => row.id === old.id)) rows.push(old);
 
     // 링크로 들어온 대국이 목록에 없으면(취소·오래된 결과) 따로 불러온다
     if (initialGameId && !rows.some((row) => row.id === initialGameId)) {
@@ -478,7 +489,10 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
   );
   const liveGames = games.filter((game) => game.status === "playing" && game.id !== myActive?.id && (!game.is_test || game.host_member === currentMemberId));
   // 테스트 대국은 최근 결과에 남기지 않는다 (관리자 본인에게도)
-  const recent = games.filter((game) => game.status === "finished" && !game.is_test).slice(0, 8);
+  const recent = games
+    .filter((game) => game.status === "finished" && !game.is_test)
+    .sort((a, b) => (b.finished_at ?? "").localeCompare(a.finished_at ?? ""))
+    .slice(0, showAllRecent ? RECENT_MAX : 8);
 
   return (
     <div
@@ -746,7 +760,12 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
 
             {recent.length > 0 && (
               <div className="omokSection">
-                <strong>최근 결과</strong>
+                <strong>
+                  최근 결과
+                  {!showAllRecent && games.filter((game) => game.status === "finished" && !game.is_test).length > 8 && (
+                    <button className="smallButton ghost recentMore" onClick={() => setShowAllRecent(true)}>더 보기</button>
+                  )}
+                </strong>
                 {recent.map((game) => (
                   <button className="omokResultRow" key={game.id} onClick={() => setViewId(game.id)}>
                     <span>

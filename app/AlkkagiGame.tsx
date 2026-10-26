@@ -83,6 +83,7 @@ type Props = {
   isAdmin?: boolean;
 };
 
+const RECENT_MAX = 30; // 최근 결과 (더 보기)
 const COLUMNS =
   "id,status,stake,host_member,host_name,guest_member,guest_name,target_member,cho,turn,pieces,last_shot,shot_no,strikes,turn_deadline,winner,end_reason,escrow_state,escrow_note,settle_state,is_test,is_friendly,created_at,started_at,finished_at";
 const STAKE_PRESETS = [100, 300, 500, 1000];
@@ -172,6 +173,7 @@ export default function AlkkagiGame({
   const lastEmoteAt = useRef(0);
   const [emotes, setEmotes] = useState<ShownEmote[]>([]);
   const [emoteCooldownUntil, setEmoteCooldownUntil] = useState(0);
+  const [showAllRecent, setShowAllRecent] = useState(false);
 
   const load = useCallback(async () => {
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -183,6 +185,15 @@ export default function AlkkagiGame({
       .limit(40);
     if (error) return;
     const rows = (data ?? []) as AlkRow[];
+    // ★ 지난 결과는 시간과 상관없이 최근 것부터 (예전엔 24시간이 지나면 목록에서 사라졌다)
+    const history = await supabase
+      .from("alkkagi_games")
+      .select(COLUMNS)
+      .eq("status", "finished")
+      .eq("is_test", false)
+      .order("finished_at", { ascending: false })
+      .limit(RECENT_MAX);
+    for (const old of (history.data ?? []) as AlkRow[]) if (!rows.some((row) => row.id === old.id)) rows.push(old);
     if (initialGameId && !rows.some((row) => row.id === initialGameId)) {
       const single = await supabase.from("alkkagi_games").select(COLUMNS).eq("id", initialGameId).maybeSingle();
       if (single.data) rows.push(single.data as AlkRow);
@@ -398,7 +409,10 @@ export default function AlkkagiGame({
   const challengesToMe = games.filter((game) => game.status === "challenge" && game.target_member === currentMemberId);
   const liveGames = games.filter((game) => game.status === "playing" && game.id !== myActive?.id && (!game.is_test || game.host_member === currentMemberId));
   // 테스트 대국은 최근 결과에 남기지 않는다 (관리자 본인에게도)
-  const recent = games.filter((game) => game.status === "finished" && !game.is_test).slice(0, 8);
+  const recent = games
+    .filter((game) => game.status === "finished" && !game.is_test)
+    .sort((a, b) => (b.finished_at ?? "").localeCompare(a.finished_at ?? ""))
+    .slice(0, showAllRecent ? RECENT_MAX : 8);
 
   return (
     <div
@@ -657,7 +671,12 @@ export default function AlkkagiGame({
 
             {recent.length > 0 && (
               <div className="omokSection">
-                <strong>최근 결과</strong>
+                <strong>
+                  최근 결과
+                  {!showAllRecent && games.filter((game) => game.status === "finished" && !game.is_test).length > 8 && (
+                    <button className="smallButton ghost recentMore" onClick={() => setShowAllRecent(true)}>더 보기</button>
+                  )}
+                </strong>
                 {recent.map((game) => (
                   <button className="omokResultRow" key={game.id} onClick={() => setViewId(game.id)}>
                     <span>

@@ -83,6 +83,13 @@ export type Player = {
   allIn: boolean;
   acted: boolean;     // 마지막 레이즈 이후 행동했는지
   out: boolean;       // 칩이 없어 빠짐
+  // ── 온라인 테이블용 ──
+  seatId?: string;    // holdem_seats.id
+  member?: string;    // members.id
+  empty?: boolean;    // 빈자리
+  leaving?: boolean;  // 이번 판 끝나면 일어남 (차례가 오면 자동 폴드)
+  strikes?: number;   // 연속 시간 초과
+  hands?: number;     // 앉은 뒤 참여한 판 수
 };
 
 export type Stage = "preflop" | "flop" | "turn" | "river" | "showdown";
@@ -101,6 +108,7 @@ export type Table = {
   log: string[];
   handNo: number;
   winners: Array<{ id: number; amount: number; hand: string }>;
+  leftSeats?: string[]; // 온라인: 이미 정산(일어남)한 자리 — 다시 앉히지 않게
 };
 
 export const START_CHIPS = 1000;
@@ -323,3 +331,40 @@ export function botAction(t: Table): Action {
 }
 
 export const cardText = (c: Card) => `${SUIT_ICON[c.s]}${rankText(c.r)}`;
+
+// ── 온라인 테이블 ──
+export const ONLINE_SEATS = 6;
+export const BUY_IN = 1000;
+
+export function emptyTable(seats = ONLINE_SEATS): Table {
+  return {
+    players: Array.from({ length: seats }, (_, i) => ({
+      id: i, name: "", bot: false, chips: 0, hole: [], bet: 0, total: 0,
+      folded: true, allIn: false, acted: false, out: true, empty: true,
+    })),
+    deck: [], board: [], stage: "showdown", dealer: seats - 1, turn: -1, currentBet: 0, minRaise: 20,
+    sb: 10, bb: 20, log: [], handNo: 0, winners: [],
+  };
+}
+
+export const potOf = (t: Table) => t.players.reduce((s, p) => s + p.total, 0);
+
+// 쇼다운에서 공개되는 사람: 모두 폴드가 아닌 판의 남은 사람
+export function showdownOpen(t: Table) {
+  return t.stage === "showdown" && t.handNo > 0 && t.players.filter((p) => !p.out && !p.folded).length > 1;
+}
+
+// 화면용: 덱을 빼고, 남의 손패는 뒷면(r: 0)으로. 쇼다운 공개분만 그대로
+const BACK: Card = { r: 0, s: "s" };
+export function publicView(t: Table): Table {
+  const open = showdownOpen(t);
+  return {
+    ...t,
+    deck: [],
+    log: t.log.slice(-30),
+    players: t.players.map((p) => ({
+      ...p,
+      hole: open && !p.folded && !p.out ? p.hole : p.hole.map(() => BACK),
+    })),
+  };
+}

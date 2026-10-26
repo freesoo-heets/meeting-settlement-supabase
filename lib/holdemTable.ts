@@ -1,0 +1,140 @@
+// 홀덤 온라인 테이블 진행 (서버 전용 · 순수 함수: DB 는 api/holdem 이 다룬다)
+import { act, legal, showdownOpen, startHand, type Action, type Player, type Table } from "./holdem";
+
+export const TURN_SECONDS = 25;   // 한 사람 생각 시간
+export const DEAL_SECONDS = 6;    // 새 판: 카드 나눠 주는 연출 시간만큼 더
+export const STREET_SECONDS = 2;  // 플랍 · 턴 · 리버 까는 연출
+export const GRACE_MS = 1500;     // 통신 지연 여유
+export const MAX_STRIKES = 2;     // 연속 시간 초과 → 이번 판 뒤 자동으로 일어남
+export const IDLE_MINUTES = 15;   // 혼자 남은 대기 테이블은 이 시간이 지나면 정리 (칩 반환)
+export const SEAT_ACTIVE = ["escrow", "seated"];
+
+export type TableStatus = "waiting" | "playing" | "closed";
+export type SeatRow = {
+  id: string;
+  table_id: string;
+  member_id: string;
+  name: string;
+  status: string;
+  buy_in: number;
+  escrow_state: string;
+};
+export type Ctx = {
+  t: Table;
+  status: TableStatus;
+  turnDeadline: number | null;
+  nextHandAt: number | null;
+  updatedAt: number;
+  seatUpdates: Map<string, Record<string, unknown>>;
+};
+
+const iso = (ms: number) => new Date(ms).toISOString();
+const fmt = (n: number) => n.toLocaleString("ko-KR");
+
+const snap = (t: Table) => ({ hand: t.handNo, stage: t.stage, turn: t.turn, board: t.board.length });
+
+// 행동 · 판 변화 뒤: 다음 사람 마감 시각, 판이 끝났으면 다음 판 시각
+function afterChange(ctx: Ctx, before: ReturnType<typeof snap>, now: number) {
+  const t = ctx.t;
+  if (t.stage === "showdown") {
+    ctx.turnDeadline = null;
+    if (before.stage !== "showdown" || before.hand !== t.handNo) {
+      const newCards = t.board.length - (before.hand === t.handNo ? before.board : 0);
+      const shown = t.players.filter((p) => !p.out && !p.folded).length;
+      // 화면이 카드를 한 장씩 까고, 한 명씩 공개한 뒤 결과를 보여 줄 시간
+      ctx.nextHandAt = now + (showdownOpen(t) ? 5000 + shown * 1000 + newCards * 1100 : 3500 + newCards * 1100);
+    }
+    return;
+  }
+  if (t.turn !== before.turn || t.stage !== before.stage || t.handNo !== before.hand) {
+    const extra = t.handNo !== before.hand ? DEAL_SECONDS : t.stage !== before.stage ? STREET_SECONDS + (t.board.length - before.board > 1 ? 1 : 0) : 0;
+    ctx.turnDeadline = now + (TURN_SECONDS + extra) * 1000;
+  }
+}
+
+export function apply(ctx: Ctx, action: Action, now: number) {
+  const before = snap(ctx.t);
+  ctx.t = act(ctx.t, action);
+  afterChange(ctx, before, now);
+}
+
+// 일어남: 남은 칩을 기록하고 자리를 비운다 (이번 판에 낸 금액 total 은 팟 계산용으로 남겨 둔다)
+function cashOut(ctx: Ctx, p: Player, now: number) {
+  if (p.seatId) {
+    ctx.seatUpdates.set(p.seatId, { status: "left", cash_out: p.chips, hands: p.hands ?? 0, left_at: iso(now) });
+    ctx.t.leftSeats = [...(ctx.t.leftSeats ?? []), p.seatId].slice(-60);
+  }
+  ctx.t.log.push(`🚪 ${p.name} 일어남 · 칩 ${fmt(p.chips)}`);
+  Object.assign(p, {
+    name: "", chips: 0, hole: [], out: true, folded: true, allIn: false, empty: true,
+    seatId: undefined, member: undefined, leaving: false, strikes: 0, hands: 0,
+  });
+}
+
+// 판을 앞으로 진행: 새로 앉은 사람 · 시간 초과 · 일어난 사람 · 다음 판
+export function step(ctx: Ctx, seats: SeatRow[], now: number) {
+  // 1) 봇이 차감을 끝낸 자리 앉히기 (진행 중인 판에는 다음 판부터)
+  for (const seat of seats) {
+    if (seat.status !== "seated" || ctx.t.players.some((p) => p.seatId === seat.id) || (ctx.t.leftSeats ?? []).includes(seat.id)) continue;
+    const slot = ctx.t.players.find((p) => p.empty && (ctx.t.stage === "showdown" || p.total === 0));
+    if (!slot) {
+      // 자리가 없으면 받은 그대로 돌려준다
+      ctx.seatUpdates.set(seat.id, { status: "left", cash_out: seat.buy_in, hands: 0, left_at: iso(now) });
+      ctx.t.leftSeats = [...(ctx.t.leftSeats ?? []), seat.id].slice(-60);
+      continue;
+    }
+    Object.assign(slot, {
+      name: seat.name, bot: false, chips: seat.buy_in, hole: [], bet: 0, total: 0,
+      folded: true, allIn: false, acted: false, out: true, empty: false,
+      seatId: seat.id, member: seat.member_id, leaving: false, strikes: 0, hands: 0,
+    });
+    ctx.t.log.push(`💺 ${seat.name} 착석 · 칩 ${fmt(seat.buy_in)}`);
+    if (ctx.status === "closed") ctx.status = "waiting";
+  }
+
+  // 2) 차례인 사람이 시간 초과 · 일어남 · 빈자리 → 자동 (체크 가능하면 체크, 아니면 폴드)
+  for (let guard = 0; guard < 20 && ctx.t.stage !== "showdown" && ctx.t.turn >= 0; guard += 1) {
+    const p = ctx.t.players[ctx.t.turn];
+    const timedOut = ctx.turnDeadline !== null && now > ctx.turnDeadline + GRACE_MS;
+    if (!p.leaving && !p.empty && !timedOut) break;
+    if (timedOut && !p.leaving && !p.empty) {
+      p.strikes = (p.strikes ?? 0) + 1;
+      ctx.t.log.push(`⏰ ${p.name} 시간 초과`);
+      if (p.strikes >= MAX_STRIKES) {
+        p.leaving = true;
+        ctx.t.log.push(`💤 ${p.name} 자리 비움 → 이번 판이 끝나면 일어납니다`);
+      }
+    }
+    apply(ctx, legal(ctx.t).canCheck && !p.leaving && !p.empty ? { type: "check" } : { type: "fold" }, now);
+  }
+
+  // 3) 혼자 오래 기다린 테이블은 정리
+  if (ctx.status === "waiting" && now - ctx.updatedAt > IDLE_MINUTES * 60 * 1000) {
+    for (const p of ctx.t.players) if (!p.empty) p.leaving = true;
+  }
+
+  // 4) 진행 중인 판에서 이미 빠진(폴드) 사람이 일어나면 바로 정산
+  if (ctx.t.stage !== "showdown") {
+    for (const p of ctx.t.players) if (!p.empty && p.leaving && (p.folded || p.out)) cashOut(ctx, p, now);
+  }
+
+  // 5) 판이 끝났고 결과를 보여 줄 시간이 지났으면: 일어날 사람 · 칩 없는 사람 정리 → 다음 판
+  if (ctx.t.stage === "showdown" && (ctx.nextHandAt === null || now >= ctx.nextHandAt)) {
+    for (const p of ctx.t.players) if (!p.empty && (p.leaving || p.chips <= 0)) cashOut(ctx, p, now);
+    const ready = ctx.t.players.filter((p) => !p.empty && p.chips > 0);
+    if (ready.length >= 2) {
+      const before = snap(ctx.t);
+      ctx.t = startHand(ctx.t);
+      for (const p of ctx.t.players) if (!p.out) p.hands = (p.hands ?? 0) + 1;
+      ctx.status = "playing";
+      ctx.nextHandAt = null;
+      afterChange(ctx, before, now);
+    } else {
+      const pending = seats.some((s) => s.status === "escrow");
+      ctx.status = ready.length === 0 && !pending ? "closed" : "waiting";
+      ctx.nextHandAt = null;
+      ctx.turnDeadline = null;
+    }
+  }
+}
+

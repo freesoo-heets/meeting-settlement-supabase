@@ -6400,3 +6400,55 @@ button.meetingMetricCard {
 }
 .hdSeat.left .hdBet { left: calc(100% + 10px); top: calc(50% + 30px); transform: none; }
 .hdSeat.right .hdBet { right: calc(100% + 10px); top: calc(50% + 30px); transform: none; }
+
+/* 홀덤 6인석: 왼쪽 · 오른쪽에 두 자리씩 */
+.hdSeat.left.high, .hdSeat.right.high { top: 20%; }
+.hdSeat.left.low, .hdSeat.right.low { top: 74%; }
+.hdSeat.left.high { --dx: 150px; --dy: 90px; } .hdSeat.right.high { --dx: -150px; --dy: 90px; }
+.hdSeat.left.low { --dx: 150px; --dy: -60px; } .hdSeat.right.low { --dx: -150px; --dy: -60px; }
+@media (max-width: 520px) {
+  .hdSeat.left.high, .hdSeat.right.high { top: 17%; }
+  .hdSeat.left.low, .hdSeat.right.low { top: 56%; }
+  .hdSeat.left.high { --dx: 110px; --dy: 150px; } .hdSeat.right.high { --dx: -110px; --dy: 150px; }
+  .hdSeat.left.low { --dx: 110px; --dy: 40px; } .hdSeat.right.low { --dx: -110px; --dy: 40px; }
+}
+/* 빈자리 */
+.hdPill.empty { justify-content: center; background: rgba(8, 12, 28, .35); border-style: dashed; box-shadow: none; min-height: 40px; }
+.hdPill.empty .hdPillText span { color: rgba(148, 163, 184, .7); font-weight: 700; }
+.hdSeat.emptySeat { opacity: .8; }
+/* 남은 시간 */
+.hdClock { position: absolute; top: -9px; left: -6px; min-width: 24px; height: 24px; padding: 0 5px; border-radius: 12px; display: grid; place-items: center; font: 800 12px/1 system-ui, sans-serif; color: #1c1405; background: var(--hd-gold); box-shadow: 0 0 0 2px #0b0d1c; }
+.hdClock.hurry { background: #ef4444; color: #fff; animation: hdPulse .5s ease-in-out infinite alternate; }
+
+/* 행동 버튼: 위에 거는 금액 · 폴드면 잃는 금액 */
+.hdBar { height: 56px; min-height: 56px; }
+.hdBar button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; line-height: 1.1; padding: 6px 2px; }
+.hdCost { font-style: normal; font-size: 11px; font-weight: 800; color: var(--hd-gold); font-variant-numeric: tabular-nums; }
+.hdCost.lose { color: #fca5a5; }
+.hdBar button.call .hdCost { color: #dbeafe; }
+.hdBar button:disabled .hdCost { color: #475569; }
+.hdBar .hdWait { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; }
+.hdBar .hdWait .smallButton { padding: 4px 10px; }
+
+/* 홀덤 온라인: 일어나기 · 안내 · 초대 */
+.hdRanksBtn.stand { border-color: rgba(248, 113, 113, .45); color: #fecaca; }
+.hdRanksBtn.stand:disabled { opacity: .5; }
+@media (min-width: 521px) { .hdRanksBtn.stand { display: inline-block; } }
+.hdNotice { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.hdNotice:empty { display: none; }
+.hdNotice .omokMessage { margin: 0; font-size: 12.5px; padding: 6px 10px; }
+.hdInvite { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+.hdModal .hdInvite .smallButton { font-size: 12.5px; padding: 6px 12px; }
+
+/* 홀덤 로비 */
+.hdLobby { display: flex; flex-direction: column; gap: 12px; }
+.hdLobbyActions { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; }
+.hdLobbyActions .smallButton { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 8px; }
+.hdLobbyActions .smallButton small { font-size: 11px; opacity: .75; font-weight: 600; }
+.hdRecord { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 7px 2px; border-bottom: 1px solid rgba(148, 163, 184, .2); font-size: 13px; }
+.hdRecord b { margin-right: 6px; }
+.hdRecord em { font-style: normal; text-align: right; font-size: 12px; color: #64748b; }
+.hdPlus { color: #16a34a !important; font-weight: 800; }
+.hdMinus { color: #dc2626 !important; font-weight: 800; }
+.recentMore { margin-left: 8px; padding: 2px 10px; font-size: 12px; }
+.hdTitle span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

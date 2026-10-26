@@ -6,10 +6,10 @@ import { supabase } from "../lib/supabase";
 import OmokGame, { type Opponent } from "./OmokGame";
 import AlkkagiGame from "./AlkkagiGame";
 import CatchMindGame from "./CatchMindGame";
-import HoldemGame from "./HoldemGame";
+import HoldemOnline from "./HoldemOnline";
 import RatingBoard from "./RatingBoard";
 
-export type GameKind = "omok" | "alkkagi" | "catch";
+export type GameKind = "omok" | "alkkagi" | "catch" | "holdem";
 
 type StakeRow = {
   id: string;
@@ -48,7 +48,7 @@ type Props = {
 
 const STAKE_COLUMNS = "id,status,stake,host_member,host_name,guest_member,guest_name,target_member,is_test,is_friendly";
 
-const GAMES: Array<{ kind: GameKind; icon: string; name: string; desc: string }> = [
+const GAMES: Array<{ kind: Exclude<GameKind, "holdem">; icon: string; name: string; desc: string }> = [
   { kind: "omok", icon: "🏁", name: "오목", desc: "렌주룰 · 점수 내기 · 1:1" },
   { kind: "alkkagi", icon: "🥏", name: "알까기", desc: "장기알 · 점수 내기 · 1:1" },
   { kind: "catch", icon: "🎨", name: "캐치마인드", desc: "그림 맞히기 · 최대 6명 · 점수 없음" },
@@ -76,14 +76,17 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
   const [omok, setOmok] = useState<StakeRow[]>([]);
   const [alkkagi, setAlkkagi] = useState<StakeRow[]>([]);
   const [catchRooms, setCatchRooms] = useState<CatchRow[]>([]);
+  const [holdemTables, setHoldemTables] = useState<Array<{ id: string; status: string; host_name: string; is_friendly: boolean; max_seats: number; hand_no: number; view: { players?: Array<{ name: string; empty?: boolean }> } }>>([]);
   const [showRating, setShowRating] = useState(false);
 
   const load = useCallback(async () => {
-    const [o, a, c] = await Promise.all([
+    const [o, a, c, h] = await Promise.all([
       supabase.from("omok_games").select(STAKE_COLUMNS).in("status", ["open", "challenge", "escrow", "playing"]).order("created_at", { ascending: false }).limit(20),
       supabase.from("alkkagi_games").select(STAKE_COLUMNS).in("status", ["open", "challenge", "escrow", "playing"]).order("created_at", { ascending: false }).limit(20),
       supabase.from("catch_rooms").select("id,status,host_name,players,max_players,turn_no,turn_total,is_test").in("status", ["waiting", "playing"]).order("created_at", { ascending: false }).limit(20),
+      supabase.from("holdem_tables").select("id,status,host_name,is_friendly,max_seats,hand_no,view").in("status", ["waiting", "playing"]).order("created_at", { ascending: false }).limit(20),
     ]);
+    setHoldemTables((h.data ?? []) as typeof holdemTables);
     // 테스트 판은 만든 관리자에게만 보인다
     const mineOrReal = (row: StakeRow) => !row.is_test || row.host_member === currentMemberId;
     setOmok(((o.data ?? []) as StakeRow[]).filter(mineOrReal));
@@ -116,7 +119,6 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
   }, [load, active]);
 
   const back = () => setActive(null);
-  const [holdemOpen, setHoldemOpen] = useState(false); // 🃏 홀덤 (관리자 테스트판)
 
   // 관리자 테스트: 바로 만들어 그 판으로 들어간다
   const [testing, setTesting] = useState(false);
@@ -141,8 +143,16 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
     else setTestError(result.error ?? `테스트를 시작하지 못했습니다. (응답: ${JSON.stringify(result).slice(0, 120)})`);
   }
 
-  if (holdemOpen) {
-    return <HoldemGame onClose={onClose} onBack={() => setHoldemOpen(false)} myName={myName} />;
+  if (active?.kind === "holdem") {
+    return (
+      <HoldemOnline
+        onClose={onClose}
+        onBack={back}
+        initialTableId={active.id || undefined}
+        currentMemberId={currentMemberId}
+        myName={myName}
+      />
+    );
   }
 
   if (active?.kind === "omok") {
@@ -202,7 +212,7 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
     return "관전";
   };
 
-  const sections: Record<GameKind, Array<{ id: string; line: string; sub: string; action: string; hot: boolean }>> = {
+  const sections: Record<Exclude<GameKind, "holdem">, Array<{ id: string; line: string; sub: string; action: string; hot: boolean }>> = {
     omok: omok.map((row) => ({
       id: row.id,
       line: stakeLine(row),
@@ -252,18 +262,35 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
         {testError && <div className="omokMessage">{testError}</div>}
         {cleanNote && <div className="omokMessage info">{cleanNote}</div>}
         <div className="gameHubGrid">
-          {isAdmin && (
-            <article className="gameHubCard holdem">
-              <div className="gameHubHead">
-                <span className="gameHubIcon" aria-hidden="true">🃏</span>
-                <div>
-                  <strong>텍사스 홀덤</strong>
-                  <span>🧪 관리자 테스트 · 봇 3명과 연습</span>
-                </div>
-                <button className="smallButton" onClick={() => setHoldemOpen(true)}>시작</button>
+          <article className="gameHubCard holdem">
+            <div className="gameHubHead">
+              <span className="gameHubIcon" aria-hidden="true">🃏</span>
+              <div>
+                <strong>텍사스 홀덤</strong>
+                <span>바이인 1,000점 · 2~6명 · 자유 입퇴장</span>
               </div>
-            </article>
-          )}
+              <button className="smallButton" onClick={() => setActive({ kind: "holdem", id: "" })}>입장</button>
+            </div>
+            <div className="gameHubRooms">
+              {holdemTables.length === 0 && <span className="muted">열린 테이블이 없습니다. (입장 → 만들기 · 봇과 연습)</span>}
+              {holdemTables.map((table) => {
+                const players = (table.view?.players ?? []).filter((p) => !p.empty);
+                return (
+                  <button
+                    key={table.id}
+                    className={`gameHubRoom ${table.status === "waiting" ? "hot" : ""}`}
+                    onClick={() => setActive({ kind: "holdem", id: table.id })}
+                  >
+                    <span>
+                      <b>{table.host_name}님의 테이블 · {table.status === "playing" ? `진행 중 ${table.hand_no}판째` : "대기 중"}</b>
+                      <em>{table.is_friendly ? "🤝 친선" : "💎 1,000점"} · 👥 {players.length}/{table.max_seats}</em>
+                    </span>
+                    <i>{players.length < table.max_seats ? "참가 →" : "관전 →"}</i>
+                  </button>
+                );
+              })}
+            </div>
+          </article>
           {GAMES.map((game) => {
             const rows = sections[game.kind];
             return (

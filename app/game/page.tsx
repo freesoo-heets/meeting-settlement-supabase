@@ -4,13 +4,13 @@ import { getServerAdmin } from "../../lib/server-admin";
 // 게임 초대 링크 전용 주소 (/game?omok=… · /game?alkkagi=… · /game?catch=…)
 // 카톡 미리보기에 '모임 참석 · 비용 정산' 대신 게임 제목이 나오게 하고, 들어오면 메인 화면의 그 방으로 보낸다.
 
-type Kind = "omok" | "alkkagi" | "catch";
+type Kind = "omok" | "alkkagi" | "catch" | "holdem";
 type Search = Promise<Record<string, string | string[] | undefined>>;
 
-const LABEL: Record<Kind, string> = { omok: "🏁 오목", alkkagi: "🥏 알까기", catch: "🎨 캐치마인드" };
+const LABEL: Record<Kind, string> = { omok: "🏁 오목", alkkagi: "🥏 알까기", catch: "🎨 캐치마인드", holdem: "🃏 홀덤" };
 
 function pick(params: Record<string, string | string[] | undefined>): { kind: Kind; id: string } | null {
-  for (const kind of ["omok", "alkkagi", "catch"] as Kind[]) {
+  for (const kind of ["omok", "alkkagi", "catch", "holdem"] as Kind[]) {
     const value = params[kind];
     const id = Array.isArray(value) ? value[0] : value;
     if (id && /^[0-9a-f-]{36}$/i.test(id)) return { kind, id };
@@ -21,6 +21,15 @@ function pick(params: Record<string, string | string[] | undefined>): { kind: Ki
 async function describe(kind: Kind, id: string) {
   try {
     const admin = getServerAdmin();
+    if (kind === "holdem") {
+      const { data } = await admin.from("holdem_tables").select("host_name,is_friendly,max_seats,view").eq("id", id).maybeSingle();
+      if (!data) return null;
+      const players = ((data.view as { players?: Array<{ empty?: boolean }> })?.players ?? []).filter((p) => !p.empty).length;
+      return {
+        title: `${LABEL.holdem} · ${data.host_name}님의 테이블`,
+        description: `${data.is_friendly ? "🤝 친선" : "💎 바이인 1,000점"} · ${players}/${data.max_seats}명 · 눌러서 참가하세요`,
+      };
+    }
     if (kind === "catch") {
       const { data } = await admin.from("catch_rooms").select("host_name,players,max_players").eq("id", id).maybeSingle();
       if (!data) return null;
