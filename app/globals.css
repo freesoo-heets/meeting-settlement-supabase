@@ -6114,7 +6114,7 @@ button.meetingMetricCard {
   border: 10px solid #1e293b;
   box-shadow: 0 0 0 3px #6366f1, 0 0 28px rgba(99, 102, 241, .7), inset 0 0 40px rgba(0, 0, 0, .55);
 }
-.hdCenter { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
+.hdCenter { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; }
 .hdPot { display: flex; align-items: center; gap: 8px; background: rgba(2, 6, 23, .75); border: 1px solid #4f46e5; border-radius: 999px; padding: 4px 16px 4px 8px; }
 .hdPot b { font-size: 16px; color: #fde68a; font-variant-numeric: tabular-nums; }
 .hdChipStack { display: inline-flex; }
@@ -6215,3 +6215,28 @@ button.meetingMetricCard {
 .hdSuspense { font: 900 14px/1 Arial, sans-serif; letter-spacing: .2em; color: #fde68a; text-shadow: 0 0 10px #f59e0b; animation: hdPulse .8s ease-in-out infinite alternate; }
 @keyframes hdPulse { from { opacity: .45; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .hdCard.face.flipIn, .hdSuspense { animation: none; } }
+
+/* 홀덤: 칩 더미 (가운데는 카드 뒤로) */
+.hdPotArea { position: relative; display: flex; justify-content: center; }
+.hdPotArea .hdCommunity { position: relative; z-index: 1; }
+.hdChips { position: absolute; pointer-events: none; }
+.hdChips.pot { left: 50%; top: -30px; width: 0; height: 0; z-index: 0; }
+.hdChipCol { position: absolute; left: -11px; top: 0; width: 22px; height: 40px; }
+.hdChip {
+  position: absolute; left: 0; width: 22px; height: 9px; border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, .45);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, .55), inset 0 0 0 2px rgba(255, 255, 255, .85), inset 0 0 0 4px currentColor;
+  background: repeating-conic-gradient(from 0deg, currentColor 0 30deg, #fff 30deg 45deg);
+  animation: hdChipDrop .32s cubic-bezier(.3, 1.4, .6, 1) both;
+}
+.hdChip.red { color: #dc2626; }
+.hdChip.blue { color: #2563eb; }
+.hdChip.black { color: #111827; }
+.hdChip.purple { color: #7c3aed; }
+@keyframes hdChipDrop { from { transform: translateY(-26px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.hdBet { position: relative; display: flex; flex-direction: column; align-items: center; min-height: 34px; padding-top: 2px; background: none; }
+.hdBet .hdChips.bet { position: relative; width: 22px; height: 22px; }
+.hdBet .hdChips.bet .hdChipCol { left: 0; height: 22px; }
+.hdBet > span { font-size: 11px; font-weight: 800; color: #fde68a; background: rgba(2, 6, 23, .8); border-radius: 999px; padding: 0 7px; margin-top: 2px; }
+.hdBet.mine { min-height: 30px; }
+@media (prefers-reduced-motion: reduce) { .hdChip { animation: none; } }

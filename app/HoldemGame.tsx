@@ -34,6 +34,52 @@ function CardView({ card, hidden, size = "md", lit, slow }: { card?: Card; hidde
 }
 
 const fmt = (n: number) => n.toLocaleString("ko-KR");
+
+// ── 칩 그림 ──
+// 금액을 칩 종류별로 나눠 기둥(최대 8개)으로 쌓는다. 새로 생긴 칩만 위에서 떨어지듯 내려앉는다.
+const CHIP_KINDS = [
+  { v: 500, cls: "purple" },
+  { v: 100, cls: "black" },
+  { v: 50, cls: "blue" },
+  { v: 10, cls: "red" },
+];
+function chipColumns(amount: number, maxPerColumn = 8) {
+  const cols: Array<{ cls: string; n: number }> = [];
+  let left = amount;
+  for (const kind of CHIP_KINDS) {
+    let n = Math.floor(left / kind.v);
+    left -= n * kind.v;
+    while (n > 0) {
+      const take = Math.min(maxPerColumn, n);
+      cols.push({ cls: kind.cls, n: take });
+      n -= take;
+    }
+  }
+  if (left > 0 && cols.length === 0) cols.push({ cls: "red", n: 1 });
+  return cols.slice(0, 9); // 너무 많으면 9기둥까지만 (팟이 아주 커도 화면이 넘치지 않게)
+}
+// 기둥 자리: 가운데에서 좌우 · 위아래로 조금씩 흩어 놓는다 (판마다 같은 자리)
+const SPOTS = [
+  [0, 0], [-26, 6], [26, 4], [-50, -2], [50, 8], [-14, -18], [16, -16], [-38, -20], [40, -14],
+];
+function ChipPile({ amount, className }: { amount: number; className: string }) {
+  const cols = chipColumns(amount);
+  return (
+    <div className={`hdChips ${className}`} aria-hidden="true">
+      {cols.map((col, c) => (
+        <span
+          key={`${c}-${col.cls}`}
+          className="hdChipCol"
+          style={{ transform: `translate(${SPOTS[c % SPOTS.length][0]}px, ${SPOTS[c % SPOTS.length][1]}px)` }}
+        >
+          {Array.from({ length: col.n }, (_, k) => (
+            <i key={k} className={`hdChip ${col.cls}`} style={{ bottom: k * 3.5, animationDelay: `${(k % 4) * 40}ms` }} />
+          ))}
+        </span>
+      ))}
+    </div>
+  );
+}
 const SEAT_POS = ["me", "left", "top", "right"] as const; // 0=나(아래), 1=왼쪽, 2=위, 3=오른쪽
 
 export default function HoldemGame({ onClose, onBack, myName }: { onClose: () => void; onBack?: () => void; myName: string }) {
@@ -144,10 +190,11 @@ export default function HoldemGame({ onClose, onBack, myName }: { onClose: () =>
             {/* 가운데: 팟 · 공용 카드 */}
             <div className="hdCenter">
               <div className="hdPot">
-                <span className="hdChipStack" aria-hidden="true"><i /><i /><i /></span>
                 <b>{fmt(pot)}</b>
               </div>
-              <div className="hdCommunity">
+              <div className="hdPotArea">
+                {!resultShown && <ChipPile amount={pot - table.players.reduce((sum, q) => sum + q.bet, 0)} className="pot" />}
+                <div className="hdCommunity">
                 {Array.from({ length: 5 }, (_, i) => (
                   <CardView
                     key={`${table.handNo}-${i}-${i < boardShown}`}
@@ -156,6 +203,7 @@ export default function HoldemGame({ onClose, onBack, myName }: { onClose: () =>
                     lit={i < boardShown && resultShown && inBest(table.board[i])}
                   />
                 ))}
+                </div>
               </div>
               {handOver && !revealDone && contested && boardReady && <div className="hdSuspense">쇼다운…</div>}
               {resultShown && table.winners.length > 0 && (
@@ -182,7 +230,12 @@ export default function HoldemGame({ onClose, onBack, myName }: { onClose: () =>
                       <CardView key={`${k}-${isRevealed(p.id)}`} card={c} hidden={!isRevealed(p.id)} size={isRevealed(p.id) ? "md" : "sm"} />
                     ))}
                   </div>
-                  {p.bet > 0 && <div className="hdBet">{fmt(p.bet)}</div>}
+                  {p.bet > 0 && (
+                    <div className="hdBet">
+                      <ChipPile amount={p.bet} className="bet" />
+                      <span>{fmt(p.bet)}</span>
+                    </div>
+                  )}
                   {table.dealer === p.id && <span className="hdMarker d">D</span>}
                   {!handOver && sbSeat === p.id && <span className="hdMarker sb">SB</span>}
                   {!handOver && bbSeat === p.id && <span className="hdMarker bb">BB</span>}
@@ -199,7 +252,12 @@ export default function HoldemGame({ onClose, onBack, myName }: { onClose: () =>
             <div className="hdMyInfo">
               {best && <span className="hdHandName">♠ {HAND_NAME[best.score[0]]}</span>}
               <b>{fmt(chipsShown(0))}</b>
-              {me.bet > 0 && <em>베팅 {fmt(me.bet)}</em>}
+              {me.bet > 0 && (
+                <div className="hdBet mine">
+                  <ChipPile amount={me.bet} className="bet" />
+                  <span>{fmt(me.bet)}</span>
+                </div>
+              )}
               {table.dealer === 0 && <span className="hdMarker d inline">D</span>}
             </div>
           </div>
