@@ -18,7 +18,8 @@ import { IDLE_MINUTES, SEAT_ACTIVE, apply, step, type Ctx, type SeatRow, type Ta
  * 점수·티켓은 사이트가 직접 건드리지 않는다.
  *  · 자리 신청 → holdem_seats(escrow·requested) → 봇이 1000점 · 티켓 1장 차감 후 seated 로 바꾼다
  *  · 여기서 seated 자리를 테이블에 앉히고 판을 진행한다 (덱 · 손패는 holdem_secrets, 화면용은 holdem_tables.view)
- *  · 일어나면 left + cash_out(남은 칩) → 봇이 점수로 돌려준다 (딴 금액의 5% 수수료)
+ *  · 일어나면 left + cash_out(남은 칩) → 봇이 점수로 돌려준다 (딴 금액의 10% 수수료)
+ *  · 🎫 티켓 1장 = 1시간 이용권 (holdem_passes). 이용권이 있으면 다시 앉아도 티켓이 들지 않는다
  * 시간 초과 · 다음 판 시작은 누구든(화면 · 봇) tick 을 부르면 처리된다.
  */
 
@@ -60,10 +61,12 @@ async function load(admin: Admin, tableId: string) {
   const [table, secret, first] = await Promise.all([
     admin.from("holdem_tables").select("id,status,host_member,host_name,is_friendly,max_seats,version,turn_deadline,next_hand_at,updated_at").eq("id", tableId).maybeSingle(),
     admin.from("holdem_secrets").select("state,version").eq("table_id", tableId).maybeSingle(),
-    seatQuery(`${SEAT_BASE},rebuy_state,rebuy_count,last_rebuy`),
+    seatQuery(`${SEAT_BASE},rebuy_state,rebuy_count,last_rebuy,pass_until,renew_state`),
   ]);
-  // 충전 칸이 아직 DB에 없으면(SQL 실행 전) 그 칸 없이
-  const seats = first.error?.code === "42703" ? await seatQuery(SEAT_BASE) : first;
+  // 새 칸이 아직 DB에 없으면(SQL 실행 전) 있는 칸만
+  let seats = first;
+  if (seats.error?.code === "42703") seats = await seatQuery(`${SEAT_BASE},rebuy_state,rebuy_count,last_rebuy`);
+  if (seats.error?.code === "42703") seats = await seatQuery(SEAT_BASE);
   if (!table.data || !secret.data || seats.error) return null;
   return {
     row: table.data as TableRow,
@@ -132,6 +135,12 @@ async function mutate(
   return { ok: false, error: "동시에 처리하는 중이었어요. 다시 눌러 주세요." };
 }
 
+// 🎫 아직 끝나지 않은 이용권이 있는지 (표가 아직 없으면 없는 것으로)
+async function hasPass(admin: Admin, memberId: string) {
+  const { data } = await admin.from("holdem_passes").select("expires_at").eq("member_id", memberId).maybeSingle();
+  return !!data && new Date(data.expires_at as string).getTime() > Date.now() + 5000;
+}
+
 // 자리 신청 (봇이 점수 · 티켓을 차감하면 앉는다)
 async function requestSeat(admin: Admin, memberId: string, table: { id: string; is_friendly: boolean }) {
   const { data: active } = await admin
@@ -154,7 +163,7 @@ async function requestSeat(admin: Admin, memberId: string, table: { id: string; 
     const player = await loadPlayer(admin, memberId);
     if ("error" in player) return player.error;
     if (player.exp < BUY_IN) return `점수가 부족합니다. 바이인 ${fmt(BUY_IN)}점이 필요해요. (지금 ${fmt(player.exp)}점)`;
-    if (player.tickets < 1) return "티켓이 부족합니다. 카톡에서 !티켓구매 로 살 수 있습니다.";
+    if (player.tickets < 1 && !(await hasPass(admin, memberId))) return "티켓이 부족합니다. 카톡에서 !티켓구매 로 살 수 있습니다.";
     uid = player.uid;
     name = player.name;
   }

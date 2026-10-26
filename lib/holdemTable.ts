@@ -8,6 +8,8 @@ export const GRACE_MS = 1500;     // 통신 지연 여유
 export const MAX_STRIKES = 2;     // 연속 시간 초과 → 이번 판 뒤 자동으로 일어남
 export const IDLE_MINUTES = 15;   // 혼자 남은 대기 테이블은 이 시간이 지나면 정리 (칩 반환)
 export const SEAT_ACTIVE = ["escrow", "seated"];
+export const PASS_RENEW_BEFORE_MS = 60 * 1000;  // 이용권이 1분 남으면 봇에게 연장(티켓 1장) 요청
+export const PASS_RENEW_WAIT_MS = 30 * 1000;    // 끝난 뒤 이만큼 기다려도 연장이 안 되면 그 판 뒤 일어남
 
 export type TableStatus = "waiting" | "playing" | "closed";
 export type SeatRow = {
@@ -21,6 +23,8 @@ export type SeatRow = {
   rebuy_state?: string;   // 충전: none | requested | locking | locked | failed
   rebuy_count?: number;   // 봇이 처리한 충전 횟수
   last_rebuy?: number;    // 마지막 충전 칩
+  pass_until?: string | null; // 🎫 이용권 끝 시각 (없으면 옛 자리: 시간 제한 없음)
+  renew_state?: string;       // 연장: none | requested | locking | failed
 };
 
 // 봇이 아직 충전을 처리 중인 자리 (그동안은 정산하지 않는다 — 차감한 점수가 사라지지 않게)
@@ -114,6 +118,22 @@ export function step(ctx: Ctx, seats: SeatRow[], now: number) {
     if (!p.empty && p.pendingChips && (ctx.t.stage === "showdown" || p.out || p.folded)) {
       p.chips += p.pendingChips;
       p.pendingChips = 0;
+    }
+  }
+
+  // 1-3) 🎫 이용권(티켓 1장 = 1시간): 1분 남으면 연장 요청, 끝났는데 연장이 안 되면 이번 판 뒤 일어남
+  for (const seat of seats) {
+    const p = ctx.t.players.find((q) => q.seatId === seat.id && !q.empty);
+    if (!p || seat.status !== "seated" || !seat.pass_until) continue;
+    const until = new Date(seat.pass_until).getTime();
+    const renew = seat.renew_state ?? "none";
+    if (renew === "none" && now >= until - PASS_RENEW_BEFORE_MS && !p.leaving && !p.standAfter) {
+      ctx.seatUpdates.set(seat.id, { renew_state: "requested" });
+    }
+    const expired = now >= until && (renew === "failed" || now >= until + PASS_RENEW_WAIT_MS);
+    if (expired && !p.standAfter && !p.leaving) {
+      p.standAfter = true;
+      ctx.t.log.push(`🎫 ${p.name} 이용 시간 끝 → 이번 판이 끝나면 일어납니다`);
     }
   }
 

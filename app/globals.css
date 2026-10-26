@@ -6472,3 +6472,8 @@ button.meetingMetricCard {
   .hdSeat.left.high { --dx: 110px; --dy: 130px; } .hdSeat.right.high { --dx: -110px; --dy: 130px; }
   .hdSeat.left.low { --dx: 110px; --dy: -40px; } .hdSeat.right.low { --dx: -110px; --dy: -40px; }
 }
+
+/* 홀덤: 🎫 이용 시간 */
+.hdPass { flex: none; font: 700 12px/1 system-ui, sans-serif; font-variant-numeric: tabular-nums; color: var(--hd-dim); padding: 5px 8px; border-radius: 8px; background: rgba(255, 255, 255, .05); border: 1px solid var(--hd-line); }
+.hdPass.low { color: #fca5a5; border-color: rgba(248, 113, 113, .45); }
+.hdPassText { font-variant-numeric: tabular-nums; }

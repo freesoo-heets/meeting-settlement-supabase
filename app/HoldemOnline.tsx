@@ -1,7 +1,8 @@
 "use client";
 
 // 🃏 텍사스 홀덤 (점수 내기 · 자유 입퇴장 · 2~6명)
-// 앉을 때 봇이 💎 1,000점 · 🎫 1장을 차감하고, 일어나면 남은 칩을 점수로 돌려준다 (딴 금액의 5% 수수료)
+// 앉을 때 봇이 💎 1,000점을 차감하고, 일어나면 남은 칩을 점수로 돌려준다 (딴 금액의 10% 수수료)
+// 🎫 티켓 1장 = 1시간 이용권 (그 안에는 다시 앉아도 티켓이 들지 않는다)
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { BUY_IN, type Action, type Card, type Table } from "../lib/holdem";
@@ -43,18 +44,45 @@ type SeatRow = {
   rebuy_note?: string | null;
   rebuy_want?: number | null;
   rebuy_total?: number;
+  renew_state?: string;
 };
 
 const TABLE_COLUMNS = "id,status,host_member,host_name,is_friendly,max_seats,view,hand_no,turn_deadline,next_hand_at,created_at";
 const SEAT_BASE = "id,table_id,member_id,name,status,buy_in,is_friendly,escrow_state,escrow_note,cash_out,hands,settle_state,payout,fee,created_at,left_at";
-const SEAT_COLUMNS = `${SEAT_BASE},rebuy_state,rebuy_note,rebuy_want,rebuy_total`;
+const SEAT_COLUMNS = `${SEAT_BASE},rebuy_state,rebuy_note,rebuy_want,rebuy_total,renew_state`;
+const SEAT_REBUY = `${SEAT_BASE},rebuy_state,rebuy_note,rebuy_want,rebuy_total`;
 // 자리 기록 읽기 (충전 칸이 아직 DB에 없으면 그 칸 없이)
 async function readSeats(build: (columns: string) => PromiseLike<{ data: unknown; error: { code?: string } | null }>) {
-  const first = await build(SEAT_COLUMNS);
-  const result = first.error?.code === "42703" ? await build(SEAT_BASE) : first;
+  let result = await build(SEAT_COLUMNS);
+  if (result.error?.code === "42703") result = await build(SEAT_REBUY);
+  if (result.error?.code === "42703") result = await build(SEAT_BASE);
   return ((result.data ?? []) as SeatRow[]);
 }
-const WIN_FEE = 0.05; // 봇(holdem_bridge.py HOLDEM_FEE)과 같아야 한다
+const WIN_FEE = 0.1; // 봇(holdem_bridge.py HOLDEM_FEE)과 같아야 한다
+
+// 🎫 내 이용권 끝 시각 (15초마다 확인) + 1초마다 남은 시간
+function usePass(memberId: string) {
+  const [until, setUntil] = useState<number | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const read = async () => {
+      const { data } = await supabase.from("holdem_passes").select("expires_at").eq("member_id", memberId).maybeSingle();
+      setUntil(data?.expires_at ? new Date(data.expires_at as string).getTime() : null);
+    };
+    void read();
+    const timer = window.setInterval(() => void read(), 15000);
+    return () => window.clearInterval(timer);
+  }, [memberId]);
+  const live = until !== null && until > now;
+  useEffect(() => {
+    if (!live) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [live]);
+  if (!live || until === null) return { left: 0, text: "" };
+  const left = Math.floor((until - now) / 1000);
+  return { left, text: `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}` };
+}
 const fmt = (n: number) => n.toLocaleString("ko-KR");
 
 async function callHoldem(payload: Record<string, unknown>) {
@@ -145,6 +173,7 @@ function HoldemLobby({
   const [message, setMessage] = useState("");
   const [info, setInfo] = useState("");
   const [showAll, setShowAll] = useState(false);
+  const pass = usePass(currentMemberId);
 
   const load = useCallback(async () => {
     sweepHoldem();
@@ -232,6 +261,7 @@ function HoldemLobby({
           <div className="omokMine">
             <span>내 점수 <strong>💎 {myPoints !== null ? fmt(myPoints) : "-"}</strong></span>
             <span>티켓 <strong>🎫 {myTickets ?? "-"}</strong></span>
+            {pass.text && <span>이용 중 <strong className="hdPassText">⏱ {pass.text}</strong></span>}
           </div>
 
           {myActive && (
@@ -254,11 +284,12 @@ function HoldemLobby({
             <div className="omokCreate">
               <strong>새 테이블</strong>
               <button className="primaryButton" disabled={busy} onClick={() => void run({ action: "create", friendly: false }, (id) => id && onOpen(id))}>
-                테이블 만들기 · 💎 {fmt(BUY_IN)}점 · 🎫 1장
+                테이블 만들기 · 💎 {fmt(BUY_IN)}점{pass.text ? "" : " · 🎫 1장"}
               </button>
               <small>
                 앉을 때 {fmt(BUY_IN)}점 · 티켓 1장을 내고 칩 {fmt(BUY_IN)}개로 시작해요. 아무 때나 일어나면 남은 칩을 점수로
-                돌려받습니다 (딴 금액의 5% 수수료). 한 판도 안 하고 일어나면 점수 · 티켓 모두 환불돼요.
+                돌려받습니다 (딴 금액의 10% 수수료). 🎫 티켓 1장으로 1시간 동안 플레이할 수 있어요 (시간이 끝나면 티켓 1장으로
+                자동 연장, 티켓이 없으면 그 판이 끝난 뒤 일어남). 한 판도 안 하고 일어나면 점수 · 티켓 모두 환불돼요.
               </small>
             </div>
           )}
@@ -329,6 +360,7 @@ function HoldemRoom({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [info, setInfo] = useState("");
+  const pass = usePass(currentMemberId);
 
   const load = useCallback(async () => {
     const [t, s] = await Promise.all([
@@ -439,7 +471,7 @@ function HoldemRoom({
     if (!mySeat && !me) {
       return (
         <button className="next" disabled={busy || full} onClick={() => void run({ action: "sit" }, () => setInfo("🪑 자리를 신청했어요. 봇이 점수를 확인하면 앉습니다."))}>
-          {full ? "자리가 다 찼어요 (관전 중)" : `앉기 · 💎 ${fmt(BUY_IN)}점 · 🎫 1장`}
+          {full ? "자리가 다 찼어요 (관전 중)" : `앉기 · 💎 ${fmt(BUY_IN)}점${pass.text ? "" : " · 🎫 1장"}`}
         </button>
       );
     }
@@ -510,6 +542,7 @@ function HoldemRoom({
       {me?.standAfter && <div className="omokMessage info">⏳ 나가기 예약 · 이번 판이 끝나면 일어나고 남은 칩을 점수로 돌려받아요.</div>}
       {me && (me.pendingChips ?? 0) > 0 && <div className="omokMessage info">💎 충전한 칩 {fmt(me.pendingChips ?? 0)}개는 이번 판이 끝나면 들어와요.</div>}
       {mySeat?.rebuy_state === "failed" && mySeat.rebuy_note && <div className="omokMessage">충전 실패: {mySeat.rebuy_note}</div>}
+      {mySeat?.renew_state === "failed" && <div className="omokMessage">🎫 티켓이 없어 이용 시간을 연장하지 못했어요. 이번 판이 끝나면 일어납니다.</div>}
       {lastFailed && !mySeat && !me && <div className="omokMessage">자리 신청 실패: {lastFailed.escrow_note}</div>}
       {lastLeft && lastLeftResult && !me && (
         <div className="omokMessage info">
@@ -531,6 +564,13 @@ function HoldemRoom({
       deadline={row.turn_deadline ? new Date(row.turn_deadline).getTime() : null}
       title={`${row.is_friendly ? "🤝 " : ""}${row.host_name}님의 홀덤`}
       subtitle={`${money} · 블라인드 ${view.sb}/${view.bb}${handNo ? ` · ${handNo}번째 판` : ""} · ${seatedCount}/${row.max_seats}명${meIndex < 0 ? " · 관전 중" : ""}`}
+      headerExtra={
+        pass.text ? (
+          <span className={`hdPass ${pass.left < 300 ? "low" : ""}`} title="티켓 이용 시간 (끝나면 티켓 1장으로 자동 연장)">
+            {mySeat?.renew_state === "requested" || mySeat?.renew_state === "locking" ? "🎫 연장 중" : `🎫${pass.text}`}
+          </span>
+        ) : null
+      }
       idleBar={idleBar}
       notice={notice}
       onClose={onClose}
