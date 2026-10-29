@@ -6617,3 +6617,4 @@ button.meetingMetricCard {
 .wdHelp { top: calc(11px + env(safe-area-inset-top, 0px)); }
 .wdModal .wdHelp { z-index: 5; }   /* 제목 줄(흰 배경) 위에 */
 .wdAsk p { white-space: pre-line; font-weight: 500; color: #444; line-height: 1.6; }
+.wdKeys.view .wdKey { cursor: default; box-shadow: none; }

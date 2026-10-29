@@ -541,7 +541,7 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
                 {message || (preview.length ? `👉 ${preview.join(" · ")}` : autoNote ? `🎫 티켓 자동 구매 (-${TICKET_PRICE}점)` : "")}
               </div>
             </div>
-            <div className={`wdChat ${spectating ? "big" : ""}`}>
+            <div className="wdChat">
               <div className="wdChatLog" ref={chatLogRef}>
                 {chat.length === 0 && (
                   <span className="muted">{spectating ? "같이 보면서 힌트를 나눠 보세요 💬" : "관전하는 사람들과 채팅할 수 있어요 💬"}</span>
@@ -581,17 +581,17 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
                 <button type="submit" aria-label="보내기" onPointerDown={(event) => event.preventDefault()}>↑</button>
               </form>
             </div>
-            {!spectating && (
-            <div className="wdKeys">
+            {/* 관전자도 자판을 본다 (남은 자모 확인용 · 누를 수는 없음) */}
+            <div className={`wdKeys ${spectating ? "view" : ""}`}>
               {KEY_ROWS.map((row, i) => (
                 <div className="wdKeyRow" key={i}>
                   {row.map((k) => (
-                    <button key={k} className={`wdKey ${keyMarks[k] ?? ""}`} onClick={() => press(k)} disabled={game.status !== "playing"}>
+                    <button key={k} className={`wdKey ${keyMarks[k] ?? ""}`} onClick={() => press(k)} disabled={spectating || game.status !== "playing"}>
                       {k}
                     </button>
                   ))}
                   {i === 0 && (
-                    <button className="wdKey back" aria-label="지우기" onClick={() => press("back")} disabled={game.status !== "playing"}>
+                    <button className="wdKey back" aria-label="지우기" onClick={() => press("back")} disabled={spectating || game.status !== "playing"}>
                       ←
                     </button>
                   )}
@@ -599,7 +599,7 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
               ))}
               {finished ? (
                 <button className="wdBig" onClick={() => setShowResult(true)}>결과보기</button>
-              ) : (
+              ) : spectating ? null : (
                 <button
                   className="wdBig"
                   disabled={busy || game.status !== "playing" || typed.length !== WORD_LEN}
@@ -609,12 +609,6 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
                 </button>
               )}
             </div>
-            )}
-            {spectating && finished && (
-              <div className="wdKeys">
-                <button className="wdBig" onClick={() => setShowResult(true)}>결과보기</button>
-              </div>
-            )}
           </>
         )}
 
