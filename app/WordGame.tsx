@@ -88,6 +88,16 @@ export default function WordGame({ onClose, onBack, currentMemberId, myPoints, m
       const { data } = await supabase.from("word_games").select(WORD_GAME_COLUMNS).eq("id", game.id).maybeSingle();
       if (!data) return;
       const row = data as unknown as WordGameRow;
+      if (row.status === "escrow") {
+        const waited = Date.now() - new Date(row.created_at).getTime();
+        if (waited > 20000) {
+          setMessage(
+            waited > 60000
+              ? "⚠️ 카톡 봇이 응답하지 않아요. ⋯ 메뉴에서 '시작 취소'를 할 수 있어요. (티켓은 차감되지 않았어요)"
+              : "⏳ 카톡 봇이 아직 응답하지 않아요. 조금만 기다려 주세요…",
+          );
+        }
+      }
       if (row.status === "rejected") {
         setMessage(`🚫 시작하지 못했어요. ${row.reject_reason ?? ""}`);
         setGame(null);
@@ -95,6 +105,7 @@ export default function WordGame({ onClose, onBack, currentMemberId, myPoints, m
         return;
       }
       if (row.status !== game.status || row.settle_state !== game.settle_state) {
+        if (game.status === "escrow") setMessage("");
         setGame(row);
         void load();
       }
