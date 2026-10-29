@@ -6615,3 +6615,4 @@ button.meetingMetricCard {
   .wdModal:not(.chatting) .wdBoard { width: min(100%, 270px, max(170px, calc(var(--vvh, 100dvh) - 500px))); }
 }
 .wdHelp { top: calc(11px + env(safe-area-inset-top, 0px)); }
+.wdModal .wdHelp { z-index: 5; }   /* 제목 줄(흰 배경) 위에 */
