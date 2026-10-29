@@ -6621,3 +6621,9 @@ button.meetingMetricCard {
 .wdModal .wdHelp { z-index: 5; }   /* 제목 줄(흰 배경) 위에 */
 .wdAsk p { white-space: pre-line; font-weight: 500; color: #444; line-height: 1.6; }
 .wdKeys.view .wdKey { cursor: default; box-shadow: none; }
+.wdTabs { display: flex; gap: 4px; }
+.wdTabs button { border: 0; background: none; padding: 4px 8px; border-radius: 8px; font-size: 14px; font-weight: 700; color: #9ca3af; cursor: pointer; }
+.wdTabs button.on { color: #222; background: #f3f4f6; }
+.wdRecord { align-items: center; }
+.wdRecentRow.withName { grid-template-columns: 72px 64px 1fr auto; }
+.wdRecentRow i { font-style: normal; font-weight: 700; color: #374151; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

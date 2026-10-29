@@ -72,6 +72,9 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
   const [showResult, setShowResult] = useState(false);
   const [menu, setMenu] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [recordTab, setRecordTab] = useState<"mine" | "all">("mine");
+  const [allGames, setAllGames] = useState<WordGameRow[]>([]);
+  const [allLoaded, setAllLoaded] = useState(false);
   const [autoNote, setAutoNote] = useState(false); // 🎫 자동 구매 안내: 시작할 때 잠깐만
   const retry = useRef<{ key: string; count: number; timer: ReturnType<typeof setTimeout> | null }>({ key: "", count: 0, timer: null });
   const [chat, setChat] = useState<ChatLine[]>([]);
@@ -112,6 +115,21 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
       if (live) setGame(live);
     });
   }, [load, initialGameId]);
+
+  // 👥 모두의 기록 (끝난 판 최근 30개)
+  useEffect(() => {
+    if (recordTab !== "all" || game) return;
+    void supabase
+      .from("word_games")
+      .select(WORD_GAME_COLUMNS)
+      .in("status", ["won", "lost"])
+      .order("finished_at", { ascending: false })
+      .limit(30)
+      .then(({ data }) => {
+        setAllGames((data ?? []) as unknown as WordGameRow[]);
+        setAllLoaded(true);
+      });
+  }, [recordTab, game]);
 
   const addChat = useCallback((line: Omit<ChatLine, "key">) => {
     chatKey.current += 1;
@@ -195,6 +213,7 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
     if (!spectating || !game) return;
     const timer = setInterval(async () => {
       if (game.status === "escrow" || game.status === "playing") return void refetch(game.id);
+      if (!game.finished_at || Date.now() - new Date(game.finished_at).getTime() > 10 * 60 * 1000) return;
       const { data } = await supabase
         .from("word_games")
         .select(WORD_GAME_COLUMNS)
@@ -433,7 +452,7 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
     >
       <section className={`meetingModal gameModal wdModal ${chatting && game ? "chatting" : ""}`} role="dialog" aria-modal="true">
         <header className="wdHeader">
-          <button className="wdIcon" aria-label="뒤로" onClick={spectating ? onBack : game && !finished ? () => setMenu((m) => !m) : game ? () => setGame(null) : onBack}>
+          <button className="wdIcon" aria-label="뒤로" onClick={spectating && !finished ? onBack : game && !finished ? () => setMenu((m) => !m) : game ? () => setGame(null) : onBack}>
             ‹
           </button>
           <h2>단어게임</h2>
@@ -478,16 +497,23 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
             </div>
             {message && <div className="omokMessage">{message}</div>}
             <div className="wdRecord">
-              <b>📋 내 기록</b>
-              <span>
-                {record.length}판 · 정답 {wins}번{record.length ? ` (${Math.round((wins / record.length) * 100)}%)` : ""}
-              </span>
+              <div className="wdTabs" role="tablist">
+                <button role="tab" aria-selected={recordTab === "mine"} className={recordTab === "mine" ? "on" : ""} onClick={() => setRecordTab("mine")}>📋 내 기록</button>
+                <button role="tab" aria-selected={recordTab === "all"} className={recordTab === "all" ? "on" : ""} onClick={() => setRecordTab("all")}>👥 모두의 기록</button>
+              </div>
+              {recordTab === "mine" && (
+                <span>
+                  {record.length}판 · 정답 {wins}번{record.length ? ` (${Math.round((wins / record.length) * 100)}%)` : ""}
+                </span>
+              )}
             </div>
             <div className="wdRecent">
-              {loaded && record.length === 0 && <span className="muted">아직 기록이 없어요.</span>}
-              {record.slice(0, 15).map((g) => (
-                <button key={g.id} className="wdRecentRow" onClick={() => { setGame(g); setShowResult(false); }}>
+              {recordTab === "mine" && loaded && record.length === 0 && <span className="muted">아직 기록이 없어요.</span>}
+              {recordTab === "all" && allLoaded && allGames.length === 0 && <span className="muted">아직 기록이 없어요.</span>}
+              {(recordTab === "mine" ? record.slice(0, 15) : allGames).map((g) => (
+                <button key={g.id} className={`wdRecentRow ${recordTab === "all" ? "withName" : ""}`} onClick={() => { setGame(g); setShowResult(false); }}>
                   <span>{shortDate(g.created_at)}</span>
+                  {recordTab === "all" && <i>{g.name}</i>}
                   <b>{g.answer ?? "-"}</b>
                   <em className={g.status}>{g.status === "won" ? `🎉 ${g.tries}번 만에 +${g.reward}점` : "💀 실패"}</em>
                 </button>
