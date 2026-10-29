@@ -8,8 +8,10 @@ import AlkkagiGame from "./AlkkagiGame";
 import CatchMindGame from "./CatchMindGame";
 import HoldemOnline, { sweepHoldem } from "./HoldemOnline";
 import RatingBoard from "./RatingBoard";
+import WordGame from "./WordGame";
 
-export type GameKind = "omok" | "alkkagi" | "catch" | "holdem";
+export type GameKind = "omok" | "alkkagi" | "catch" | "holdem" | "word";
+type RoomKind = Exclude<GameKind, "holdem" | "word">;
 
 type StakeRow = {
   id: string;
@@ -48,7 +50,7 @@ type Props = {
 
 const STAKE_COLUMNS = "id,status,stake,host_member,host_name,guest_member,guest_name,target_member,is_test,is_friendly";
 
-const GAMES: Array<{ kind: Exclude<GameKind, "holdem">; icon: string; name: string; desc: string }> = [
+const GAMES: Array<{ kind: RoomKind; icon: string; name: string; desc: string }> = [
   { kind: "omok", icon: "🏁", name: "오목", desc: "렌주룰 · 점수 내기 · 1:1" },
   { kind: "alkkagi", icon: "🥏", name: "알까기", desc: "장기알 · 점수 내기 · 1:1" },
   { kind: "catch", icon: "🎨", name: "캐치마인드", desc: "그림 맞히기 · 최대 6명 · 점수 없음" },
@@ -77,15 +79,18 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
   const [alkkagi, setAlkkagi] = useState<StakeRow[]>([]);
   const [catchRooms, setCatchRooms] = useState<CatchRow[]>([]);
   const [holdemTables, setHoldemTables] = useState<Array<{ id: string; status: string; host_name: string; is_friendly: boolean; max_seats: number; hand_no: number; view: { players?: Array<{ name: string; empty?: boolean }> } }>>([]);
+  const [wordRecent, setWordRecent] = useState<Array<{ id: string; name: string; status: string; tries: number; reward: number; answer: string | null }>>([]);
   const [showRating, setShowRating] = useState(false);
 
   const load = useCallback(async () => {
-    const [o, a, c, h] = await Promise.all([
+    const [o, a, c, h, w] = await Promise.all([
       supabase.from("omok_games").select(STAKE_COLUMNS).in("status", ["open", "challenge", "escrow", "playing"]).order("created_at", { ascending: false }).limit(20),
       supabase.from("alkkagi_games").select(STAKE_COLUMNS).in("status", ["open", "challenge", "escrow", "playing"]).order("created_at", { ascending: false }).limit(20),
       supabase.from("catch_rooms").select("id,status,host_name,players,max_players,turn_no,turn_total,is_test").in("status", ["waiting", "playing"]).order("created_at", { ascending: false }).limit(20),
       supabase.from("holdem_tables").select("id,status,host_name,is_friendly,max_seats,hand_no,view").in("status", ["waiting", "playing"]).order("created_at", { ascending: false }).limit(20),
+      supabase.from("word_games").select("id,name,status,tries,reward,answer").in("status", ["won", "lost"]).order("finished_at", { ascending: false }).limit(5),
     ]);
+    setWordRecent((w.data ?? []) as typeof wordRecent);
     setHoldemTables((h.data ?? []) as typeof holdemTables);
     if ((h.data ?? []).length > 0) sweepHoldem(); // 멈춘 홀덤 테이블 정리
     // 테스트 판은 만든 관리자에게만 보인다
@@ -149,6 +154,12 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
     );
   }
 
+  if (active?.kind === "word") {
+    return (
+      <WordGame onClose={onClose} onBack={back} currentMemberId={currentMemberId} myPoints={myPoints} myTickets={myTickets} />
+    );
+  }
+
   if (active?.kind === "omok") {
     return (
       <OmokGame
@@ -206,7 +217,7 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
     return "관전";
   };
 
-  const sections: Record<Exclude<GameKind, "holdem">, Array<{ id: string; line: string; sub: string; action: string; hot: boolean }>> = {
+  const sections: Record<RoomKind, Array<{ id: string; line: string; sub: string; action: string; hot: boolean }>> = {
     omok: omok.map((row) => ({
       id: row.id,
       line: stakeLine(row),
@@ -297,6 +308,28 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
               </article>
             );
           })}
+          <article className="gameHubCard word">
+            <div className="gameHubHead">
+              <span className="gameHubIcon" aria-hidden="true">📝</span>
+              <div>
+                <strong>오늘의 단어</strong>
+                <span>자모 5칸 · 5번 안에 · 티켓 1장 · 최대 300점</span>
+              </div>
+              <button className="smallButton" onClick={() => setActive({ kind: "word", id: "" })}>시작하기</button>
+            </div>
+            <div className="gameHubRooms">
+              {wordRecent.length === 0 && <span className="muted">최근 기록이 없습니다.</span>}
+              {wordRecent.map((row) => (
+                <button key={row.id} className="gameHubRoom" onClick={() => setActive({ kind: "word", id: "" })}>
+                  <span>
+                    <b>{row.name}님 · {row.status === "won" ? `🎉 ${row.tries}번 만에 정답` : "💀 실패"}</b>
+                    <em>정답 [{row.answer ?? "?"}]{row.status === "won" ? ` · 💎 +${row.reward}점` : ""}</em>
+                  </span>
+                  <i>도전 →</i>
+                </button>
+              ))}
+            </div>
+          </article>
           <article className="gameHubCard holdem">
             <div className="gameHubHead">
               <span className="gameHubIcon" aria-hidden="true">🃏</span>

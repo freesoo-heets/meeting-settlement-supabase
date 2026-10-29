@@ -6477,3 +6477,87 @@ button.meetingMetricCard {
 .hdPass { flex: none; font: 700 12px/1 system-ui, sans-serif; font-variant-numeric: tabular-nums; color: var(--hd-dim); padding: 5px 8px; border-radius: 8px; background: rgba(255, 255, 255, .05); border: 1px solid var(--hd-line); }
 .hdPass.low { color: #fca5a5; border-color: rgba(248, 113, 113, .45); }
 .hdPassText { font-variant-numeric: tabular-nums; }
+
+/* ===== 오늘의 단어 (카톡 단어게임 화면과 비슷하게) ===== */
+.wdModal {
+  --wd-g: #86df98; --wd-y: #ffe27a; --wd-x: #c9c9c9; --wd-line: #dcdcdc; --wd-kbd: #f2f2f2; --wd-btn: #ffe500;
+  position: relative; width: min(420px, 100%); max-height: min(92vh, 860px); padding: 0; overflow: hidden;
+  display: flex; flex-direction: column; background: #fff; color: #222; user-select: none; -webkit-user-select: none;
+}
+.wdHeader { position: relative; display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; height: 52px; padding: 0 6px; flex: none; }
+.wdHeader h2 { margin: 0; text-align: center; font-size: 17px; font-weight: 800; letter-spacing: -.2px; }
+.wdIcon { border: 0; background: none; font-size: 26px; line-height: 1; height: 44px; cursor: pointer; color: #222; }
+.wdMenu { position: absolute; right: 8px; top: 46px; z-index: 5; display: grid; min-width: 150px; background: #fff; border: 1px solid #e5e5e5; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.14); overflow: hidden; }
+.wdMenu button { border: 0; background: none; text-align: left; padding: 12px 14px; font-size: 14px; cursor: pointer; }
+.wdMenu button:hover { background: #f6f6f6; }
+
+.wdPlay { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 4px 16px 10px; min-height: 0; }
+.wdHint { font-size: 13px; color: #666; font-weight: 600; }
+.wdBoard { display: grid; gap: 8px; width: min(100%, 300px); }
+.wdRow { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.wdRow.shake { animation: wdShake .42s; }
+.wdTile {
+  aspect-ratio: 1; display: grid; place-items: center; border-radius: 12px; border: 1.5px solid var(--wd-line); background: #fff;
+  font-size: clamp(18px, 6vw, 22px); font-weight: 700; color: #333;
+}
+.wdTile.typed { border-color: #b5b5b5; animation: wdPop .12s; }
+.wdTile.g, .wdTile.y, .wdTile.x { border-color: transparent; }
+.wdTile.g { background: var(--wd-g); }
+.wdTile.y { background: var(--wd-y); }
+.wdTile.x { background: var(--wd-x); }
+.wdTile.flip { animation: wdFlip .5s both; }
+.wdNote { min-height: 18px; font-size: 13px; color: #555; text-align: center; padding: 0 8px; }
+
+.wdKeys { flex: none; background: var(--wd-kbd); padding: 10px 8px calc(14px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 7px; }
+.wdKeyRow { display: flex; justify-content: center; gap: 5px; }
+.wdKey {
+  flex: 0 1 38px; height: 46px; min-width: 0; border: 0; border-radius: 7px; background: #fff; color: #222;
+  font-size: 17px; font-weight: 600; box-shadow: 0 1px 0 rgba(0,0,0,.12); cursor: pointer; padding: 0;
+}
+.wdKey:active:not(:disabled) { transform: translateY(1px); filter: brightness(.95); }
+.wdKey.g { background: var(--wd-g); }
+.wdKey.y { background: var(--wd-y); }
+.wdKey.x { background: var(--wd-x); }
+.wdKey.back { font-size: 18px; }
+.wdKey:disabled { cursor: default; }
+.wdBig {
+  margin-top: 8px; width: 100%; height: 52px; border: 0; border-radius: 14px; background: var(--wd-btn); color: #222;
+  font-size: 16px; font-weight: 800; cursor: pointer;
+}
+.wdBig:disabled { opacity: .55; cursor: default; }
+
+.wdLobby { flex: 1; overflow: auto; display: flex; flex-direction: column; gap: 10px; padding: 0 16px; }
+.wdIntro { border: 1px solid #eee; border-radius: 14px; padding: 14px; background: #fafafa; display: grid; gap: 8px; font-size: 13.5px; }
+.wdIntro p { margin: 0; color: #555; line-height: 1.7; }
+.wdIntro ul { margin: 0; padding-left: 18px; color: #444; line-height: 1.7; }
+.wdChip { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; font-size: 12px; font-weight: 700; vertical-align: -5px; }
+.wdChip.g { background: #86df98; } .wdChip.y { background: #ffe27a; } .wdChip.x { background: #c9c9c9; }
+.wdMine { font-size: 13px; font-weight: 700; color: #333; }
+.wdRecord { display: flex; justify-content: space-between; font-size: 14px; padding: 2px 2px 0; }
+.wdRecord span { color: #666; }
+.wdRecent { display: grid; gap: 6px; }
+.wdRecentRow { display: grid; grid-template-columns: 82px 1fr auto; align-items: center; gap: 8px; border: 1px solid #eee; background: #fff; border-radius: 10px; padding: 9px 12px; font-size: 13.5px; text-align: left; cursor: pointer; }
+.wdRecentRow span { color: #888; font-variant-numeric: tabular-nums; }
+.wdRecentRow em { font-style: normal; font-weight: 700; }
+.wdRecentRow em.won { color: #15803d; } .wdRecentRow em.lost { color: #888; }
+.wdBottom { position: sticky; bottom: 0; background: #fff; padding: 4px 0 calc(14px + env(safe-area-inset-bottom, 0px)); margin-top: auto; }
+
+.wdResultBack { position: absolute; inset: 0; z-index: 6; background: rgba(0,0,0,.35); display: grid; place-items: center; padding: 20px; }
+.wdResult { width: min(320px, 100%); background: #fff; border-radius: 18px; padding: 22px 18px 16px; display: grid; justify-items: center; gap: 8px; text-align: center; animation: wdPop .2s; }
+.wdResult p { margin: 0; font-weight: 700; }
+.wdResultIcon { font-size: 40px; line-height: 1; }
+.wdAnswer { font-size: 28px; font-weight: 900; letter-spacing: 2px; }
+.wdMini { display: grid; gap: 3px; margin: 4px 0; }
+.wdMini div { display: flex; gap: 3px; }
+.wdMini i { width: 16px; height: 16px; border-radius: 4px; background: #c9c9c9; }
+.wdMini i.g { background: #86df98; } .wdMini i.y { background: #ffe27a; }
+.wdResultButtons { display: grid; gap: 6px; width: 100%; }
+.gameHubCard.word { border-left: 4px solid #22c55e; }
+
+@keyframes wdFlip { 0% { transform: rotateX(90deg); } 100% { transform: rotateX(0); } }
+@keyframes wdPop { 0% { transform: scale(.9); } 100% { transform: scale(1); } }
+@keyframes wdShake { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
+@media (max-width: 760px) {
+  .gameModal.wdModal { padding: 0; width: 100%; max-width: none; height: 100%; max-height: none; }
+  .wdKey { height: 50px; }
+}
