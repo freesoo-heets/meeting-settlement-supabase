@@ -217,8 +217,7 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
 
   async function askHelp() {
     if (!game) return;
-    if (!window.confirm("카톡방에 도움 요청을 보낼까요?
-지금까지 입력한 칸과 관전 링크가 함께 올라가요.")) return;
+    if (!window.confirm("카톡방에 도움 요청을 보낼까요?\n지금까지 입력한 칸과 관전 링크가 함께 올라가요.")) return;
     const id = game.id;
     const result = await callWord({ action: "help", gameId: id });
     if (!result.ok) return setMessage(result.error ?? "요청하지 못했습니다.");
