@@ -145,26 +145,46 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
   // ── 실시간 채널: 관전 · 채팅 · 입력 중인 글자 ──
   const gameId = game?.id ?? "";
   const playerId = game?.member_id ?? "";
+  const gameCreated = game?.created_at ?? "";
+  const chatPlayer = useRef("");
   const refetch = useCallback(async (id: string) => {
     const { data } = await supabase.from("word_games").select(WORD_GAME_COLUMNS).eq("id", id).maybeSingle();
     if (data) setGame(data as unknown as WordGameRow);
   }, []);
   useEffect(() => {
-    if (!gameId) return;
-    setChat([]);
+    if (!gameId) {
+      chatPlayer.current = ""; // 목록으로 나가면 다음에 열 때 새로 읽는다
+      return;
+    }
+    // 같은 사람이 '한 판 더'로 이어 하면 채팅도 이어진다 (다른 사람 판으로 바뀔 때만 비운다)
+    const sameRun = chatPlayer.current === playerId;
+    chatPlayer.current = playerId;
+    if (!sameRun) setChat([]);
+    else addChat({ name: "", text: "── 🔄 다음 판 ──", kind: "sys" });
     const watching = playerId !== currentMemberId;
-    // 지난 채팅 (자리를 비운 사이 남긴 힌트도 보이게)
-    void supabase
-      .from("word_chat")
-      .select("id,member_id,name,text,created_at")
-      .eq("game_id", gameId)
-      .order("created_at", { ascending: false })
-      .limit(CHAT_MAX)
-      .then(({ data }) => {
-        for (const row of ((data ?? []) as ChatRow[]).reverse()) {
-          addChat({ id: row.id, at: row.created_at, name: row.name, text: row.text, kind: row.member_id === currentMemberId ? "me" : undefined });
-        }
-      });
+    // 지난 채팅: 이 판 + 같은 사람이 1시간 안에 이어서 한 판들 (자리를 비운 사이 남긴 힌트도 보이게)
+    void (async () => {
+      const since = new Date(new Date(gameCreated).getTime() - 60 * 60 * 1000).toISOString();
+      const { data: run } = await supabase
+        .from("word_games")
+        .select("id")
+        .eq("member_id", playerId)
+        .gte("created_at", since)
+        .lte("created_at", gameCreated)
+        .order("created_at", { ascending: false })
+        .limit(6);
+      const ids = Array.from(new Set([gameId, ...((run ?? []) as Array<{ id: string }>).map((r) => r.id)]));
+      const { data } = await supabase
+        .from("word_chat")
+        .select("id,member_id,name,text,created_at")
+        .in("game_id", ids)
+        .order("created_at", { ascending: false })
+        .limit(CHAT_MAX);
+      // 이어 하는 중이면 이미 보이는 채팅은 그대로 두고 빠진 것만 붙는다 (중복은 id 로 거른다)
+      for (const row of ((data ?? []) as ChatRow[]).reverse()) {
+        addChat({ id: row.id, at: row.created_at, name: row.name, text: row.text, kind: row.member_id === currentMemberId ? "me" : undefined });
+      }
+    })();
     const channel = supabase
       .channel(`word-${gameId}`, { config: { broadcast: { self: false }, presence: { key: currentMemberId } } })
       .on("presence", { event: "sync" }, () => {
@@ -197,7 +217,7 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
       channelRef.current = null;
       void supabase.removeChannel(channel);
     };
-  }, [gameId, playerId, currentMemberId, myName, addChat, refetch]);
+  }, [gameId, playerId, gameCreated, currentMemberId, myName, addChat, refetch]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 자동 구매 안내는 판이 시작될 때 5초만 보여 준다
   const autoKey = game && game.status === "playing" && game.auto_bought && game.tries === 0 && game.member_id === currentMemberId ? game.id : "";
