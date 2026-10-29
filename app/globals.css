@@ -6576,7 +6576,7 @@ button.meetingMetricCard {
 .wdChatInput button { width: 40px; height: 36px; border: 0; border-radius: 10px; background: var(--wd-btn); font-weight: 800; cursor: pointer; }
 .wdModal .wdPlay { gap: 8px; }
 @media (max-width: 760px) { .wdBoard { width: min(100%, 270px); } }
-.wdHelp { position: absolute; top: 58px; right: 12px; z-index: 2; border: 0; border-radius: 999px; padding: 6px 12px; background: #fee2e2; color: #b91c1c; font-size: 13px; font-weight: 800; cursor: pointer; }
+.wdHelp { position: absolute; top: 11px; right: 50px; z-index: 2; border: 0; border-radius: 999px; padding: 6px 12px; background: #fee2e2; color: #b91c1c; font-size: 13px; font-weight: 800; cursor: pointer; }
 .wdHelp:active { transform: translateY(1px); }
 
 /* 홀덤 감정표현 (오목 스티커) */
@@ -6591,3 +6591,17 @@ button.meetingMetricCard {
 .hdEmoteBar { margin: 10px auto 4px; }
 .hdEmoteBar .omokEmoteButton { width: 42px; height: 42px; background: rgba(255, 255, 255, .06); border-color: rgba(255, 255, 255, .14); }
 .hdEmoteBar .omokEmoteWait { right: -18px; }
+
+/* 단어게임: 채팅 입력 중 (키보드가 올라와 화면이 낮아짐) */
+.wdModal .wdPlay { overflow: hidden; }
+.wdModal.chatting .wdKeys,
+.wdModal.chatting .wdHelp,
+.wdModal.chatting .wdHint,
+.wdModal.chatting .wdNote { display: none; }
+.wdModal.chatting .wdPlay { flex: 0 1 auto; padding: 2px 12px 6px; gap: 4px; }
+.wdModal.chatting .wdBoard { width: min(100%, 160px); gap: 4px; }
+.wdModal.chatting .wdRow { gap: 4px; }
+.wdModal.chatting .wdTile { border-radius: 7px; font-size: 13px; }
+.wdModal.chatting .wdWatch { font-size: 11px; padding: 2px 10px; }
+.wdModal.chatting .wdChat { flex: 1 1 auto; min-height: 0; grid-template-rows: 1fr auto; padding-bottom: 6px; }
+.wdModal.chatting .wdChatLog { height: auto; min-height: 56px; }

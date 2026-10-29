@@ -70,6 +70,9 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
   const retry = useRef<{ key: string; count: number; timer: ReturnType<typeof setTimeout> | null }>({ key: "", count: 0, timer: null });
   const [chat, setChat] = useState<ChatLine[]>([]);
   const [chatText, setChatText] = useState("");
+  // 채팅 입력 중(휴대폰 키보드가 올라옴): 판을 줄이고 자모 자판 · 도움 버튼을 잠깐 숨긴다
+  const [chatting, setChatting] = useState(false);
+  const blurTimer = useRef<number | undefined>(undefined);
   const [viewers, setViewers] = useState<string[]>([]);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const chatKey = useRef(0);
@@ -376,7 +379,7 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <section className="meetingModal gameModal wdModal" role="dialog" aria-modal="true">
+      <section className={`meetingModal gameModal wdModal ${chatting && game ? "chatting" : ""}`} role="dialog" aria-modal="true">
         <header className="wdHeader">
           <button className="wdIcon" aria-label="뒤로" onClick={spectating ? onBack : game && !finished ? () => setMenu((m) => !m) : game ? () => setGame(null) : onBack}>
             ‹
@@ -513,6 +516,15 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
                 <input
                   value={chatText}
                   onChange={(event) => setChatText(event.target.value)}
+                  onFocus={() => {
+                    window.clearTimeout(blurTimer.current);
+                    setChatting(true);
+                  }}
+                  onBlur={() => {
+                    // 보내기를 누를 때 잠깐 포커스가 빠져도 화면이 출렁이지 않게 조금 늦게 푼다
+                    window.clearTimeout(blurTimer.current);
+                    blurTimer.current = window.setTimeout(() => setChatting(false), 200);
+                  }}
                   placeholder="채팅"
                   maxLength={80}
                   enterKeyHint="send"
