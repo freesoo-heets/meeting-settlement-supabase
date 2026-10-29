@@ -1941,9 +1941,10 @@ async function setAttendanceMembers(memberIds: string[]) {
         groups.get(key)!.parts.set(meeting.id, Math.max(0, share - paid));
       }
       for (const guest of meeting.guests) {
-        // 게스트는 회원 ID가 없으므로 서로 다른 벙에서 동일 이름이어도 자동 합산하지 않습니다.
-        const key = `g:${meeting.id}:${guest.id}`;
-        groups.set(key, { name: guest.name, guest: true, parts: new Map([[meeting.id, allocation.shares[`g:${guest.id}`] ?? 0]]) });
+        // 게스트는 회원 ID가 없어 이름으로 묶습니다 (1·2차에 같은 이름 게스트 = 같은 사람, 카톡 !정산과 같음).
+        const key = `g:${guest.name}`;
+        if (!groups.has(key)) groups.set(key, { name: guest.name, guest: true, parts: new Map() });
+        groups.get(key)!.parts.set(meeting.id, allocation.shares[`g:${guest.id}`] ?? 0);
       }
     }
     const sections = new Map<string, { ids: string[]; rows: { name: string; guest: boolean; parts: number[]; total: number }[] }>();
@@ -1965,7 +1966,7 @@ async function setAttendanceMembers(memberIds: string[]) {
     if (multiSettlementMeetings.length < 2) return '';
     const lines = [
       '📌 강서구 찐친만들기 통합 벙비 정산', '━━━━━━━━━━━━━━',
-      ...multiSettlementMeetings.map((meeting, i) => `${i + 1}번) ${meeting.date} · ${meeting.title}`),
+      ...multiSettlementMeetings.map((meeting, i) => `${i + 1}번) ${meeting.date} · ${meeting.title}${meeting.cost == null ? '' : ` · ${won(Number(meeting.cost))}`}`),
       '',
     ];
     for (const section of multiSettlementResult) {
