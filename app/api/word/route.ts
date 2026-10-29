@@ -92,7 +92,23 @@ export async function POST(request: Request) {
   if (action === "help") {
     if (game.status !== "playing") return fail("진행 중인 게임에서만 도움을 요청할 수 있어요.");
     const result = await requestInvite(admin, "word", game.id, memberId);
-    return result.ok ? NextResponse.json({ ok: true }) : fail(result.error);
+    if (result.ok) return NextResponse.json({ ok: true });
+    if (result.error.includes("check constraint")) {
+      return fail("카톡 알림 설정이 아직 안 됐어요. (운영진: 단어게임 도움 SQL 실행 필요)");
+    }
+    return fail(result.error);
+  }
+
+  // 도움 요청이 카톡방에 올라갔는지 (봇이 보내면 sent_at 이 찬다)
+  if (action === "helpStatus") {
+    const { data } = await admin
+      .from("bot_announcements")
+      .select("sent_at")
+      .eq("ref_id", game.id)
+      .eq("kind", "word")
+      .order("created_at", { ascending: false })
+      .limit(1);
+    return NextResponse.json({ ok: true, sent: !!data?.[0]?.sent_at });
   }
 
   if (action === "quit") {

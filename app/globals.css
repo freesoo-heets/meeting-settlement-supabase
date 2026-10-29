@@ -6606,3 +6606,12 @@ button.meetingMetricCard {
 .wdModal.chatting .wdChat { flex: 1 1 auto; min-height: 0; grid-template-rows: 1fr auto; padding-bottom: 6px; }
 .wdModal.chatting .wdChatLog { height: auto; min-height: 56px; }
 .wdChatLine time { margin-right: 5px; font-size: 11px; color: #9ca3af; font-variant-numeric: tabular-nums; }
+
+/* 단어게임: 화면이 낮은 휴대폰에서 판 위쪽이 제목 줄에 가려지지 않게 */
+.wdModal .wdPlay { justify-content: safe center; }
+.wdModal .wdHeader { height: auto; min-height: 52px; padding-top: env(safe-area-inset-top, 0px); background: #fff; z-index: 3; }
+@media (max-width: 760px) {
+  /* 판 크기를 남는 높이에 맞춘다 (제목 · 채팅 · 자판을 빼고) */
+  .wdModal:not(.chatting) .wdBoard { width: min(100%, 270px, max(170px, calc(var(--vvh, 100dvh) - 500px))); }
+}
+.wdHelp { top: calc(11px + env(safe-area-inset-top, 0px)); }

@@ -217,8 +217,19 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
 
   async function askHelp() {
     if (!game) return;
-    const result = await callWord({ action: "help", gameId: game.id });
-    setMessage(result.ok ? "📣 카톡방에 도움을 요청했어요. 링크로 들어와 같이 볼 수 있어요." : result.error ?? "요청하지 못했습니다.");
+    if (!window.confirm("카톡방에 도움 요청을 보낼까요?
+지금까지 입력한 칸과 관전 링크가 함께 올라가요.")) return;
+    const id = game.id;
+    const result = await callWord({ action: "help", gameId: id });
+    if (!result.ok) return setMessage(result.error ?? "요청하지 못했습니다.");
+    setMessage("📣 도움 요청 중… (카톡 봇이 올려요)");
+    // 봇이 실제로 올렸는지 확인한다
+    for (let i = 0; i < 10; i += 1) {
+      await new Promise((r) => setTimeout(r, 2000));
+      const status = (await callWord({ action: "helpStatus", gameId: id })) as CallResult & { sent?: boolean };
+      if (status.sent) return setMessage("✅ 카톡방에 도움을 요청했어요. 링크로 들어와 같이 볼 수 있어요.");
+    }
+    setMessage("⚠️ 카톡 봇이 아직 알림을 올리지 않았어요. 봇이 켜져 있는지 확인해 주세요. (word_bridge.py)");
   }
 
   async function sendChat() {
