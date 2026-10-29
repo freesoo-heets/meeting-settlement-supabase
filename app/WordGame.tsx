@@ -566,6 +566,8 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
                       : `💀 정답은 [${game.answer ?? "?"}]`
                     : `힌트: ${game.hint_len ?? "?"}글자 단어 · 남은 기회 ${game.max_tries - game.tries}번`}
               </div>
+              {/* 판은 남은 공간(가로 · 세로 중 작은 쪽)에 딱 맞게 줄어든다 — 접은 폴드처럼 좁거나 낮은 화면 */}
+              <div className="wdBoardWrap">
               <div className="wdBoard">
                 {Array.from({ length: MAX_TRIES }, (_, r) => {
                   const done = history[r];
@@ -588,6 +590,7 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
                     </div>
                   );
                 })}
+              </div>
               </div>
               <div className="wdNote">
                 {message || (preview.length ? `👉 ${preview.join(" · ")}` : autoNote ? `🎫 티켓 자동 구매 (-${TICKET_PRICE}점)` : "")}
