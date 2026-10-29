@@ -19,9 +19,13 @@ type Props = {
   onClose: () => void;
   onBack: () => void;
   currentMemberId: string;
+  myName: string;
   myPoints: number | null;
   myTickets: number | null;
+  initialGameId?: string; // 다른 사람 판을 관전할 때
 };
+
+type ChatLine = { key: number; name: string; text: string; kind?: "sys" | "me" };
 
 type CallResult = { ok: boolean; error?: string; id?: string; pending?: boolean; game?: WordGameRow };
 
@@ -41,13 +45,18 @@ const fmt = (n: number) => n.toLocaleString("ko-KR");
 const RANK: Record<Mark, number> = { x: 1, y: 2, g: 3 };
 const PENDING_RETRY_MS = 2500;
 const PENDING_MAX_RETRY = 14;
+const CHAT_MAX = 60;
+
+// 채팅 입력칸 등에 쓰는 중이면 게임 자판으로 가로채지 않는다
+const isTypingField = (target: EventTarget | null) =>
+  target instanceof HTMLElement && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
 
 function shortDate(value: string) {
   const d = new Date(value);
   return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
-export default function WordGame({ onClose, onBack, currentMemberId, myPoints, myTickets }: Props) {
+export default function WordGame({ onClose, onBack, currentMemberId, myName, myPoints, myTickets, initialGameId }: Props) {
   const [games, setGames] = useState<WordGameRow[]>([]);
   const [game, setGame] = useState<WordGameRow | null>(null);
   const [typed, setTyped] = useState<string[]>([]);
@@ -58,6 +67,13 @@ export default function WordGame({ onClose, onBack, currentMemberId, myPoints, m
   const [menu, setMenu] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const retry = useRef<{ key: string; count: number; timer: ReturnType<typeof setTimeout> | null }>({ key: "", count: 0, timer: null });
+  const [chat, setChat] = useState<ChatLine[]>([]);
+  const [chatText, setChatText] = useState("");
+  const [viewers, setViewers] = useState<string[]>([]);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const chatKey = useRef(0);
+  const chatLogRef = useRef<HTMLDivElement | null>(null);
+  const spectating = !!game && game.member_id !== currentMemberId;
 
   const load = useCallback(async () => {
     const { data } = await supabase
@@ -72,18 +88,114 @@ export default function WordGame({ onClose, onBack, currentMemberId, myPoints, m
     return rows;
   }, [currentMemberId]);
 
-  // 처음: 진행 중인 판이 있으면 이어서
+  // 처음: 관전할 판 · 아니면 내가 하던 판 이어서
   useEffect(() => {
-    void load().then((rows) => {
+    void load().then(async (rows) => {
+      if (initialGameId) {
+        const { data } = await supabase.from("word_games").select(WORD_GAME_COLUMNS).eq("id", initialGameId).maybeSingle();
+        if (data) return setGame(data as unknown as WordGameRow);
+      }
       const live = rows.find((r) => r.status === "escrow" || r.status === "playing");
       if (live) setGame(live);
     });
-  }, [load]);
+  }, [load, initialGameId]);
+
+  const addChat = useCallback((line: Omit<ChatLine, "key">) => {
+    chatKey.current += 1;
+    const key = chatKey.current;
+    setChat((list) => [...list.slice(-(CHAT_MAX - 1)), { ...line, key }]);
+  }, []);
+
+  useEffect(() => {
+    const log = chatLogRef.current;
+    if (log) log.scrollTop = log.scrollHeight;
+  }, [chat]);
+
+  // ── 실시간 채널: 관전 · 채팅 · 입력 중인 글자 ──
+  const gameId = game?.id ?? "";
+  const playerId = game?.member_id ?? "";
+  const refetch = useCallback(async (id: string) => {
+    const { data } = await supabase.from("word_games").select(WORD_GAME_COLUMNS).eq("id", id).maybeSingle();
+    if (data) setGame(data as unknown as WordGameRow);
+  }, []);
+  useEffect(() => {
+    if (!gameId) return;
+    setChat([]);
+    const watching = playerId !== currentMemberId;
+    const channel = supabase
+      .channel(`word-${gameId}`, { config: { broadcast: { self: false }, presence: { key: currentMemberId } } })
+      .on("presence", { event: "sync" }, () => {
+        const state = channel.presenceState() as Record<string, Array<{ name?: string }>>;
+        setViewers(Object.entries(state).filter(([id]) => id !== playerId).map(([, metas]) => metas[0]?.name ?? "?"));
+      })
+      .on("presence", { event: "join" }, ({ key, newPresences }) => {
+        const name = (newPresences[0] as { name?: string } | undefined)?.name;
+        if (key !== currentMemberId && key !== playerId && name) addChat({ name: "", text: `👀 ${name}님이 관전을 시작했어요`, kind: "sys" });
+      })
+      .on("broadcast", { event: "chat" }, ({ payload }) => {
+        const data = payload as { name?: string; text?: string };
+        if (data.text) addChat({ name: String(data.name ?? "").slice(0, 10), text: String(data.text).slice(0, 80) });
+      })
+      .on("broadcast", { event: "typing" }, ({ payload }) => {
+        const jamo = (payload as { jamo?: unknown }).jamo;
+        if (watching && Array.isArray(jamo)) setTyped(jamo.slice(0, WORD_LEN).map(String));
+      })
+      .on("broadcast", { event: "game" }, () => {
+        if (watching) {
+          setTyped([]);
+          void refetch(gameId);
+        }
+      })
+      .subscribe((state) => {
+        if (state === "SUBSCRIBED") void channel.track({ name: myName });
+      });
+    channelRef.current = channel;
+    return () => {
+      channelRef.current = null;
+      void supabase.removeChannel(channel);
+    };
+  }, [gameId, playerId, currentMemberId, myName, addChat, refetch]);
+
+  // 관전: 실시간이 끊겨도 따라가게 가끔 다시 읽고, 끝나면 그 사람의 다음 판으로 넘어간다
+  useEffect(() => {
+    if (!spectating || !game) return;
+    const timer = setInterval(async () => {
+      if (game.status === "escrow" || game.status === "playing") return void refetch(game.id);
+      const { data } = await supabase
+        .from("word_games")
+        .select(WORD_GAME_COLUMNS)
+        .eq("member_id", game.member_id)
+        .in("status", ["escrow", "playing"])
+        .gt("created_at", game.created_at)
+        .limit(1);
+      const next = (data ?? [])[0] as unknown as WordGameRow | undefined;
+      if (next) {
+        setShowResult(false);
+        setTyped([]);
+        setGame(next);
+      }
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [spectating, game, refetch]);
+
+  // 내가 치는 글자를 관전자에게
+  useEffect(() => {
+    if (spectating || !game || game.status !== "playing") return;
+    void channelRef.current?.send({ type: "broadcast", event: "typing", payload: { jamo: typed } });
+  }, [typed, spectating, game]);
+
+  function sendChat() {
+    const text = chatText.trim().slice(0, 80);
+    if (!text) return;
+    setChatText("");
+    addChat({ name: myName, text, kind: "me" });
+    void channelRef.current?.send({ type: "broadcast", event: "chat", payload: { name: myName, text } });
+  }
 
   // 봇이 티켓을 확인하는 동안 · 끝난 판 보상 지급을 기다리는 동안
   const waiting = game && (game.status === "escrow" || ((game.status === "won" || game.status === "lost") && game.settle_state !== "done"));
   useEffect(() => {
-    if (!game || !waiting) return;
+    if (!game || !waiting || game.member_id !== currentMemberId) return;
     const timer = setInterval(async () => {
       const { data } = await supabase.from("word_games").select(WORD_GAME_COLUMNS).eq("id", game.id).maybeSingle();
       if (!data) return;
@@ -111,7 +223,7 @@ export default function WordGame({ onClose, onBack, currentMemberId, myPoints, m
       }
     }, 1500);
     return () => clearInterval(timer);
-  }, [game, waiting, load]);
+  }, [game, waiting, load, currentMemberId]);
 
   useEffect(() => () => {
     if (retry.current.timer) clearTimeout(retry.current.timer);
@@ -167,6 +279,7 @@ export default function WordGame({ onClose, onBack, currentMemberId, myPoints, m
       setMessage("");
       setGame(result.game);
       setTyped([]);
+      void channelRef.current?.send({ type: "broadcast", event: "game", payload: {} });
       if (result.game.status !== "playing") {
         void load();
         setTimeout(() => setShowResult(true), 1700);
@@ -187,21 +300,27 @@ export default function WordGame({ onClose, onBack, currentMemberId, myPoints, m
   }, [game, load]);
 
   const press = useCallback((key: string) => {
-    if (!game || game.status !== "playing" || busy) return;
+    if (!game || game.status !== "playing" || busy || game.member_id !== currentMemberId) return;
     if (key === "back") {
       retry.current.key = "";
       setTyped((t) => t.slice(0, -1));
       return;
     }
     setTyped((t) => (t.length < WORD_LEN ? [...t, key] : t));
-  }, [game, busy]);
+  }, [game, busy, currentMemberId]);
 
   // 컴퓨터 자판: 한/영 상관없이 자판 위치(code)로 읽는다
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.ctrlKey || event.metaKey || event.altKey) return;
-      if (event.key === "Backspace") return press("back");
-      if (event.key === "Enter") return void submit(typed);
+      if (event.ctrlKey || event.metaKey || event.altKey || isTypingField(event.target)) return;
+      if (event.key === "Backspace") {
+        event.preventDefault(); // 웨일 등 일부 브라우저: 백스페이스 = 뒤로 가기
+        return press("back");
+      }
+      if (event.key === "Enter") {
+        event.preventDefault();
+        return void submit(typed);
+      }
       const letter = event.code.startsWith("Key") ? QWERTY[event.code.slice(3).toLowerCase()] : undefined;
       if (letter) {
         event.preventDefault();
@@ -243,7 +362,7 @@ export default function WordGame({ onClose, onBack, currentMemberId, myPoints, m
     >
       <section className="meetingModal gameModal wdModal" role="dialog" aria-modal="true">
         <header className="wdHeader">
-          <button className="wdIcon" aria-label="뒤로" onClick={game && !finished ? () => setMenu((m) => !m) : game ? () => setGame(null) : onBack}>
+          <button className="wdIcon" aria-label="뒤로" onClick={spectating ? onBack : game && !finished ? () => setMenu((m) => !m) : game ? () => setGame(null) : onBack}>
             ‹
           </button>
           <h2>오늘의 단어</h2>
@@ -252,8 +371,8 @@ export default function WordGame({ onClose, onBack, currentMemberId, myPoints, m
           </button>
           {menu && (
             <div className="wdMenu" onClick={() => setMenu(false)}>
-              {game?.status === "playing" && <button onClick={() => void quit()}>🏳️ 포기하기</button>}
-              {game?.status === "escrow" && <button onClick={() => void quit()}>✖ 시작 취소</button>}
+              {!spectating && game?.status === "playing" && <button onClick={() => void quit()}>🏳️ 포기하기</button>}
+              {!spectating && game?.status === "escrow" && <button onClick={() => void quit()}>✖ 시작 취소</button>}
               {game && <button onClick={() => setGame(null)}>📋 내 기록</button>}
               <button onClick={onBack}>🎮 게임 목록</button>
               <button onClick={onClose}>✕ 닫기</button>
@@ -312,6 +431,12 @@ export default function WordGame({ onClose, onBack, currentMemberId, myPoints, m
         ) : (
           <>
             <div className="wdPlay">
+              {(spectating || viewers.length > 0) && (
+                <div className="wdWatch">
+                  {spectating ? `👀 ${game.name}님의 도전을 관전 중` : `👀 ${viewers.length}명 관전 중`}
+                  {viewers.length > 0 && <span>{viewers.slice(0, 6).join(" · ")}</span>}
+                </div>
+              )}
               <div className="wdHint">
                 {game.status === "escrow"
                   ? "🎫 티켓 확인 중… (카톡 봇이 처리해요)"
@@ -345,9 +470,40 @@ export default function WordGame({ onClose, onBack, currentMemberId, myPoints, m
                 })}
               </div>
               <div className="wdNote">
-                {message || (preview.length ? `👉 ${preview.join(" · ")}` : game.auto_bought ? `🎫 티켓 자동 구매 (-${TICKET_PRICE}점)` : "")}
+                {message || (preview.length ? `👉 ${preview.join(" · ")}` : !spectating && game.auto_bought ? `🎫 티켓 자동 구매 (-${TICKET_PRICE}점)` : "")}
               </div>
             </div>
+            <div className={`wdChat ${spectating ? "big" : ""}`}>
+              <div className="wdChatLog" ref={chatLogRef}>
+                {chat.length === 0 && (
+                  <span className="muted">{spectating ? "같이 보면서 힌트를 나눠 보세요 💬" : "관전하는 사람들과 채팅할 수 있어요 💬"}</span>
+                )}
+                {chat.map((line) => (
+                  <div key={line.key} className={`wdChatLine ${line.kind ?? ""}`}>
+                    {line.name && <b>{line.name}</b>} {line.text}
+                  </div>
+                ))}
+              </div>
+              <form
+                className="wdChatInput"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  sendChat();
+                }}
+              >
+                <input
+                  value={chatText}
+                  onChange={(event) => setChatText(event.target.value)}
+                  placeholder="채팅"
+                  maxLength={80}
+                  enterKeyHint="send"
+                  autoComplete="off"
+                  aria-label="채팅 입력"
+                />
+                <button type="submit" aria-label="보내기" onPointerDown={(event) => event.preventDefault()}>↑</button>
+              </form>
+            </div>
+            {!spectating && (
             <div className="wdKeys">
               {KEY_ROWS.map((row, i) => (
                 <div className="wdKeyRow" key={i}>
@@ -375,6 +531,12 @@ export default function WordGame({ onClose, onBack, currentMemberId, myPoints, m
                 </button>
               )}
             </div>
+            )}
+            {spectating && finished && (
+              <div className="wdKeys">
+                <button className="wdBig" onClick={() => setShowResult(true)}>결과보기</button>
+              </div>
+            )}
           </>
         )}
 
@@ -382,7 +544,7 @@ export default function WordGame({ onClose, onBack, currentMemberId, myPoints, m
           <div className="wdResultBack" onClick={() => setShowResult(false)}>
             <div className="wdResult" onClick={(e) => e.stopPropagation()}>
               <span className="wdResultIcon">{game.status === "won" ? "🎉" : "💀"}</span>
-              <strong>{game.status === "won" ? `${game.tries}번 만에 정답!` : "아쉬워요"}</strong>
+              <strong>{spectating ? `${game.name}님 · ` : ""}{game.status === "won" ? `${game.tries}번 만에 정답!` : "아쉬워요"}</strong>
               <div className="wdAnswer">{game.answer ?? "?"}</div>
               <div className="wdMini">
                 {game.history.map((row, i) => (
@@ -399,7 +561,7 @@ export default function WordGame({ onClose, onBack, currentMemberId, myPoints, m
                 </p>
               )}
               <div className="wdResultButtons">
-                <button className="wdBig" disabled={busy} onClick={() => void start()}>한 판 더</button>
+                <button className="wdBig" disabled={busy} onClick={() => void start()}>{spectating ? "나도 도전" : "한 판 더"}</button>
                 <button className="smallButton ghost" onClick={() => { setShowResult(false); setGame(null); }}>내 기록</button>
               </div>
             </div>

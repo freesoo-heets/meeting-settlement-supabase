@@ -6561,3 +6561,18 @@ button.meetingMetricCard {
   .gameModal.wdModal { padding: 0; width: 100%; max-width: none; height: 100%; max-height: none; }
   .wdKey { height: 50px; }
 }
+
+/* 오늘의 단어: 관전 · 채팅 */
+.wdWatch { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 8px; font-size: 12.5px; font-weight: 700; color: #15803d; background: #effaf2; border-radius: 999px; padding: 4px 12px; max-width: 100%; }
+.wdWatch span { font-weight: 500; color: #4b5563; }
+.wdChat { flex: none; display: grid; gap: 6px; padding: 0 12px 8px; }
+.wdChatLog { height: 64px; overflow-y: auto; font-size: 13px; line-height: 1.5; padding: 6px 10px; border: 1px solid #eee; border-radius: 10px; background: #fafafa; user-select: text; -webkit-user-select: text; }
+.wdChat.big .wdChatLog { height: 150px; }
+.wdChatLine b { margin-right: 4px; }
+.wdChatLine.me b { color: #15803d; }
+.wdChatLine.sys { color: #6b7280; font-size: 12px; }
+.wdChatInput { display: flex; gap: 6px; }
+.wdChatInput input { flex: 1; min-width: 0; height: 36px; border: 1px solid #ddd; border-radius: 10px; padding: 0 10px; font-size: 16px; background: #fff; }
+.wdChatInput button { width: 40px; height: 36px; border: 0; border-radius: 10px; background: var(--wd-btn); font-weight: 800; cursor: pointer; }
+.wdModal .wdPlay { gap: 8px; }
+@media (max-width: 760px) { .wdBoard { width: min(100%, 270px); } }

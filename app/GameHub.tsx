@@ -79,7 +79,7 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
   const [alkkagi, setAlkkagi] = useState<StakeRow[]>([]);
   const [catchRooms, setCatchRooms] = useState<CatchRow[]>([]);
   const [holdemTables, setHoldemTables] = useState<Array<{ id: string; status: string; host_name: string; is_friendly: boolean; max_seats: number; hand_no: number; view: { players?: Array<{ name: string; empty?: boolean }> } }>>([]);
-  const [wordRecent, setWordRecent] = useState<Array<{ id: string; name: string; status: string; tries: number; reward: number; answer: string | null }>>([]);
+  const [wordLive, setWordLive] = useState<Array<{ id: string; name: string; status: string; tries: number; max_tries: number; member_id: string }>>([]);
   const [showRating, setShowRating] = useState(false);
 
   const load = useCallback(async () => {
@@ -88,9 +88,9 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
       supabase.from("alkkagi_games").select(STAKE_COLUMNS).in("status", ["open", "challenge", "escrow", "playing"]).order("created_at", { ascending: false }).limit(20),
       supabase.from("catch_rooms").select("id,status,host_name,players,max_players,turn_no,turn_total,is_test").in("status", ["waiting", "playing"]).order("created_at", { ascending: false }).limit(20),
       supabase.from("holdem_tables").select("id,status,host_name,is_friendly,max_seats,hand_no,view").in("status", ["waiting", "playing"]).order("created_at", { ascending: false }).limit(20),
-      supabase.from("word_games").select("id,name,status,tries,reward,answer").in("status", ["won", "lost"]).order("finished_at", { ascending: false }).limit(5),
+      supabase.from("word_games").select("id,name,status,tries,max_tries,member_id").eq("status", "playing").order("created_at", { ascending: false }).limit(10),
     ]);
-    setWordRecent((w.data ?? []) as typeof wordRecent);
+    setWordLive((w.data ?? []) as typeof wordLive);
     setHoldemTables((h.data ?? []) as typeof holdemTables);
     if ((h.data ?? []).length > 0) sweepHoldem(); // 멈춘 홀덤 테이블 정리
     // 테스트 판은 만든 관리자에게만 보인다
@@ -156,7 +156,15 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
 
   if (active?.kind === "word") {
     return (
-      <WordGame onClose={onClose} onBack={back} currentMemberId={currentMemberId} myPoints={myPoints} myTickets={myTickets} />
+      <WordGame
+        onClose={onClose}
+        onBack={back}
+        currentMemberId={currentMemberId}
+        myName={myName}
+        myPoints={myPoints}
+        myTickets={myTickets}
+        initialGameId={active.id || undefined}
+      />
     );
   }
 
@@ -318,14 +326,14 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
               <button className="smallButton" onClick={() => setActive({ kind: "word", id: "" })}>시작하기</button>
             </div>
             <div className="gameHubRooms">
-              {wordRecent.length === 0 && <span className="muted">최근 기록이 없습니다.</span>}
-              {wordRecent.map((row) => (
-                <button key={row.id} className="gameHubRoom" onClick={() => setActive({ kind: "word", id: "" })}>
+              {wordLive.length === 0 && <span className="muted">지금 도전 중인 사람이 없습니다.</span>}
+              {wordLive.map((row) => (
+                <button key={row.id} className="gameHubRoom hot" onClick={() => setActive({ kind: "word", id: row.member_id === currentMemberId ? "" : row.id })}>
                   <span>
-                    <b>{row.name}님 · {row.status === "won" ? `🎉 ${row.tries}번 만에 정답` : "💀 실패"}</b>
-                    <em>정답 [{row.answer ?? "?"}]{row.status === "won" ? ` · 💎 +${row.reward}점` : ""}</em>
+                    <b>{row.name}님 도전 중</b>
+                    <em>{row.tries}/{row.max_tries}번째 · 같이 보며 채팅</em>
                   </span>
-                  <i>도전 →</i>
+                  <i>{row.member_id === currentMemberId ? "이어하기 →" : "관전 →"}</i>
                 </button>
               ))}
             </div>
