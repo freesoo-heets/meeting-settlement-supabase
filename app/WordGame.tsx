@@ -81,6 +81,7 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
   // 채팅 입력 중(휴대폰 키보드가 올라옴): 판을 줄이고 자모 자판 · 도움 버튼을 잠깐 숨긴다
   const [chatting, setChatting] = useState(false);
   const blurTimer = useRef<number | undefined>(undefined);
+  const pressedOutside = useRef(false);
   const [viewers, setViewers] = useState<string[]>([]);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const chatKey = useRef(0);
@@ -421,8 +422,13 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
     <div
       className="meetingModalBackdrop gameBackdrop"
       role="presentation"
+      // 바깥을 '눌렀다 뗀' 때만 닫는다 (창 안에서 누르고 화면이 바뀐 뒤 바깥에서 떼면 닫히던 문제)
+      onPointerDown={(event) => {
+        pressedOutside.current = event.target === event.currentTarget;
+      }}
       onClick={(event) => {
-        if (event.target === event.currentTarget) onClose();
+        if (event.target === event.currentTarget && pressedOutside.current) onClose();
+        pressedOutside.current = false;
       }}
     >
       <section className={`meetingModal gameModal wdModal ${chatting && game ? "chatting" : ""}`} role="dialog" aria-modal="true">
