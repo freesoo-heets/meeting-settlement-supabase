@@ -66,6 +66,7 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
   const [showResult, setShowResult] = useState(false);
   const [menu, setMenu] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [autoNote, setAutoNote] = useState(false); // 🎫 자동 구매 안내: 시작할 때 잠깐만
   const retry = useRef<{ key: string; count: number; timer: ReturnType<typeof setTimeout> | null }>({ key: "", count: 0, timer: null });
   const [chat, setChat] = useState<ChatLine[]>([]);
   const [chatText, setChatText] = useState("");
@@ -155,6 +156,15 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
       void supabase.removeChannel(channel);
     };
   }, [gameId, playerId, currentMemberId, myName, addChat, refetch]);
+
+  // 자동 구매 안내는 판이 시작될 때 5초만 보여 준다
+  const autoKey = game && game.status === "playing" && game.auto_bought && game.tries === 0 && game.member_id === currentMemberId ? game.id : "";
+  useEffect(() => {
+    if (!autoKey) return setAutoNote(false);
+    setAutoNote(true);
+    const timer = window.setTimeout(() => setAutoNote(false), 5000);
+    return () => window.clearTimeout(timer);
+  }, [autoKey]);
 
   // 관전: 실시간이 끊겨도 따라가게 가끔 다시 읽고, 끝나면 그 사람의 다음 판으로 넘어간다
   useEffect(() => {
@@ -479,7 +489,7 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
                 })}
               </div>
               <div className="wdNote">
-                {message || (preview.length ? `👉 ${preview.join(" · ")}` : !spectating && game.auto_bought ? `🎫 티켓 자동 구매 (-${TICKET_PRICE}점)` : "")}
+                {message || (preview.length ? `👉 ${preview.join(" · ")}` : autoNote ? `🎫 티켓 자동 구매 (-${TICKET_PRICE}점)` : "")}
               </div>
             </div>
             <div className={`wdChat ${spectating ? "big" : ""}`}>
