@@ -93,7 +93,7 @@ export default function WordGame({ onClose, onBack, currentMemberId, myPoints, m
         if (waited > 20000) {
           setMessage(
             waited > 60000
-              ? "⚠️ 카톡 봇이 응답하지 않아요. ⋯ 메뉴에서 '시작 취소'를 할 수 있어요. (티켓은 차감되지 않았어요)"
+              ? "⚠️ 카톡 봇이 응답하지 않아요. 봇에 word_bridge.py 가 없거나 재시작 전일 수 있어요. ⋯ 메뉴에서 '시작 취소'를 할 수 있어요. (티켓은 차감되지 않았어요)"
               : "⏳ 카톡 봇이 아직 응답하지 않아요. 조금만 기다려 주세요…",
           );
         }
