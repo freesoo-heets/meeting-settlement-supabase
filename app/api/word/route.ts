@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServerAdmin } from "../../../lib/server-admin";
-import { fail, loadPlayer, requestInvite, requireMemberId } from "../../../lib/gameServer";
+import { fail, loadMember, loadPlayer, requestInvite, requireMemberId } from "../../../lib/gameServer";
 import {
   KEYS,
   REWARDS,
@@ -58,6 +58,31 @@ export async function POST(request: Request) {
       .single();
     if (error) return fail(`시작하지 못했습니다: ${error.message}`);
     return NextResponse.json({ ok: true, id: data.id });
+  }
+
+  // 💬 채팅 (관전자도): 저장해 두어 나중에 다시 열어도 보인다
+  if (action === "chat") {
+    const text = String(body.text ?? "").trim().slice(0, 80);
+    if (!text || !gameId) return fail("채팅 내용을 입력해 주세요.");
+    const member = await loadMember(admin, memberId);
+    if ("error" in member) return fail(member.error, member.status);
+    const { data: exists } = await admin.from("word_games").select("id").eq("id", gameId).maybeSingle();
+    if (!exists) return fail("게임을 찾지 못했습니다.", 404);
+    const { data: last } = await admin
+      .from("word_chat")
+      .select("created_at")
+      .eq("game_id", gameId)
+      .eq("member_id", memberId)
+      .order("created_at", { ascending: false })
+      .limit(1);
+    if (last?.[0] && Date.now() - new Date(last[0].created_at as string).getTime() < 700) return fail("조금 천천히 보내 주세요.");
+    const { data, error } = await admin
+      .from("word_chat")
+      .insert({ game_id: gameId, member_id: memberId, name: member.name, text })
+      .select("id")
+      .single();
+    if (error) return fail(`채팅을 저장하지 못했어요: ${error.message}`);
+    return NextResponse.json({ ok: true, chatId: data.id });
   }
 
   const game = gameId ? await readGame(admin, gameId, memberId) : null;

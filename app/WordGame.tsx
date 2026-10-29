@@ -25,7 +25,8 @@ type Props = {
   initialGameId?: string; // 다른 사람 판을 관전할 때
 };
 
-type ChatLine = { key: number; name: string; text: string; kind?: "sys" | "me" };
+type ChatLine = { key: number; id?: string; at?: string; name: string; text: string; kind?: "sys" | "me" };
+type ChatRow = { id: string; member_id: string; name: string; text: string; created_at: string };
 
 type CallResult = { ok: boolean; error?: string; id?: string; pending?: boolean; game?: WordGameRow };
 
@@ -50,6 +51,11 @@ const CHAT_MAX = 60;
 // 채팅 입력칸 등에 쓰는 중이면 게임 자판으로 가로채지 않는다
 const isTypingField = (target: EventTarget | null) =>
   target instanceof HTMLElement && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
+
+function chatTime(value: string) {
+  const d = new Date(value);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
 
 function shortDate(value: string) {
   const d = new Date(value);
@@ -107,7 +113,7 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
   const addChat = useCallback((line: Omit<ChatLine, "key">) => {
     chatKey.current += 1;
     const key = chatKey.current;
-    setChat((list) => [...list.slice(-(CHAT_MAX - 1)), { ...line, key }]);
+    setChat((list) => (line.id && list.some((l) => l.id === line.id) ? list : [...list.slice(-(CHAT_MAX - 1)), { ...line, key }]));
   }, []);
 
   useEffect(() => {
@@ -126,6 +132,18 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
     if (!gameId) return;
     setChat([]);
     const watching = playerId !== currentMemberId;
+    // 지난 채팅 (자리를 비운 사이 남긴 힌트도 보이게)
+    void supabase
+      .from("word_chat")
+      .select("id,member_id,name,text,created_at")
+      .eq("game_id", gameId)
+      .order("created_at", { ascending: false })
+      .limit(CHAT_MAX)
+      .then(({ data }) => {
+        for (const row of ((data ?? []) as ChatRow[]).reverse()) {
+          addChat({ id: row.id, at: row.created_at, name: row.name, text: row.text, kind: row.member_id === currentMemberId ? "me" : undefined });
+        }
+      });
     const channel = supabase
       .channel(`word-${gameId}`, { config: { broadcast: { self: false }, presence: { key: currentMemberId } } })
       .on("presence", { event: "sync" }, () => {
@@ -137,8 +155,8 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
         if (key !== currentMemberId && key !== playerId && name) addChat({ name: "", text: `👀 ${name}님이 관전을 시작했어요`, kind: "sys" });
       })
       .on("broadcast", { event: "chat" }, ({ payload }) => {
-        const data = payload as { name?: string; text?: string };
-        if (data.text) addChat({ name: String(data.name ?? "").slice(0, 10), text: String(data.text).slice(0, 80) });
+        const data = payload as { id?: string; at?: string; name?: string; text?: string };
+        if (data.text) addChat({ id: data.id, at: data.at, name: String(data.name ?? "").slice(0, 10), text: String(data.text).slice(0, 80) });
       })
       .on("broadcast", { event: "typing" }, ({ payload }) => {
         const jamo = (payload as { jamo?: unknown }).jamo;
@@ -203,12 +221,16 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
     setMessage(result.ok ? "📣 카톡방에 도움을 요청했어요. 링크로 들어와 같이 볼 수 있어요." : result.error ?? "요청하지 못했습니다.");
   }
 
-  function sendChat() {
+  async function sendChat() {
     const text = chatText.trim().slice(0, 80);
-    if (!text) return;
+    if (!text || !game) return;
     setChatText("");
-    addChat({ name: myName, text, kind: "me" });
-    void channelRef.current?.send({ type: "broadcast", event: "chat", payload: { name: myName, text } });
+    const at = new Date().toISOString();
+    addChat({ name: myName, text, kind: "me", at });
+    // 저장해 두고(나중에 와도 보이게) 지금 보는 사람들에게는 바로 보낸다
+    const result = (await callWord({ action: "chat", gameId: game.id, text })) as CallResult & { chatId?: string };
+    if (!result.ok) setMessage(result.error ?? "채팅을 저장하지 못했어요.");
+    void channelRef.current?.send({ type: "broadcast", event: "chat", payload: { id: result.chatId, at, name: myName, text } });
   }
 
   // 봇이 티켓을 확인하는 동안 · 끝난 판 보상 지급을 기다리는 동안
@@ -502,6 +524,7 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
                 )}
                 {chat.map((line) => (
                   <div key={line.key} className={`wdChatLine ${line.kind ?? ""}`}>
+                    {line.at && <time>{chatTime(line.at)}</time>}
                     {line.name && <b>{line.name}</b>} {line.text}
                   </div>
                 ))}
@@ -510,7 +533,7 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
                 className="wdChatInput"
                 onSubmit={(event) => {
                   event.preventDefault();
-                  sendChat();
+                  void sendChat();
                 }}
               >
                 <input
