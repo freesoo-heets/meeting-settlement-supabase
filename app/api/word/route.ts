@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServerAdmin } from "../../../lib/server-admin";
-import { fail, loadPlayer, requireMemberId } from "../../../lib/gameServer";
+import { fail, loadPlayer, requestInvite, requireMemberId } from "../../../lib/gameServer";
 import {
   KEYS,
   REWARDS,
@@ -13,7 +13,7 @@ import {
 } from "../../../lib/wordGame";
 
 /*
- * 오늘의 단어 API (모든 쓰기는 여기서만)
+ * 단어게임 API (모든 쓰기는 여기서만)
  *  · start  → word_games(escrow) → 봇이 티켓 1장(없으면 50점 자동구매) 차감 · 정답을 word_secrets 에 넣고 playing
  *  · guess  → 단어장(word_dict)에 있는 단어만. 처음 보는 단어는 valid=null 로 넣고 봇이 AI 로 검증한다 (pending)
  *  · 끝나면 won · lost + answer → 봇이 보상(1번 300 · 2번 150 · 3번 90 · 4번 50 · 5번 30점) 지급 · 카톡 전적에 합산
@@ -62,6 +62,13 @@ export async function POST(request: Request) {
 
   const game = gameId ? await readGame(admin, gameId, memberId) : null;
   if (!game) return fail("게임을 찾지 못했습니다.", 404);
+
+  // 🆘 도움! → 카톡방에 알림 (봇이 올린다, 1분에 한 번)
+  if (action === "help") {
+    if (game.status !== "playing") return fail("진행 중인 게임에서만 도움을 요청할 수 있어요.");
+    const result = await requestInvite(admin, "word", game.id, memberId);
+    return result.ok ? NextResponse.json({ ok: true }) : fail(result.error);
+  }
 
   if (action === "quit") {
     const now = new Date().toISOString();

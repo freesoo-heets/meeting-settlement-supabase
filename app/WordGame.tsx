@@ -184,6 +184,12 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
     void channelRef.current?.send({ type: "broadcast", event: "typing", payload: { jamo: typed } });
   }, [typed, spectating, game]);
 
+  async function askHelp() {
+    if (!game) return;
+    const result = await callWord({ action: "help", gameId: game.id });
+    setMessage(result.ok ? "📣 카톡방에 도움을 요청했어요. 링크로 들어와 같이 볼 수 있어요." : result.error ?? "요청하지 못했습니다.");
+  }
+
   function sendChat() {
     const text = chatText.trim().slice(0, 80);
     if (!text) return;
@@ -365,7 +371,7 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
           <button className="wdIcon" aria-label="뒤로" onClick={spectating ? onBack : game && !finished ? () => setMenu((m) => !m) : game ? () => setGame(null) : onBack}>
             ‹
           </button>
-          <h2>오늘의 단어</h2>
+          <h2>단어게임</h2>
           <button className="wdIcon" aria-label="메뉴" onClick={() => setMenu((m) => !m)}>
             ⋯
           </button>
@@ -431,6 +437,9 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
         ) : (
           <>
             <div className="wdPlay">
+              {!spectating && game.status === "playing" && (
+                <button className="wdHelp" onClick={() => void askHelp()}>🆘 도움!</button>
+              )}
               {(spectating || viewers.length > 0) && (
                 <div className="wdWatch">
                   {spectating ? `👀 ${game.name}님의 도전을 관전 중` : `👀 ${viewers.length}명 관전 중`}

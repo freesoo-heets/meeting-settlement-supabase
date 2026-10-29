@@ -8,7 +8,17 @@ import { supabase } from "../lib/supabase";
 import { BUY_IN, type Action, type Card, type Table } from "../lib/holdem";
 import { copyInviteLink } from "./copyInvite";
 import { useGameViewport } from "./useGameViewport";
-import { HoldemTableView } from "./HoldemGame";
+import { HoldemTableView, type HoldemEmote } from "./HoldemGame";
+import { EMOTE_COOLDOWN_MS, EMOTE_SHOW_MS, isEmoteKind, type EmoteKind } from "./OmokEmotes";
+
+// 안내 문구는 잠깐 보였다가 사라진다
+function useAutoClear(value: string, clear: (v: string) => void, ms: number) {
+  useEffect(() => {
+    if (!value) return;
+    const timer = window.setTimeout(() => clear(""), ms);
+    return () => window.clearTimeout(timer);
+  }, [value, clear, ms]);
+}
 
 type TableRow = {
   id: string;
@@ -134,12 +144,13 @@ type Props = {
   myPoints: number | null;
   myTickets: number | null;
   initialTableId?: string;
+  myName?: string;
 };
 
-export default function HoldemOnline({ onClose, onBack, currentMemberId, myPoints, myTickets, initialTableId }: Props) {
+export default function HoldemOnline({ onClose, onBack, currentMemberId, myPoints, myTickets, initialTableId, myName = "" }: Props) {
   const [tableId, setTableId] = useState(initialTableId ?? "");
   if (tableId) {
-    return <HoldemRoom key={tableId} tableId={tableId} currentMemberId={currentMemberId} onClose={onClose} onBack={() => setTableId("")} />;
+    return <HoldemRoom key={tableId} tableId={tableId} currentMemberId={currentMemberId} myName={myName} onClose={onClose} onBack={() => setTableId("")} />;
   }
   return (
     <HoldemLobby
@@ -172,6 +183,7 @@ function HoldemLobby({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [info, setInfo] = useState("");
+  useAutoClear(info, setInfo, 5000);
   const [showAll, setShowAll] = useState(false);
   const pass = usePass(currentMemberId);
 
@@ -352,8 +364,8 @@ function RecordRow({ seat, showName }: { seat: SeatRow; showName?: boolean }) {
 
 // ───────── 테이블 ─────────
 function HoldemRoom({
-  tableId, currentMemberId, onClose, onBack,
-}: { tableId: string; currentMemberId: string; onClose: () => void; onBack: () => void }) {
+  tableId, currentMemberId, myName, onClose, onBack,
+}: { tableId: string; currentMemberId: string; myName: string; onClose: () => void; onBack: () => void }) {
   const [row, setRow] = useState<TableRow | null>(null);
   const [seats, setSeats] = useState<SeatRow[]>([]);
   const [hole, setHole] = useState<{ handNo: number; cards: Card[] } | null>(null);
@@ -361,6 +373,36 @@ function HoldemRoom({
   const [message, setMessage] = useState("");
   const [info, setInfo] = useState("");
   const pass = usePass(currentMemberId);
+  useAutoClear(info, setInfo, 5000);
+  useAutoClear(message, setMessage, 8000);
+
+  // 😀 감정표현 (오목과 같은 스티커 · 3초에 한 번)
+  const [emotes, setEmotes] = useState<HoldemEmote[]>([]);
+  const [emoteUntil, setEmoteUntil] = useState(0);
+  const [, setTickNow] = useState(0);
+  const emoteKey = useRef(0);
+  const emoteChannel = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const showEmote = useCallback((e: Omit<HoldemEmote, "key">) => {
+    emoteKey.current += 1;
+    const key = emoteKey.current;
+    setEmotes((list) => [...list.filter((x) => x.member !== e.member).slice(-7), { ...e, key }]);
+    window.setTimeout(() => setEmotes((list) => list.filter((x) => x.key !== key)), EMOTE_SHOW_MS);
+  }, []);
+  useEffect(() => {
+    const channel = supabase
+      .channel(`holdem-emote-${tableId}`, { config: { broadcast: { self: false } } })
+      .on("broadcast", { event: "emote" }, ({ payload }) => {
+        const data = payload as { kind?: unknown; member?: unknown; name?: unknown };
+        if (!isEmoteKind(data.kind) || typeof data.member !== "string") return;
+        showEmote({ kind: data.kind, member: data.member, name: String(data.name ?? "").slice(0, 10) });
+      })
+      .subscribe();
+    emoteChannel.current = channel;
+    return () => {
+      emoteChannel.current = null;
+      void supabase.removeChannel(channel);
+    };
+  }, [tableId, showEmote]);
 
   const load = useCallback(async () => {
     const [t, s] = await Promise.all([
@@ -437,6 +479,17 @@ function HoldemRoom({
     void load();
   }
   const onAct = (action: Action) => void run({ action: "act", type: action.type, to: action.to ?? 0, handNo });
+  const onEmote = (kind: EmoteKind) => {
+    const now = Date.now();
+    if (now < emoteUntil) return;
+    setEmoteUntil(now + EMOTE_COOLDOWN_MS);
+    // 남은 초 표시를 줄여 가며 보여 준다
+    for (let s = 1; s <= EMOTE_COOLDOWN_MS / 1000; s += 1) window.setTimeout(() => setTickNow(Date.now()), s * 1000);
+    const name = (meIndex >= 0 ? view?.players?.[meIndex]?.name : myName) || "관전";
+    const payload = { kind, member: currentMemberId, name };
+    showEmote(payload);
+    void emoteChannel.current?.send({ type: "broadcast", event: "emote", payload });
+  };
 
   if (!row || !view?.players) {
     return (
@@ -575,6 +628,9 @@ function HoldemRoom({
       notice={notice}
       onClose={onClose}
       onBack={onBack}
+      emotes={emotes}
+      onEmote={onEmote}
+      emoteReadyIn={Math.max(0, emoteUntil - Date.now())}
     />
   );
 }

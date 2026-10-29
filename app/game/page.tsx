@@ -4,13 +4,13 @@ import { getServerAdmin } from "../../lib/server-admin";
 // 게임 초대 링크 전용 주소 (/game?omok=… · /game?alkkagi=… · /game?catch=…)
 // 카톡 미리보기에 '모임 참석 · 비용 정산' 대신 게임 제목이 나오게 하고, 들어오면 메인 화면의 그 방으로 보낸다.
 
-type Kind = "omok" | "alkkagi" | "catch" | "holdem";
+type Kind = "omok" | "alkkagi" | "catch" | "holdem" | "word";
 type Search = Promise<Record<string, string | string[] | undefined>>;
 
-const LABEL: Record<Kind, string> = { omok: "🏁 오목", alkkagi: "🥏 알까기", catch: "🎨 캐치마인드", holdem: "🃏 홀덤" };
+const LABEL: Record<Kind, string> = { omok: "🏁 오목", alkkagi: "🥏 알까기", catch: "🎨 캐치마인드", holdem: "🃏 홀덤", word: "📝 단어게임" };
 
 function pick(params: Record<string, string | string[] | undefined>): { kind: Kind; id: string } | null {
-  for (const kind of ["omok", "alkkagi", "catch", "holdem"] as Kind[]) {
+  for (const kind of ["omok", "alkkagi", "catch", "holdem", "word"] as Kind[]) {
     const value = params[kind];
     const id = Array.isArray(value) ? value[0] : value;
     if (id && /^[0-9a-f-]{36}$/i.test(id)) return { kind, id };
@@ -28,6 +28,14 @@ async function describe(kind: Kind, id: string) {
       return {
         title: `${LABEL.holdem} · ${data.host_name}님의 테이블`,
         description: `${data.is_friendly ? "🤝 친선" : "💎 바이인 1,000점"} · ${players}/${data.max_seats}명 · 눌러서 참가하세요`,
+      };
+    }
+    if (kind === "word") {
+      const { data } = await admin.from("word_games").select("name,tries,max_tries,status").eq("id", id).maybeSingle();
+      if (!data) return null;
+      return {
+        title: `🆘 ${data.name}님의 단어게임 도와주세요!`,
+        description: `${data.tries}/${data.max_tries}번째 도전 중 · 눌러서 같이 보며 채팅하세요`,
       };
     }
     if (kind === "catch") {

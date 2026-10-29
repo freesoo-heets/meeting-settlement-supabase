@@ -150,6 +150,7 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
         currentMemberId={currentMemberId}
         myPoints={myPoints}
         myTickets={myTickets}
+        myName={myName}
       />
     );
   }
@@ -320,7 +321,7 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
             <div className="gameHubHead">
               <span className="gameHubIcon" aria-hidden="true">📝</span>
               <div>
-                <strong>오늘의 단어</strong>
+                <strong>단어게임</strong>
                 <span>자모 5칸 · 5번 안에 · 티켓 1장 · 최대 300점</span>
               </div>
               <button className="smallButton" onClick={() => setActive({ kind: "word", id: "" })}>시작하기</button>

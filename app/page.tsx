@@ -191,7 +191,7 @@ export default function Home() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     let invite: { kind: GameKind; id: string } | null = null;
-    for (const kind of ["omok", "alkkagi", "catch", "holdem"] as GameKind[]) {
+    for (const kind of ["omok", "alkkagi", "catch", "holdem", "word"] as GameKind[]) {
       const id = params.get(kind);
       if (id) invite = { kind, id };
     }

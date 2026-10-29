@@ -106,7 +106,7 @@ export async function isAdminMember(admin: Admin, memberId: string) {
 
 // 카톡방 초대 메시지 요청 (봇이 bot_announcements 를 보고 올린다). 같은 대국은 1분에 한 번
 export const INVITE_COOLDOWN_MS = 60 * 1000;
-export async function requestInvite(admin: Admin, kind: "omok" | "alkkagi" | "holdem", refId: string, memberId: string) {
+export async function requestInvite(admin: Admin, kind: "omok" | "alkkagi" | "holdem" | "word", refId: string, memberId: string) {
   const { data: last } = await admin
     .from("bot_announcements")
     .select("created_at")

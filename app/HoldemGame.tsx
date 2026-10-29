@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useGameViewport } from "./useGameViewport";
 import { useGameSound } from "./gameSound";
+import { EMOTES, EmoteIcon, type EmoteKind } from "./OmokEmotes";
 import {
   sndBoard, sndDeal, sndFlip, sndForLog, sndHurry, sndLose, sndMyTurn, sndPot, sndShowdown, sndWin,
 } from "./holdemSound";
@@ -152,12 +153,30 @@ type ViewProps = {
   onReady?: (ready: boolean) => void; // 연출이 끝나 다음 행동을 해도 될 때
   onClose: () => void;
   onBack?: () => void;
+  emotes?: HoldemEmote[];       // 떠 있는 감정표현 (오목과 같은 스티커)
+  onEmote?: (kind: EmoteKind) => void;
+  emoteReadyIn?: number;        // 다시 보낼 수 있을 때까지 남은 ms
 };
+
+export type HoldemEmote = { key: number; kind: EmoteKind; member: string; name: string };
+
+function EmotePop({ emote, watcher }: { emote: HoldemEmote; watcher?: boolean }) {
+  return (
+    <div className={`hdEmotePop ${watcher ? "center" : ""}`}>
+      <EmoteIcon kind={emote.kind} />
+      {watcher && <span>👀 {emote.name}</span>}
+    </div>
+  );
+}
 
 // 테이블 화면 (연습판 · 온라인 공용)
 export function HoldemTableView({
   table, meIndex, myHole, onAct, busy, deadline, title, subtitle, headerExtra, idleBar, notice, onReady, onClose, onBack,
+  emotes = [], onEmote, emoteReadyIn = 0,
 }: ViewProps) {
+  // 감정표현: 앉은 사람은 그 자리 위에, 관전자는 테이블 가운데에
+  const emoteAt = (member?: string) => (member ? emotes.filter((e) => e.member === member) : []);
+  const watcherEmotes = emotes.filter((e) => !table.players.some((p) => !p.empty && p.member === e.member));
   useGameViewport();
   const [ranksOpen, setRanksOpen] = useState(false); // 휴대폰: 족보표 펼치기
   const n = table.players.length;
@@ -252,8 +271,6 @@ export function HoldemTableView({
     () => (myCards && visibleBoard.length >= 3 ? bestHand([...myCards, ...visibleBoard]) : null),
     [myCards, visibleBoard.length], // eslint-disable-line react-hooks/exhaustive-deps
   );
-  // 내 족보에 쓰인 카드에 테두리
-  const inBest = (c: Card) => !!best?.cards.some((b) => b.r === c.r && b.s === c.s);
 
   // 남은 시간 (차례인 자리에 표시)
   const [clock, setClock] = useState(() => Date.now());
@@ -286,6 +303,14 @@ export function HoldemTableView({
     if (id !== meIndex && !isRevealed(id) && !resultShown) return "";
     return HAND_NAME[bestHand([...cards, ...table.board]).score[0]];
   };
+  // 결과 때 빛나는 카드: 이긴 사람의 족보 5장만 (폴드한 사람 · 진 사람 카드는 빛나지 않게)
+  const winCards = resultShown && contested && table.board.length >= 5
+    ? table.winners.flatMap((w) => {
+        const cards = cardsOf(w.id);
+        return cards.length === 2 && cards[0].r > 0 ? bestHand([...cards, ...table.board]).cards : [];
+      })
+    : [];
+  const inWin = (c: Card) => winCards.some((b) => b.r === c.r && b.s === c.s);
   const lastLine = table.log.filter((line) => resultShown || !line.startsWith("🏆")).slice(-1)[0] ?? "";
   const roleOf = (id: number) =>
     table.handNo === 0 ? "" : table.dealer === id ? "D" : !handOver && sbSeat === id ? "SB" : !handOver && bbSeat === id ? "BB" : "";
@@ -378,6 +403,7 @@ export function HoldemTableView({
           <div className="hdRail">
             {/* 가운데: 팟 · 공용 카드 */}
             <div className="hdCenter">
+              {watcherEmotes.map((e) => <EmotePop key={e.key} emote={e} watcher />)}
               <div className="hdPot"><span>POT</span><b>{fmt(pot)}</b></div>
               <div className="hdPotArea">
                 {!resultShown && <ChipPile amount={pot - table.players.reduce((sum, q) => sum + q.bet, 0)} className="pot" />}
@@ -387,7 +413,7 @@ export function HoldemTableView({
                       key={`${table.handNo}-${i}-${i < boardShown}`}
                       card={i < boardShown ? table.board[i] : undefined}
                       slow={i >= 3}
-                      lit={i < boardShown && resultShown && inBest(table.board[i])}
+                      lit={i < boardShown && inWin(table.board[i])}
                     />
                   ))}
                 </div>
@@ -422,6 +448,7 @@ export function HoldemTableView({
               const turn = table.turn === p.id && !handOver && dealDone;
               return (
                 <div key={p.id} className={`hdSeat ${pos} ${turn ? "turn" : ""} ${p.folded || p.out ? "folded" : ""} ${win ? "win" : ""} ${lost ? "lost" : ""}`}>
+                  {emoteAt(p.member).map((e) => <EmotePop key={e.key} emote={e} />)}
                   <div className="hdTags">
                     {win && <span className="hdWinTag">👑 WIN +{fmt(wonAmount(p.id))}</span>}
                     {made && <span className={`hdMade ${win ? "win" : ""}`}>{made}</span>}
@@ -429,7 +456,7 @@ export function HoldemTableView({
                   <div className={`hdSeatCards ${isRevealed(p.id) ? "open" : ""}`}>
                     {p.hole.slice(0, handOver ? 2 : dealtTo(p.id)).map((c, k) => (
                       <span key={`${table.handNo}-${k}`} className="hdDealIn from-center">
-                        <CardView key={`${k}-${isRevealed(p.id)}`} card={c} hidden={!isRevealed(p.id) || c.r === 0} size="sm" />
+                        <CardView key={`${k}-${isRevealed(p.id)}`} card={c} hidden={!isRevealed(p.id) || c.r === 0} size="sm" lit={isRevealed(p.id) && inWin(c)} />
                       </span>
                     ))}
                   </div>
@@ -469,6 +496,7 @@ export function HoldemTableView({
             </div>
           ) : (
             <div className={`hdMe ${table.turn === base && !handOver && dealDone ? "turn" : ""} ${bottomWin ? "win" : ""} ${resultShown && contested && !bottomWin && !bottom.folded && !bottom.out ? "lost" : ""}`}>
+              {emoteAt(bottom.member).map((e) => <EmotePop key={e.key} emote={e} />)}
               <div className="hdTags me">
                 {bottomWin && <span className="hdWinTag">👑 WIN +{fmt(wonAmount(base))}</span>}
                 {madeOf(base) && resultShown && <span className={`hdMade ${bottomWin ? "win" : ""}`}>{madeOf(base)}</span>}
@@ -482,7 +510,7 @@ export function HoldemTableView({
                       <span className="hdFan">
                         <span className={`hdFlipCard ${open ? "open" : ""}`}>
                           <CardView card={c} size="lg" hidden />
-                          {known && <span className="hdFlipFront"><CardView card={c} size="lg" lit={resultShown && base === meIndex && inBest(c)} /></span>}
+                          {known && <span className="hdFlipFront"><CardView card={c} size="lg" lit={inWin(c)} /></span>}
                         </span>
                       </span>
                     </span>
@@ -551,6 +579,23 @@ export function HoldemTableView({
         </div>
         {notice}
         <p className="hdLastLine" aria-live="polite">{lastLine}</p>
+        {onEmote && (
+          <div className="omokEmoteBar hdEmoteBar" role="group" aria-label="감정표현">
+            {EMOTES.map((item) => (
+              <button
+                key={item.kind}
+                className="omokEmoteButton"
+                disabled={emoteReadyIn > 0}
+                aria-label={item.label}
+                title={item.label}
+                onClick={() => onEmote(item.kind)}
+              >
+                <EmoteIcon kind={item.kind} />
+              </button>
+            ))}
+            {emoteReadyIn > 0 && <em className="omokEmoteWait">{Math.ceil(emoteReadyIn / 1000)}</em>}
+          </div>
+        )}
         </div>
         <div className={`hdRanksWrap ${ranksOpen ? "open" : ""}`}>
           <HandRanks current={best?.score[0]} onClose={() => setRanksOpen(false)} />
