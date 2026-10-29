@@ -76,6 +76,8 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
   const retry = useRef<{ key: string; count: number; timer: ReturnType<typeof setTimeout> | null }>({ key: "", count: 0, timer: null });
   const [chat, setChat] = useState<ChatLine[]>([]);
   const [chatText, setChatText] = useState("");
+  // 확인창 (카톡 안 브라우저는 window.confirm 이 안 뜨는 경우가 있어 화면 안에 직접 띄운다)
+  const [ask, setAsk] = useState<{ title: string; text: string; yes: string; onYes: () => void } | null>(null);
   // 채팅 입력 중(휴대폰 키보드가 올라옴): 판을 줄이고 자모 자판 · 도움 버튼을 잠깐 숨긴다
   const [chatting, setChatting] = useState(false);
   const blurTimer = useRef<number | undefined>(undefined);
@@ -215,9 +217,18 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
     void channelRef.current?.send({ type: "broadcast", event: "typing", payload: { jamo: typed } });
   }, [typed, spectating, game]);
 
-  async function askHelp() {
+  function askHelp() {
     if (!game) return;
-    if (!window.confirm("카톡방에 도움 요청을 보낼까요?\n지금까지 입력한 칸과 관전 링크가 함께 올라가요.")) return;
+    setAsk({
+      title: "🆘 도움 요청",
+      text: "카톡방에 도움 요청을 보낼까요?\n지금까지 입력한 칸과 관전 링크가 함께 올라가요.",
+      yes: "보내기",
+      onYes: () => void sendHelp(),
+    });
+  }
+
+  async function sendHelp() {
+    if (!game) return;
     const id = game.id;
     const result = await callWord({ action: "help", gameId: id });
     if (!result.ok) return setMessage(result.error ?? "요청하지 못했습니다.");
@@ -295,10 +306,13 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
     setGame(rows.find((r) => r.id === result.id) ?? null);
   }
 
-  async function quit() {
+  async function quit(force = false) {
     setMenu(false);
     if (!game) return;
-    if (game.status === "playing" && !window.confirm("포기할까요? 티켓은 돌려받지 못하고, 정답을 알려드려요.")) return;
+    if (game.status === "playing" && !force) {
+      setAsk({ title: "🏳️ 포기", text: "포기할까요?\n티켓은 돌려받지 못하고, 정답을 알려드려요.", yes: "포기하기", onYes: () => void quit(true) });
+      return;
+    }
     const result = await callWord({ action: "quit", gameId: game.id });
     if (!result.ok) {
       setMessage(result.error ?? "포기하지 못했습니다.");
@@ -483,7 +497,7 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
           <>
             <div className="wdPlay">
               {!spectating && game.status === "playing" && (
-                <button className="wdHelp" onClick={() => void askHelp()}>🆘 도움!</button>
+                <button className="wdHelp" onClick={askHelp}>🆘 도움!</button>
               )}
               {(spectating || viewers.length > 0) && (
                 <div className="wdWatch">
@@ -602,6 +616,19 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
               </div>
             )}
           </>
+        )}
+
+        {ask && (
+          <div className="wdResultBack" onClick={() => setAsk(null)}>
+            <div className="wdResult wdAsk" onClick={(e) => e.stopPropagation()}>
+              <strong>{ask.title}</strong>
+              <p>{ask.text}</p>
+              <div className="wdResultButtons">
+                <button className="wdBig" onClick={() => { const go = ask.onYes; setAsk(null); go(); }}>{ask.yes}</button>
+                <button className="smallButton ghost" onClick={() => setAsk(null)}>취소</button>
+              </div>
+            </div>
+          </div>
         )}
 
         {showResult && game && finished && (
