@@ -93,6 +93,7 @@ export type Player = {
   standAfter?: boolean;   // 나가기 예약: 이번 판을 끝까지 하고 일어남
   rebuys?: number;        // 반영한 충전 횟수 (holdem_seats.rebuy_count 와 비교)
   pendingChips?: number;  // 충전했지만 판이 끝나야 들어오는 칩
+  rebuyQueued?: boolean;  // 판 도중 누른 충전 예약 (판이 끝난 뒤 칩이 모자라면 그만큼만 봇에게 요청)
 };
 
 export type Stage = "preflop" | "flop" | "turn" | "river" | "showdown";

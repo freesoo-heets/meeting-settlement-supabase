@@ -299,7 +299,8 @@ export async function POST(request: Request) {
   }
 
   if (action === "rebuy") {
-    // 충전: 칩을 1,000개까지 다시 채운다 (점수가 모자라면 남은 점수 전부) — 봇이 차감한 뒤 판이 끝나면 들어온다
+    // 충전: 칩을 1,000개까지 다시 채운다 (점수가 모자라면 남은 점수 전부)
+    // 판에 참여 중이면 예약만 해 둔다 — 판이 끝난 뒤 칩이 모자랄 때만 그만큼 봇이 차감한다 (step)
     const loaded = await load(admin, tableId);
     if (!loaded) return fail("테이블을 찾지 못했습니다.");
     const me = loaded.state.players.find((p) => p.member === memberId && !p.empty);
@@ -312,6 +313,16 @@ export async function POST(request: Request) {
     const player = await loadPlayer(admin, memberId);
     if ("error" in player) return fail(player.error);
     if (player.exp < 1) return fail("충전할 점수가 없습니다.");
+    let queued = false;
+    const reserved = await mutate(admin, tableId, (ctx) => {
+      const p = ctx.t.players.find((q) => q.member === memberId && !q.empty);
+      if (!p) return "자리에 앉아 있지 않습니다.";
+      queued = ctx.t.stage !== "showdown" && !p.folded && !p.out;
+      if (queued) p.rebuyQueued = true;
+      return null;
+    });
+    if (!reserved.ok) return fail(reserved.error);
+    if (queued) return NextResponse.json({ ok: true, queued: true });
     const { data, error } = await admin
       .from("holdem_seats")
       .update({ rebuy_state: "requested", rebuy_want: BUY_IN - now, rebuy_note: null, updated_at: new Date().toISOString() })
@@ -321,6 +332,15 @@ export async function POST(request: Request) {
       .select("id");
     if (error || (data ?? []).length !== 1) return fail(`충전 요청 실패${error ? `: ${error.message}` : ""}`);
     return NextResponse.json({ ok: true, want: Math.min(BUY_IN - now, player.exp) });
+  }
+
+  if (action === "rebuyCancel") {
+    const result = await mutate(admin, tableId, (ctx) => {
+      const p = ctx.t.players.find((q) => q.member === memberId && !q.empty);
+      if (p) p.rebuyQueued = false;
+      return null;
+    });
+    return result.ok ? NextResponse.json(result) : fail(result.error);
   }
 
   if (action === "back") {

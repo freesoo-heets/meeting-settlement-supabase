@@ -1,5 +1,5 @@
 // 홀덤 온라인 테이블 진행 (서버 전용 · 순수 함수: DB 는 api/holdem 이 다룬다)
-import { act, legal, showdownOpen, startHand, type Action, type Player, type Table } from "./holdem";
+import { act, BUY_IN, legal, showdownOpen, startHand, type Action, type Player, type Table } from "./holdem";
 
 export const TURN_SECONDS = 25;   // 한 사람 생각 시간
 export const DEAL_SECONDS = 6;    // 새 판: 카드 나눠 주는 연출 시간만큼 더
@@ -8,6 +8,7 @@ export const GRACE_MS = 1500;     // 통신 지연 여유
 export const MAX_STRIKES = 2;     // 연속 시간 초과 → 이번 판 뒤 자동으로 일어남
 export const IDLE_MINUTES = 15;   // 혼자 남은 대기 테이블은 이 시간이 지나면 정리 (칩 반환)
 export const SEAT_ACTIVE = ["escrow", "seated"];
+export const REBUY_WAIT_MS = 12 * 1000;         // 봇이 충전을 처리하는 동안 다음 판을 이만큼까지 기다린다
 export const PASS_RENEW_BEFORE_MS = 60 * 1000;  // 이용권이 1분 남으면 봇에게 연장(티켓 1장) 요청
 export const PASS_RENEW_WAIT_MS = 30 * 1000;    // 끝난 뒤 이만큼 기다려도 연장이 안 되면 그 판 뒤 일어남
 
@@ -80,7 +81,7 @@ function cashOut(ctx: Ctx, p: Player, now: number) {
   Object.assign(p, {
     name: "", chips: 0, hole: [], out: true, folded: true, allIn: false, empty: true,
     seatId: undefined, member: undefined, leaving: false, strikes: 0, hands: 0,
-    standAfter: false, rebuys: 0, pendingChips: 0,
+    standAfter: false, rebuys: 0, pendingChips: 0, rebuyQueued: false,
   });
 }
 
@@ -121,6 +122,22 @@ export function step(ctx: Ctx, seats: SeatRow[], now: number) {
     }
   }
 
+  // 1-2-2) 충전 예약: 이 판의 칩이 정해진 뒤에야 점수를 뺀다 (이겨서 1,000개가 넘으면 충전하지 않는다)
+  for (const p of ctx.t.players) {
+    if (p.empty || !p.rebuyQueued || !(ctx.t.stage === "showdown" || p.out || p.folded)) continue;
+    p.rebuyQueued = false;
+    const seat = seats.find((s) => s.id === p.seatId && s.status === "seated");
+    const want = BUY_IN - p.chips - (p.pendingChips ?? 0);
+    if (!seat || p.leaving || p.standAfter || rebuyPending(seats, p)) continue;
+    if (want <= 0) {
+      ctx.t.log.push(`💎 ${p.name} 칩이 ${fmt(BUY_IN)}개 이상이라 충전하지 않았어요`);
+      continue;
+    }
+    const fields = { rebuy_state: "requested", rebuy_want: want, rebuy_note: null };
+    ctx.seatUpdates.set(seat.id, { ...ctx.seatUpdates.get(seat.id), ...fields });
+    seat.rebuy_state = "requested"; // 아래 단계에서 이 자리를 충전 중으로 본다
+  }
+
   // 1-3) 🎫 이용권(티켓 1장 = 1시간): 1분 남으면 연장 요청, 끝났는데 연장이 안 되면 이번 판 뒤 일어남
   for (const seat of seats) {
     const p = ctx.t.players.find((q) => q.seatId === seat.id && !q.empty);
@@ -128,7 +145,7 @@ export function step(ctx: Ctx, seats: SeatRow[], now: number) {
     const until = new Date(seat.pass_until).getTime();
     const renew = seat.renew_state ?? "none";
     if (renew === "none" && now >= until - PASS_RENEW_BEFORE_MS && !p.leaving && !p.standAfter) {
-      ctx.seatUpdates.set(seat.id, { renew_state: "requested" });
+      ctx.seatUpdates.set(seat.id, { ...ctx.seatUpdates.get(seat.id), renew_state: "requested" });
     }
     const expired = now >= until && (renew === "failed" || now >= until + PASS_RENEW_WAIT_MS);
     if (expired && !p.standAfter && !p.leaving) {
@@ -177,6 +194,9 @@ export function step(ctx: Ctx, seats: SeatRow[], now: number) {
 
   // 5) 판이 끝났고 결과를 보여 줄 시간이 지났으면: 일어날 사람 · 칩 없는 사람 정리 → 다음 판
   if (ctx.t.stage === "showdown" && (ctx.nextHandAt === null || now >= ctx.nextHandAt)) {
+    // 충전 처리 중이면 잠깐 기다린다 (새 판이 먼저 시작되면 칩이 또 판 뒤로 밀린다)
+    const rebuying = ctx.t.players.some((p) => !p.empty && rebuyPending(seats, p));
+    if (rebuying && ctx.nextHandAt !== null && now < ctx.nextHandAt + REBUY_WAIT_MS) return;
     // 나가기 예약 · 일어남 · 칩 없음 (단, 충전 처리 중이면 기다린다)
     for (const p of ctx.t.players) {
       if (!p.empty && (p.leaving || p.standAfter || p.chips <= 0) && !rebuyPending(seats, p)) cashOut(ctx, p, now);
