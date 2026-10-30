@@ -334,6 +334,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, want: Math.min(BUY_IN - now, player.exp) });
   }
 
+  if (action === "renewRetry") {
+    // 🎫 티켓이 없어 실패한 이용 시간 연장을 다시 요청 (티켓을 산 뒤)
+    const result = await mutate(admin, tableId, (ctx, seats, now) => {
+      const p = ctx.t.players.find((q) => q.member === memberId && !q.empty);
+      const seat = seats.find((s) => s.id === p?.seatId && s.status === "seated");
+      if (!p || seat?.renew_state !== "failed") return null;
+      p.renewRetryAt = now;
+      ctx.seatUpdates.set(seat.id, { renew_state: "requested" });
+      return null;
+    });
+    return result.ok ? NextResponse.json(result) : fail(result.error);
+  }
+
   if (action === "rebuyCancel") {
     const result = await mutate(admin, tableId, (ctx) => {
       const p = ctx.t.players.find((q) => q.member === memberId && !q.empty);

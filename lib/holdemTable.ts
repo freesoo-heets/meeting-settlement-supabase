@@ -31,6 +31,9 @@ export type SeatRow = {
 // 봇이 아직 충전을 처리 중인 자리 (그동안은 정산하지 않는다 — 차감한 점수가 사라지지 않게)
 const rebuyPending = (seats: SeatRow[], p: Player) =>
   seats.some((s) => s.id === p.seatId && (s.rebuy_state === "requested" || s.rebuy_state === "locking"));
+// 시간이 끝난 자리인데 봇이 연장을 처리 중 (방금 티켓을 샀다면 내보내지 않는다)
+const renewPending = (seats: SeatRow[], p: Player) =>
+  !!p.passStand && seats.some((s) => s.id === p.seatId && (s.renew_state === "requested" || s.renew_state === "locking"));
 export type Ctx = {
   t: Table;
   status: TableStatus;
@@ -81,7 +84,7 @@ function cashOut(ctx: Ctx, p: Player, now: number) {
   Object.assign(p, {
     name: "", chips: 0, hole: [], out: true, folded: true, allIn: false, empty: true,
     seatId: undefined, member: undefined, leaving: false, strikes: 0, hands: 0,
-    standAfter: false, rebuys: 0, pendingChips: 0, rebuyQueued: false,
+    standAfter: false, rebuys: 0, pendingChips: 0, rebuyQueued: false, passStand: false, renewRetryAt: 0,
   });
 }
 
@@ -147,9 +150,16 @@ export function step(ctx: Ctx, seats: SeatRow[], now: number) {
     if (renew === "none" && now >= until - PASS_RENEW_BEFORE_MS && !p.leaving && !p.standAfter) {
       ctx.seatUpdates.set(seat.id, { ...ctx.seatUpdates.get(seat.id), renew_state: "requested" });
     }
-    const expired = now >= until && (renew === "failed" || now >= until + PASS_RENEW_WAIT_MS);
+    if (p.passStand && now < until) {
+      // 티켓을 사서 연장됨 → 자동 나가기 취소
+      p.passStand = false;
+      p.standAfter = false;
+      ctx.t.log.push(`🎫 ${p.name} 이용 시간 연장`);
+    }
+    const expired = now >= until && (renew === "failed" || now >= Math.max(until, p.renewRetryAt ?? 0) + PASS_RENEW_WAIT_MS);
     if (expired && !p.standAfter && !p.leaving) {
       p.standAfter = true;
+      p.passStand = true;
       ctx.t.log.push(`🎫 ${p.name} 이용 시간 끝 → 이번 판이 끝나면 일어납니다`);
     }
   }
@@ -194,8 +204,8 @@ export function step(ctx: Ctx, seats: SeatRow[], now: number) {
 
   // 5) 판이 끝났고 결과를 보여 줄 시간이 지났으면: 일어날 사람 · 칩 없는 사람 정리 → 다음 판
   if (ctx.t.stage === "showdown" && (ctx.nextHandAt === null || now >= ctx.nextHandAt)) {
-    // 충전 처리 중이면 잠깐 기다린다 (새 판이 먼저 시작되면 칩이 또 판 뒤로 밀린다)
-    const rebuying = ctx.t.players.some((p) => !p.empty && rebuyPending(seats, p));
+    // 충전 · 연장 처리 중이면 잠깐 기다린다 (새 판이 먼저 시작되면 칩이 또 판 뒤로 밀린다)
+    const rebuying = ctx.t.players.some((p) => !p.empty && (rebuyPending(seats, p) || renewPending(seats, p)));
     if (rebuying && ctx.nextHandAt !== null && now < ctx.nextHandAt + REBUY_WAIT_MS) return;
     // 나가기 예약 · 일어남 · 칩 없음 (단, 충전 처리 중이면 기다린다)
     for (const p of ctx.t.players) {

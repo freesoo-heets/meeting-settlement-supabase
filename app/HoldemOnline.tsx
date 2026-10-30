@@ -4,11 +4,13 @@
 // 앉을 때 봇이 💎 1,000점을 차감하고, 일어나면 남은 칩을 점수로 돌려준다 (딴 금액의 10% 수수료)
 // 🎫 티켓 1장 = 1시간 이용권 (그 안에는 다시 앉아도 티켓이 들지 않는다)
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { supabase } from "../lib/supabase";
 import { BUY_IN, type Action, type Card, type Table } from "../lib/holdem";
 import { copyInviteLink } from "./copyInvite";
 import { useGameViewport } from "./useGameViewport";
 import { HoldemTableView, type HoldemEmote } from "./HoldemGame";
+import TicketBuy from "./TicketBuy";
 import { EMOTE_COOLDOWN_MS, EMOTE_SHOW_MS, isEmoteKind, type EmoteKind } from "./OmokEmotes";
 
 // 안내 문구는 잠깐 보였다가 사라진다
@@ -150,7 +152,7 @@ type Props = {
 export default function HoldemOnline({ onClose, onBack, currentMemberId, myPoints, myTickets, initialTableId, myName = "" }: Props) {
   const [tableId, setTableId] = useState(initialTableId ?? "");
   if (tableId) {
-    return <HoldemRoom key={tableId} tableId={tableId} currentMemberId={currentMemberId} myName={myName} onClose={onClose} onBack={() => setTableId("")} />;
+    return <HoldemRoom key={tableId} tableId={tableId} currentMemberId={currentMemberId} myName={myName} myPoints={myPoints} myTickets={myTickets} onClose={onClose} onBack={() => setTableId("")} />;
   }
   return (
     <HoldemLobby
@@ -364,8 +366,8 @@ function RecordRow({ seat, showName }: { seat: SeatRow; showName?: boolean }) {
 
 // ───────── 테이블 ─────────
 function HoldemRoom({
-  tableId, currentMemberId, myName, onClose, onBack,
-}: { tableId: string; currentMemberId: string; myName: string; onClose: () => void; onBack: () => void }) {
+  tableId, currentMemberId, myName, myPoints, myTickets, onClose, onBack,
+}: { tableId: string; currentMemberId: string; myName: string; myPoints: number | null; myTickets: number | null; onClose: () => void; onBack: () => void }) {
   const [row, setRow] = useState<TableRow | null>(null);
   const [seats, setSeats] = useState<SeatRow[]>([]);
   const [hole, setHole] = useState<{ handNo: number; cards: Card[] } | null>(null);
@@ -375,6 +377,8 @@ function HoldemRoom({
   const pass = usePass(currentMemberId);
   useAutoClear(info, setInfo, 5000);
   useAutoClear(message, setMessage, 8000);
+
+  const [showTicket, setShowTicket] = useState(false);
 
   // 😀 감정표현 (오목과 같은 스티커 · 3초에 한 번)
   const [emotes, setEmotes] = useState<HoldemEmote[]>([]);
@@ -573,7 +577,7 @@ function HoldemRoom({
           </button>
           <button
             className={`smallButton ${me.standAfter ? "" : "ghost"}`}
-            disabled={busy}
+            disabled={busy || me.passStand}
             onClick={() => void run({ action: "reserve" }, () => setInfo(me.standAfter ? "⏳ 나가기 예약을 취소했어요." : "⏳ 나가기 예약 · 이번 판이 끝나면 일어나고 남은 칩을 점수로 돌려받아요."))}
           >
             {me.standAfter ? "⏳ 예약 취소" : "⏳ 나가기 예약"}
@@ -603,7 +607,19 @@ function HoldemRoom({
       {info && !message && <div className="omokMessage info">{info}</div>}
       {me && (me.pendingChips ?? 0) > 0 && <div className="omokMessage info">💎 충전한 칩 {fmt(me.pendingChips ?? 0)}개는 이번 판이 끝나면 들어와요.</div>}
       {mySeat?.rebuy_state === "failed" && mySeat.rebuy_note && <div className="omokMessage">충전 실패: {mySeat.rebuy_note}</div>}
-      {mySeat?.renew_state === "failed" && <div className="omokMessage">🎫 티켓이 없어 이용 시간을 연장하지 못했어요. 이번 판이 끝나면 일어납니다.</div>}
+      {mySeat?.renew_state === "failed" && me && (
+        <div className="hdPassAlert">
+          <div>
+            <strong>🎫 {pass.text ? `이용 시간 ${pass.text} 남음` : "이용 시간이 끝났어요"}</strong>
+            <span>{pass.text ? "티켓이 없어 연장하지 못했어요" : "이번 판이 끝나면 자리에서 일어나요"}</span>
+          </div>
+          {(myTickets ?? 0) > 0 ? (
+            <button className="smallButton" disabled={busy} onClick={() => void run({ action: "renewRetry" })}>연장하기</button>
+          ) : (
+            <button className="smallButton" onClick={() => setShowTicket(true)}>티켓 구매</button>
+          )}
+        </div>
+      )}
       {lastFailed && !mySeat && !me && <div className="omokMessage">자리 신청 실패: {lastFailed.escrow_note}</div>}
       {lastLeft && lastLeftResult && !me && (
         <div className="omokMessage info">
@@ -618,6 +634,7 @@ function HoldemRoom({
   );
 
   return (
+    <>
     <HoldemTableView
       table={view}
       meIndex={meIndex}
@@ -642,5 +659,15 @@ function HoldemRoom({
       onEmote={onEmote}
       emoteReadyIn={Math.max(0, emoteUntil - Date.now())}
     />
+    {showTicket && createPortal(
+      <TicketBuy
+        myPoints={myPoints}
+        myTickets={myTickets}
+        onBought={() => void callHoldem({ action: "renewRetry", tableId })}
+        onClose={() => setShowTicket(false)}
+      />,
+      document.body,
+    )}
+    </>
   );
 }
