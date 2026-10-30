@@ -566,7 +566,7 @@ function HoldemRoom({
                 ? `충전을 예약할까요?\n이번 판이 끝난 뒤 칩이 ${fmt(BUY_IN)}개보다 적으면 모자란 만큼만 점수에서 채워요.`
                 : `칩을 ${fmt(BUY_IN)}개까지 채울까요?\n💎 ${fmt(want)}점이 듭니다. (점수가 모자라면 남은 점수 전부)`;
               if (!window.confirm(text)) return;
-              void run({ action: "rebuy" }, () => setInfo(inPlay ? "💎 충전을 예약했어요." : "💎 충전을 신청했어요. 봇이 점수를 확인하면 칩이 들어옵니다."));
+              void run({ action: "rebuy" }, () => setInfo(inPlay ? `💎 충전 예약 · 이번 판이 끝난 뒤 칩이 ${fmt(BUY_IN)}개보다 적으면 모자란 만큼만 채워요.` : "💎 충전을 신청했어요. 봇이 점수를 확인하면 칩이 들어옵니다."));
             }}
           >
             {rebuyBusy ? "충전 확인 중…" : me.rebuyQueued ? "💎 충전 예약 취소" : myChips >= BUY_IN ? "💎 충전" : `💎 충전 +${fmt(BUY_IN - myChips)}`}
@@ -574,7 +574,7 @@ function HoldemRoom({
           <button
             className={`smallButton ${me.standAfter ? "" : "ghost"}`}
             disabled={busy}
-            onClick={() => void run({ action: "reserve" })}
+            onClick={() => void run({ action: "reserve" }, () => setInfo(me.standAfter ? "⏳ 나가기 예약을 취소했어요." : "⏳ 나가기 예약 · 이번 판이 끝나면 일어나고 남은 칩을 점수로 돌려받아요."))}
           >
             {me.standAfter ? "⏳ 예약 취소" : "⏳ 나가기 예약"}
           </button>
@@ -597,11 +597,10 @@ function HoldemRoom({
   const lastLeftResult = lastLeft && !mySeat ? seatResult(lastLeft) : null;
   const notice = (
     <div className="hdNotice">
+      {seatTools}
+      <div className="hdToasts">
       {message && <div className="omokMessage">{message}</div>}
       {info && !message && <div className="omokMessage info">{info}</div>}
-      {seatTools}
-      {me?.standAfter && <div className="omokMessage info">⏳ 나가기 예약 · 이번 판이 끝나면 일어나고 남은 칩을 점수로 돌려받아요.</div>}
-      {me?.rebuyQueued && <div className="omokMessage info">💎 충전 예약 · 이번 판이 끝난 뒤 칩이 {fmt(BUY_IN)}개보다 적으면 모자란 만큼만 채워요.</div>}
       {me && (me.pendingChips ?? 0) > 0 && <div className="omokMessage info">💎 충전한 칩 {fmt(me.pendingChips ?? 0)}개는 이번 판이 끝나면 들어와요.</div>}
       {mySeat?.rebuy_state === "failed" && mySeat.rebuy_note && <div className="omokMessage">충전 실패: {mySeat.rebuy_note}</div>}
       {mySeat?.renew_state === "failed" && <div className="omokMessage">🎫 티켓이 없어 이용 시간을 연장하지 못했어요. 이번 판이 끝나면 일어납니다.</div>}
@@ -612,7 +611,9 @@ function HoldemRoom({
           {lastLeft.settle_state !== "done" && !lastLeft.is_friendly && " · 봇이 지급 중"}
         </div>
       )}
-      {(row.status === "waiting" || seatedCount < row.max_seats) && !closed && inviteButtons}
+      </div>
+      {/* 안 보일 때도 자리는 남겨 둔다 (누가 앉고 일어날 때 화면이 움직이지 않게) */}
+      <div className={`hdInviteSlot ${(row.status === "waiting" || seatedCount < row.max_seats) && !closed ? "" : "off"}`}>{inviteButtons}</div>
     </div>
   );
 
