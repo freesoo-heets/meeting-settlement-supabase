@@ -6632,3 +6632,31 @@ button.meetingMetricCard {
   .wdBoardWrap .wdTile { font-size: clamp(12px, 7cqmin, 22px); border-radius: clamp(6px, 4cqmin, 12px); }
   .wdModal.chatting .wdBoardWrap { flex: 0 0 150px; min-height: 0; }
 }
+
+/* 🎫 게임 목록 · 티켓 구매 */
+.gameHubTools { margin-left: auto; display: flex; gap: 6px; }
+.gameHubTools .smallButton { white-space: nowrap; }
+@media (max-width: 480px) {
+  .gameHubTools { flex-direction: column; gap: 5px; }
+  .gameHubTools .smallButton { padding: 7px 10px; font-size: 13px; }
+}
+.ticketBuyBack { position: fixed; inset: 0; z-index: 1100; background: rgba(0,0,0,.4); display: grid; place-items: center; padding: 16px; }
+.ticketBuyBox { width: min(320px, 100%); background: #fff; border-radius: 18px; padding: 20px 18px 16px; display: grid; gap: 10px; text-align: center; box-shadow: 0 12px 36px rgba(0,0,0,.2); }
+.ticketBuyBox > strong { font-size: 18px; }
+.ticketBuyHave { margin: 0; color: #887e76; font-size: 13px; font-weight: 700; }
+.ticketBuyStepper { display: flex; align-items: center; justify-content: center; gap: 18px; }
+.ticketBuyStepper button { width: 42px; height: 42px; border-radius: 50%; border: 1px solid #e2e8f0; background: #f8fafc; font-size: 20px; font-weight: 800; cursor: pointer; }
+.ticketBuyStepper button:disabled { opacity: .4; cursor: default; }
+.ticketBuyStepper span { min-width: 64px; font-size: 15px; }
+.ticketBuyStepper b { font-size: 26px; margin-right: 2px; }
+.ticketBuyQuick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.ticketBuyQuick button { padding: 7px 0; border-radius: 10px; border: 1px solid #e2e8f0; background: #f8fafc; font-weight: 700; color: #475569; cursor: pointer; }
+.ticketBuyQuick button.on { background: #fff4d6; border-color: #f3c14b; color: #7a5200; }
+.ticketBuyCost { margin: 0; font-size: 14px; color: #444; }
+.ticketBuyCost.short { color: #c0392b; }
+.ticketBuyNote { margin: 0; padding: 9px 10px; border-radius: 10px; font-size: 13px; line-height: 1.5; white-space: pre-line; background: #f1f5f9; color: #334155; }
+.ticketBuyNote.ok { background: #e8f7ee; color: #17663a; }
+.ticketBuyNote.err { background: #fdecea; color: #a52a1f; }
+.ticketBuyButtons { display: grid; gap: 6px; }
+.ticketBuyGo { height: 48px; border: 0; border-radius: 14px; background: #f3c14b; color: #222; font-size: 16px; font-weight: 800; cursor: pointer; }
+.ticketBuyGo:disabled { opacity: .5; cursor: default; }

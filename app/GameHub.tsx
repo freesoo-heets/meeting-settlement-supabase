@@ -8,6 +8,7 @@ import AlkkagiGame from "./AlkkagiGame";
 import CatchMindGame from "./CatchMindGame";
 import HoldemOnline, { sweepHoldem } from "./HoldemOnline";
 import RatingBoard from "./RatingBoard";
+import TicketBuy from "./TicketBuy";
 import WordGame from "./WordGame";
 
 export type GameKind = "omok" | "alkkagi" | "catch" | "holdem" | "word";
@@ -72,7 +73,13 @@ async function callCatchCleanup(force: boolean) {
   };
 }
 
-export default function GameHub({ onClose, initial, currentMemberId, myName, myPoints, myTickets, opponents, isAdmin }: Props) {
+export default function GameHub({ onClose, initial, currentMemberId, myName, myPoints: pagePoints, myTickets: pageTickets, opponents, isAdmin }: Props) {
+  // 🎫 사이트에서 산 직후에는 봇이 알려 준 점수 · 티켓을 먼저 보여 준다 (점수판이 새로 오면 그것으로)
+  const [bought, setBought] = useState<{ exp: number; tickets: number } | null>(null);
+  useEffect(() => setBought(null), [pagePoints, pageTickets]);
+  const myPoints = bought?.exp ?? pagePoints;
+  const myTickets = bought?.tickets ?? pageTickets;
+  const [showTicket, setShowTicket] = useState(false);
   useGameViewport(); // 휴대폰: 뒤 페이지 스크롤 막기 · 키보드 높이에 맞추기
   const [active, setActive] = useState<{ kind: GameKind; id: string } | null>(initial ?? null);
   const [omok, setOmok] = useState<StakeRow[]>([]);
@@ -268,10 +275,21 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
             <span>내 점수 💎 {myPoints !== null ? myPoints.toLocaleString("ko-KR") : "-"} · 티켓 🎫 {myTickets ?? "-"}</span>
             <h2>🎮 게임</h2>
           </div>
-          <button className="smallButton ratingOpenButton" onClick={() => setShowRating(true)}>🏆 랭킹</button>
+          <div className="gameHubTools">
+            <button className="smallButton" onClick={() => setShowRating(true)}>🏆 랭킹</button>
+            <button className="smallButton" onClick={() => setShowTicket(true)}>🎫 티켓구매</button>
+          </div>
           <button className="modalCloseButton" onClick={onClose}>×</button>
         </div>
         {showRating && <RatingBoard onClose={() => setShowRating(false)} />}
+        {showTicket && (
+          <TicketBuy
+            myPoints={myPoints}
+            myTickets={myTickets}
+            onBought={(exp, tickets) => setBought({ exp, tickets })}
+            onClose={() => setShowTicket(false)}
+          />
+        )}
 
         {testError && <div className="omokMessage">{testError}</div>}
         <div className="gameHubGrid">
