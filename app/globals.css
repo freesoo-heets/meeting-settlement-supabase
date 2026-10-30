@@ -6638,8 +6638,10 @@ button.meetingMetricCard {
 .gameHubTools { margin-left: auto; display: flex; gap: 6px; }
 .gameHubTools .smallButton { white-space: nowrap; }
 @media (max-width: 480px) {
-  .gameHubTools { flex-direction: column; gap: 5px; }
-  .gameHubTools .smallButton { padding: 7px 10px; font-size: 13px; }
+  .gameHubModal .meetingModalHeader { flex-wrap: wrap; gap: 10px 12px; }
+  .gameHubModal .meetingModalHeader > div:not(.gameHubTools) { flex: 1; min-width: 0; }
+  .gameHubTools { order: 3; width: 100%; margin: 0 0 6px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .gameHubTools .smallButton { padding: 9px 0; }
 }
 .ticketBuyBack { position: fixed; inset: 0; z-index: 1100; background: rgba(0,0,0,.4); display: grid; place-items: center; padding: 16px; }
 .ticketBuyBox { width: min(320px, 100%); background: #fff; border-radius: 18px; padding: 20px 18px 16px; display: grid; gap: 10px; text-align: center; box-shadow: 0 12px 36px rgba(0,0,0,.2); }

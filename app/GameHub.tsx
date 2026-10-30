@@ -1,7 +1,7 @@
 "use client";
 
 import { useGameViewport } from "./useGameViewport";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 import OmokGame, { type Opponent } from "./OmokGame";
 import AlkkagiGame from "./AlkkagiGame";
@@ -88,6 +88,36 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
   const [holdemTables, setHoldemTables] = useState<Array<{ id: string; status: string; host_name: string; is_friendly: boolean; max_seats: number; hand_no: number; view: { players?: Array<{ name: string; empty?: boolean }> } }>>([]);
   const [wordLive, setWordLive] = useState<Array<{ id: string; name: string; status: string; tries: number; max_tries: number; member_id: string }>>([]);
   const [showRating, setShowRating] = useState(false);
+
+  // 📱 휴대폰 · 브라우저 뒤로가기: 사이트를 떠나지 않고 창을 한 단계씩 닫는다
+  //  게임 창을 여는 동안 기록을 한 칸 넣어 두고, 뒤로가기로 그 칸이 빠지면 다시 채운다
+  const screen = useRef({ showTicket, showRating, active, onClose });
+  screen.current = { showTicket, showRating, active, onClose };
+  useEffect(() => {
+    let backed = false;
+    window.history.pushState({ gameHub: true }, "");
+    const onBackKey = () => {
+      const now = screen.current;
+      if (now.showTicket) setShowTicket(false);
+      else if (now.showRating) setShowRating(false);
+      else if (now.active) setActive(null);
+      else {
+        backed = true;
+        now.onClose();
+        return;
+      }
+      window.history.pushState({ gameHub: true }, "");
+    };
+    window.addEventListener("popstate", onBackKey);
+    return () => {
+      window.removeEventListener("popstate", onBackKey);
+      if (backed) return;
+      // × 로 닫음: 넣어 둔 칸을 뺀다 (닫으면서 정리한 주소는 그대로)
+      const url = window.location.href;
+      window.addEventListener("popstate", () => window.history.replaceState(window.history.state, "", url), { once: true });
+      window.history.back();
+    };
+  }, []);
 
   const load = useCallback(async () => {
     const [o, a, c, h, w] = await Promise.all([
