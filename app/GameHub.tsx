@@ -90,23 +90,41 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
   const [showRating, setShowRating] = useState(false);
 
   // 📱 휴대폰 · 브라우저 뒤로가기: 사이트를 떠나지 않고 창을 한 단계씩 닫는다
-  //  게임 창을 여는 동안 기록을 한 칸 넣어 두고, 뒤로가기로 그 칸이 빠지면 다시 채운다
-  const screen = useRef({ showTicket, showRating, active, onClose });
-  screen.current = { showTicket, showRating, active, onClose };
+  //  화면을 열 때 기록을 한 칸씩 넣고, 뒤로가기는 그 칸을 빼기만 한다
+  //  (뒤로가기 뒤에 칸을 다시 넣으면 터치 없이 만든 기록이 되어 브라우저가 건너뛰고 사이트를 나가 버린다)
+  const level = 1 + (active ? 1 : 0) + (showTicket || showRating ? 1 : 0);
+  const pushed = useRef(0);
+  const ownPops = useRef(0); // ‹ · × 로 닫으며 직접 뺀 칸 (뒤로가기가 아니다)
+  const closeHub = useRef(onClose);
+  closeHub.current = onClose;
+  useEffect(() => {
+    while (pushed.current < level) {
+      pushed.current += 1;
+      window.history.pushState({ gameHub: pushed.current }, "");
+    }
+    if (pushed.current > level) {
+      ownPops.current += 1;
+      window.history.go(level - pushed.current);
+      pushed.current = level;
+    }
+  }, [level]);
   useEffect(() => {
     let backed = false;
-    window.history.pushState({ gameHub: true }, "");
-    const onBackKey = () => {
-      const now = screen.current;
-      if (now.showTicket) setShowTicket(false);
-      else if (now.showRating) setShowRating(false);
-      else if (now.active) setActive(null);
-      else {
-        backed = true;
-        now.onClose();
+    const onBackKey = (event: PopStateEvent) => {
+      if (ownPops.current > 0) {
+        ownPops.current -= 1;
         return;
       }
-      window.history.pushState({ gameHub: true }, "");
+      const to = Number((event.state as { gameHub?: number } | null)?.gameHub ?? 0);
+      pushed.current = to;
+      if (to < 1) {
+        backed = true;
+        closeHub.current();
+        return;
+      }
+      setShowTicket(false);
+      setShowRating(false);
+      setActive(null);
     };
     window.addEventListener("popstate", onBackKey);
     return () => {
@@ -115,7 +133,7 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
       // × 로 닫음: 넣어 둔 칸을 뺀다 (닫으면서 정리한 주소는 그대로)
       const url = window.location.href;
       window.addEventListener("popstate", () => window.history.replaceState(window.history.state, "", url), { once: true });
-      window.history.back();
+      window.history.go(-pushed.current);
     };
   }, []);
 
