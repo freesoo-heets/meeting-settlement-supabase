@@ -426,9 +426,7 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
       retry.current = { key, count: 0, timer: null };
     }
     setBusy(true);
-    const slow = again ? null : setTimeout(() => setMessage("⏳ AI 검증 중… (기회 차감 없음)"), 700);
     const result = await callWord({ action: "guess", gameId: game.id, jamo });
-    if (slow) clearTimeout(slow);
     setBusy(false);
     if (result.ok && result.game) {
       retry.current.key = "";
