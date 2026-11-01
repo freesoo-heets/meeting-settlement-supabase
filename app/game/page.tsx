@@ -13,7 +13,7 @@ function pick(params: Record<string, string | string[] | undefined>): { kind: Ki
   for (const kind of ["omok", "alkkagi", "catch", "holdem", "word"] as Kind[]) {
     const value = params[kind];
     const id = Array.isArray(value) ? value[0] : value;
-    if (id && /^[0-9a-f-]{36}$/i.test(id)) return { kind, id };
+    if (id && (/^[0-9a-f-]{36}$/i.test(id) || (kind === "word" && id === "start"))) return { kind, id }; // word=start: 단어게임 첫 화면
   }
   return null;
 }

@@ -101,6 +101,7 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
   const blurTimer = useRef<number | undefined>(undefined);
   const pressedOutside = useRef(false);
   const [viewers, setViewers] = useState<string[]>([]);
+  const [fromKakao, setFromKakao] = useState(false); // 카톡에서 시작한 판: 어느 쪽에서든 입력 · 채팅은 스레드로 전달
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const chatKey = useRef(0);
   const chatLogRef = useRef<HTMLDivElement | null>(null);
@@ -213,7 +214,7 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
         .limit(CHAT_MAX);
       // 이어 하는 중이면 이미 보이는 채팅은 그대로 두고 빠진 것만 붙는다 (중복은 id 로 거른다)
       for (const row of ((data ?? []) as ChatRow[]).reverse()) {
-        addChat({ id: row.id, at: row.created_at, name: row.name, text: row.text, kind: row.member_id === currentMemberId ? "me" : undefined });
+        addChat({ id: row.id, at: row.created_at, name: row.name, text: row.text, kind: row.member_id === currentMemberId && row.name === myName ? "me" : undefined });
       }
     })();
     const channel = supabase
@@ -250,6 +251,23 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
     };
   }, [gameId, playerId, gameCreated, currentMemberId, myName, addChat, refetch]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    setFromKakao(false);
+    if (!gameId) return;
+    void supabase
+      .from("word_games")
+      .select("source")
+      .eq("id", gameId)
+      .maybeSingle()
+      .then(({ data }) => setFromKakao((data as { source?: string } | null)?.source === "kakao"));
+  }, [gameId]);
+
+  // 카톡에서 끝난 판도 기록에 바로 보이게
+  const gameStatus = game?.status;
+  useEffect(() => {
+    if (fromKakao && (gameStatus === "won" || gameStatus === "lost")) void load();
+  }, [fromKakao, gameStatus, load]);
+
   // 자동 구매 안내는 판이 시작될 때 5초만 보여 준다
   const autoKey = game && game.status === "playing" && game.auto_bought && game.tries === 0 && game.member_id === currentMemberId ? game.id : "";
   useEffect(() => {
@@ -260,10 +278,25 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
   }, [autoKey]);
 
   // 관전: 실시간이 끊겨도 따라가게 가끔 다시 읽고, 끝나면 그 사람의 다음 판으로 넘어간다
+  // 카톡 판: 카톡 입력 · 스레드 대화는 실시간으로 오지 않아서 내 판도 다시 읽는다
   useEffect(() => {
-    if (!spectating || !game) return;
+    if (!game || (!spectating && !fromKakao)) return;
     const timer = setInterval(async () => {
-      if (game.status === "escrow" || game.status === "playing") return void refetch(game.id);
+      if (game.status === "escrow" || game.status === "playing") {
+        void refetch(game.id);
+        if (!fromKakao) return;
+        const { data } = await supabase
+          .from("word_chat")
+          .select("id,member_id,name,text,created_at")
+          .eq("game_id", game.id)
+          .order("created_at", { ascending: false })
+          .limit(10);
+        for (const row of ((data ?? []) as ChatRow[]).reverse()) {
+          if (row.member_id !== currentMemberId || row.name !== myName) addChat({ id: row.id, at: row.created_at, name: row.name, text: row.text });
+        }
+        return;
+      }
+      if (!spectating) return;
       if (!game.finished_at || Date.now() - new Date(game.finished_at).getTime() > 10 * 60 * 1000) return;
       const { data } = await supabase
         .from("word_games")
@@ -280,7 +313,7 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
       }
     }, 4000);
     return () => clearInterval(timer);
-  }, [spectating, game, refetch]);
+  }, [spectating, fromKakao, game, refetch, addChat, currentMemberId, myName]);
 
   // 내가 치는 글자를 관전자에게
   useEffect(() => {
@@ -502,6 +535,7 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
   }
 
   const finished = game && (game.status === "won" || game.status === "lost");
+  const kakaoNote = !fromKakao || game?.status !== "playing" ? "" : spectating ? "📱 카톡에서 진행 중인 판이에요. 채팅은 카톡 스레드로 전달돼요" : "📱 카톡에서 시작한 판이에요. 여기서 이어서 입력하면 돼요";
   const history = game?.history ?? [];
   const preview = typed.length === WORD_LEN ? composeWords(typed) : [];
   const record = games.filter((g) => g.status === "won" || g.status === "lost");
@@ -644,7 +678,7 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
               </div>
               </div>
               <div className="wdNote">
-                {message || (preview.length ? `👉 ${preview.join(" · ")}` : autoNote ? `🎫 티켓 자동 구매 (-${TICKET_PRICE}점)` : "")}
+                {message || (preview.length ? `👉 ${preview.join(" · ")}` : autoNote ? `🎫 티켓 자동 구매 (-${TICKET_PRICE}점)` : kakaoNote)}
               </div>
             </div>
             <div className="wdChat">
@@ -657,7 +691,7 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
                 }}
               >
                 {chat.length === 0 && (
-                  <span className="muted">{spectating ? "같이 보면서 힌트를 나눠 보세요 💬" : "관전하는 사람들과 채팅할 수 있어요 💬"}</span>
+                  <span className="muted">{fromKakao ? "채팅은 카톡 스레드로도 전달돼요 💬" : spectating ? "같이 보면서 힌트를 나눠 보세요 💬" : "관전하는 사람들과 채팅할 수 있어요 💬"}</span>
                 )}
                 {chat.map((line) => (
                   <div key={line.key} className={`wdChatLine ${line.kind ?? ""}`}>
