@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
+import WordDictAdmin from "./WordDictAdmin";
 import {
   KEY_ROWS,
   MAX_TRIES,
@@ -23,12 +24,14 @@ type Props = {
   myPoints: number | null;
   myTickets: number | null;
   initialGameId?: string; // 다른 사람 판을 관전할 때
+  isAdmin?: boolean;
 };
 
 type ChatLine = { key: number; id?: string; at?: string; name: string; text: string; kind?: "sys" | "me" };
 type ChatRow = { id: string; member_id: string; name: string; text: string; created_at: string };
 
-type CallResult = { ok: boolean; error?: string; id?: string; pending?: boolean; game?: WordGameRow };
+export type WordEdit = { state: string; result: string | null; reason: string | null };
+type CallResult = { ok: boolean; error?: string; id?: string; pending?: boolean; game?: WordGameRow; note?: string; edit?: WordEdit };
 
 async function callWord(payload: Record<string, unknown>): Promise<CallResult> {
   const { data } = await supabase.auth.getSession();
@@ -47,6 +50,18 @@ const RANK: Record<Mark, number> = { x: 1, y: 2, g: 3 };
 const PENDING_RETRY_MS = 2500;
 const PENDING_MAX_RETRY = 14;
 const CHAT_MAX = 60;
+const EDIT_POLL_MS = 2000;
+const EDIT_POLL_TRIES = 20;
+
+// 단어장 요청이 끝날 때까지 기다린다. 봇이 처리하면 처리 결과, 시간이 지나면 null
+export async function waitWordEdit(id: string, call: (payload: Record<string, unknown>) => Promise<{ edit?: WordEdit }>) {
+  for (let i = 0; i < EDIT_POLL_TRIES; i += 1) {
+    await new Promise((r) => setTimeout(r, EDIT_POLL_MS));
+    const { edit } = await call({ action: "editStatus", id });
+    if (edit && edit.state !== "requested") return edit;
+  }
+  return null;
+}
 
 // 채팅 입력칸 등에 쓰는 중이면 게임 자판으로 가로채지 않는다
 const isTypingField = (target: EventTarget | null) =>
@@ -62,7 +77,7 @@ function shortDate(value: string) {
   return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
-export default function WordGame({ onClose, onBack, currentMemberId, myName, myPoints, myTickets, initialGameId }: Props) {
+export default function WordGame({ onClose, onBack, currentMemberId, myName, myPoints, myTickets, initialGameId, isAdmin }: Props) {
   const [games, setGames] = useState<WordGameRow[]>([]);
   const [game, setGame] = useState<WordGameRow | null>(null);
   const [typed, setTyped] = useState<string[]>([]);
@@ -89,6 +104,9 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const chatKey = useRef(0);
   const chatLogRef = useRef<HTMLDivElement | null>(null);
+  const chatAtBottom = useRef(true); // 위로 올려 지난 채팅을 보는 중이면 false
+  const [showDict, setShowDict] = useState(false);
+  const [wordAct, setWordAct] = useState<{ gameId: string; busy: boolean; text: string } | null>(null);
   const spectating = !!game && game.member_id !== currentMemberId;
 
   const load = useCallback(async () => {
@@ -139,8 +157,21 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
 
   useEffect(() => {
     const log = chatLogRef.current;
-    if (log) log.scrollTop = log.scrollHeight;
+    if (log && chatAtBottom.current) log.scrollTop = log.scrollHeight;
   }, [chat]);
+
+  // 채팅 칸 높이가 바뀌어도(키보드가 닫힐 때 등) 최신 채팅을 그대로 보여 준다
+  const chatOpen = !!game;
+  useEffect(() => {
+    const log = chatLogRef.current;
+    if (!log) return;
+    chatAtBottom.current = true;
+    const observer = new ResizeObserver(() => {
+      if (chatAtBottom.current) log.scrollTop = log.scrollHeight;
+    });
+    observer.observe(log);
+    return () => observer.disconnect();
+  }, [chatOpen]);
 
   // ── 실시간 채널: 관전 · 채팅 · 입력 중인 글자 ──
   const gameId = game?.id ?? "";
@@ -286,12 +317,30 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
     const text = chatText.trim().slice(0, 80);
     if (!text || !game) return;
     setChatText("");
+    chatAtBottom.current = true;
     const at = new Date().toISOString();
     addChat({ name: myName, text, kind: "me", at });
     // 저장해 두고(나중에 와도 보이게) 지금 보는 사람들에게는 바로 보낸다
     const result = (await callWord({ action: "chat", gameId: game.id, text })) as CallResult & { chatId?: string };
     if (!result.ok) setMessage(result.error ?? "채팅을 저장하지 못했어요.");
     void channelRef.current?.send({ type: "broadcast", event: "chat", payload: { id: result.chatId, at, name: myName, text } });
+  }
+
+  // 🗑️ 정답 단어 삭제: 관리자는 바로, 회원은 요청 (봇이 AI 로 판단)
+  async function removeAnswer() {
+    if (!game?.answer) return;
+    const id = game.id;
+    setWordAct({ gameId: id, busy: true, text: isAdmin ? "🗑️ 삭제하는 중…" : "🤖 AI가 확인하는 중…" });
+    const result = await callWord(isAdmin ? { action: "dictEdit", op: "delete", word: game.answer } : { action: "wordRequest", gameId: id });
+    if (!result.ok) return setWordAct({ gameId: id, busy: false, text: `❌ ${result.error ?? "요청하지 못했습니다."}` });
+    if (!result.id) return setWordAct({ gameId: id, busy: false, text: result.note ?? "" });
+    const edit = await waitWordEdit(result.id, callWord);
+    let text = "⏳ 봇이 아직 처리하지 못했어요. 봇이 켜지면 자동으로 처리됩니다.";
+    if (edit?.state === "asked") text = "📨 판단이 애매해서 운영진에게 물어봤어요.";
+    else if (edit?.result === "deleted") text = "🗑️ 삭제했어요. 앞으로 정답으로 나오지 않아요.";
+    else if (edit?.result === "kept") text = `✅ 흔히 쓰는 단어라 유지해요.${edit.reason ? `\n(${edit.reason})` : ""}`;
+    else if (edit) text = `❌ ${edit.reason ?? "처리하지 못했습니다."}`;
+    setWordAct({ gameId: id, busy: false, text });
   }
 
   // 봇이 티켓을 확인하는 동안 · 끝난 판 보상 지급을 기다리는 동안
@@ -484,6 +533,7 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
               {!spectating && game?.status === "playing" && <button onClick={() => void quit()}>🏳️ 포기하기</button>}
               {!spectating && game?.status === "escrow" && <button onClick={() => void quit()}>✖ 시작 취소</button>}
               {game && <button onClick={() => setGame(null)}>📋 내 기록</button>}
+              {isAdmin && <button onClick={() => setShowDict(true)}>🛠 단어 관리</button>}
               <button onClick={onBack}>🎮 게임 목록</button>
               <button onClick={onClose}>✕ 닫기</button>
             </div>
@@ -553,8 +603,8 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
               )}
               {(spectating || viewers.length > 0) && (
                 <div className="wdWatch">
-                  {spectating ? `👀 ${game.name}님의 도전을 관전 중` : `👀 ${viewers.length}명 관전 중`}
-                  {viewers.length > 0 && <span>{viewers.slice(0, 6).join(" · ")}</span>}
+                  <b>{spectating ? `👀 ${game.name}님 관전 중` : "👀 관전"} · {viewers.length}명</b>
+                  {viewers.length > 0 && <span>{viewers.join(" · ")}</span>}
                 </div>
               )}
               <div className="wdHint">
@@ -597,7 +647,14 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
               </div>
             </div>
             <div className="wdChat">
-              <div className="wdChatLog" ref={chatLogRef}>
+              <div
+                className="wdChatLog"
+                ref={chatLogRef}
+                onScroll={(event) => {
+                  const log = event.currentTarget;
+                  chatAtBottom.current = log.scrollHeight - log.scrollTop - log.clientHeight < 24;
+                }}
+              >
                 {chat.length === 0 && (
                   <span className="muted">{spectating ? "같이 보면서 힌트를 나눠 보세요 💬" : "관전하는 사람들과 채팅할 수 있어요 💬"}</span>
                 )}
@@ -680,6 +737,8 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
           </div>
         )}
 
+        {showDict && <WordDictAdmin call={callWord} onClose={() => setShowDict(false)} />}
+
         {showResult && game && finished && (
           <div className="wdResultBack" onClick={() => setShowResult(false)}>
             <div className="wdResult" onClick={(e) => e.stopPropagation()}>
@@ -700,6 +759,13 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
                   💎 +{game.reward}점 {game.settle_state === "done" ? "지급 완료" : "· 카톡 봇이 지급 중…"}
                 </p>
               )}
+              {game.answer && (wordAct?.gameId === game.id && !wordAct.busy ? (
+                <p className="wdWordNote">{wordAct.text}</p>
+              ) : (
+                <button className="wdWordAct" disabled={wordAct?.gameId === game.id} onClick={() => void removeAnswer()}>
+                  {wordAct?.gameId === game.id ? wordAct.text : isAdmin ? "🗑️ 이 단어 삭제" : "🙋 이상한 단어예요 (삭제 요청)"}
+                </button>
+              ))}
               <div className="wdResultButtons">
                 <button className="wdBig" disabled={busy} onClick={() => void start()}>{spectating ? "나도 도전" : "한 판 더"}</button>
                 <button className="smallButton ghost" onClick={() => { setShowResult(false); setGame(null); }}>내 기록</button>

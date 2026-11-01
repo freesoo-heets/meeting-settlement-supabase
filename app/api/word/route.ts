@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServerAdmin } from "../../../lib/server-admin";
-import { fail, loadMember, loadPlayer, requestInvite, requireMemberId } from "../../../lib/gameServer";
+import { fail, isAdminMember, loadMember, loadPlayer, requestInvite, requireMemberId } from "../../../lib/gameServer";
 import {
   KEYS,
   REWARDS,
@@ -9,6 +9,7 @@ import {
   WORD_LEN,
   checkGuess,
   composeWords,
+  splitWord,
   type WordGameRow,
 } from "../../../lib/wordGame";
 
@@ -17,10 +18,27 @@ import {
  *  · start  → word_games(escrow) → 봇이 티켓 1장(없으면 50점 자동구매) 차감 · 정답을 word_secrets 에 넣고 playing
  *  · guess  → 단어장(word_dict)에 있는 단어만. 처음 보는 단어는 valid=null 로 넣고 봇이 AI 로 검증한다 (pending)
  *  · 끝나면 won · lost + answer → 봇이 보상(1번 300 · 2번 150 · 3번 90 · 4번 50 · 5번 30점) 지급 · 카톡 전적에 합산
+ *  · 단어장 고치기 → word_edits 에 넣으면 봇이 단어장 파일과 word_dict 를 고친다
+ *      관리자: dictSearch · dictEdit(추가 · 바로 삭제) · dictDecide(애매한 요청 정하기)
+ *      회원: wordRequest(끝난 판의 정답 삭제 요청 → 봇이 AI 로 판단 · 애매하면 운영진방)
  */
 
 const ESCROW_CANCEL_MS = 60 * 1000; // 봇이 이만큼 처리 못 하면 취소할 수 있다
 const PENDING_MAX = 30; // AI 검증 대기 단어가 이보다 많으면 잠시 막는다
+const KEPT_DAYS = 30; // 유지로 판단한 단어는 이 기간 동안 다시 묻지 않는다
+const EDIT_COLUMNS = "id,word,action,source,name,state,result,reason,updated_at";
+const WORD_TEXT = /^[가-힣]{1,5}$/;
+
+type Admin = ReturnType<typeof getServerAdmin>;
+
+async function addEdit(admin: Admin, row: { word: string; action: string; member_id: string; name: string }) {
+  const { data, error } = await admin.from("word_edits").insert(row).select("id").single();
+  if (error) {
+    const missing = /word_edits/.test(error.message) && /exist|schema cache/i.test(error.message);
+    return fail(missing ? "단어 관리 설정이 아직 안 됐어요. (운영진: SQL 실행 필요)" : `요청 실패: ${error.message}`);
+  }
+  return NextResponse.json({ ok: true, id: data.id });
+}
 
 async function readGame(admin: ReturnType<typeof getServerAdmin>, id: string, memberId: string) {
   const { data } = await admin.from("word_games").select(`${WORD_GAME_COLUMNS},updated_at`).eq("id", id).maybeSingle();
@@ -83,6 +101,68 @@ export async function POST(request: Request) {
       .single();
     if (error) return fail(`채팅을 저장하지 못했어요: ${error.message}`);
     return NextResponse.json({ ok: true, chatId: data.id });
+  }
+
+  // 🙋 끝난 판의 정답 삭제 요청 (관전자도)
+  if (action === "wordRequest") {
+    const { data: row } = await admin.from("word_games").select("status,answer").eq("id", gameId).maybeSingle();
+    const word = row?.answer as string | null | undefined;
+    if (!word || (row?.status !== "won" && row?.status !== "lost")) return fail("끝난 게임의 정답만 요청할 수 있어요.");
+    const member = await loadMember(admin, memberId);
+    if ("error" in member) return fail(member.error, member.status);
+    const { data: open } = await admin.from("word_edits").select("id").eq("word", word).in("state", ["requested", "asked"]).limit(1);
+    if ((open ?? []).length) return NextResponse.json({ ok: true, note: "📨 이미 확인 중인 단어예요." });
+    const { data: known } = await admin.from("word_dict").select("valid").eq("word", word).maybeSingle();
+    if (known?.valid === false) return NextResponse.json({ ok: true, note: "🗑️ 이미 삭제된 단어예요." });
+    const since = new Date(Date.now() - KEPT_DAYS * 24 * 60 * 60 * 1000).toISOString();
+    const { data: kept } = await admin.from("word_edits").select("id").eq("word", word).eq("result", "kept").gte("updated_at", since).limit(1);
+    if ((kept ?? []).length) return NextResponse.json({ ok: true, note: "✅ 최근에 확인한 단어예요. 흔히 쓰는 단어라 유지해요." });
+    return addEdit(admin, { word, action: "request", member_id: memberId, name: member.name });
+  }
+
+  // 요청이 처리됐는지 (본인 요청 · 관리자)
+  if (action === "editStatus") {
+    const id = typeof body.id === "string" ? body.id : "";
+    const { data } = await admin.from("word_edits").select("member_id,state,result,reason").eq("id", id).maybeSingle();
+    if (!data || (data.member_id !== memberId && !(await isAdminMember(admin, memberId)))) return fail("요청을 찾지 못했습니다.", 404);
+    return NextResponse.json({ ok: true, edit: { state: data.state, result: data.result, reason: data.reason } });
+  }
+
+  // 🛠 단어 관리 (관리자)
+  if (action === "dictSearch" || action === "dictEdit" || action === "dictDecide") {
+    if (!(await isAdminMember(admin, memberId))) return fail("관리자만 할 수 있습니다.", 403);
+    const word = String(body.word ?? "").trim();
+
+    if (action === "dictSearch") {
+      const [found, asks, recent] = await Promise.all([
+        WORD_TEXT.test(word)
+          ? admin.from("word_dict").select("word,valid,reason").ilike("word", `%${word}%`).order("word").limit(30)
+          : Promise.resolve({ data: [] }),
+        admin.from("word_edits").select(EDIT_COLUMNS).eq("state", "asked").order("created_at").limit(30),
+        admin.from("word_edits").select(EDIT_COLUMNS).neq("state", "asked").order("updated_at", { ascending: false }).limit(15),
+      ]);
+      return NextResponse.json({ ok: true, rows: found.data ?? [], asks: asks.data ?? [], recent: recent.data ?? [] });
+    }
+
+    if (!WORD_TEXT.test(word)) return fail("한글 단어를 입력해 주세요.");
+    const member = await loadMember(admin, memberId);
+    if ("error" in member) return fail(member.error, member.status);
+
+    if (action === "dictDecide" && body.keep === true) {
+      const now = new Date().toISOString();
+      await admin
+        .from("word_edits")
+        .update({ state: "done", result: "kept", reason: `${member.name} 님이 유지`, updated_at: now })
+        .eq("word", word)
+        .eq("state", "asked");
+      return NextResponse.json({ ok: true });
+    }
+
+    const { data: waiting } = await admin.from("word_edits").select("id").eq("word", word).eq("state", "requested").limit(1);
+    if ((waiting ?? []).length) return fail("이 단어는 지금 처리 중이에요. 잠시만 기다려 주세요.");
+    const op = action === "dictEdit" && body.op === "add" ? "add" : "delete";
+    if (op === "add" && splitWord(word).length !== WORD_LEN) return fail(`풀어서 ${WORD_LEN}자리인 단어만 추가할 수 있어요.`);
+    return addEdit(admin, { word, action: op, member_id: memberId, name: member.name });
   }
 
   const game = gameId ? await readGame(admin, gameId, memberId) : null;

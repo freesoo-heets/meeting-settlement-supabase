@@ -220,6 +220,7 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
         myPoints={myPoints}
         myTickets={myTickets}
         initialGameId={active.id || undefined}
+        isAdmin={isAdmin}
       />
     );
   }
