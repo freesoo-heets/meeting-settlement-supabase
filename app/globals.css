@@ -6709,3 +6709,25 @@ button.meetingMetricCard {
 .hdPassAlert strong { font-size: 13px; color: var(--hd-gold); font-variant-numeric: tabular-nums; }
 .hdPassAlert span { font-size: 11.5px; color: var(--hd-dim); }
 .hdModal .hdPassAlert .smallButton { flex: none; font-size: 12.5px; padding: 7px 12px; background: linear-gradient(#f5c451, #d99a1f); color: #1c1405; border: 0; }
+
+/* ───────── 봇관리 ───────── */
+.botAdmin { position: fixed; inset: 0; z-index: 1000; display: flex; flex-direction: column; gap: 8px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); background: #fff; color: #1f2937; }
+.botAdminHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 36px; }
+.botAdminHead strong { min-width: 0; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.botAdminHead button { flex: none; width: 36px; height: 36px; border: 0; border-radius: 10px; background: #eee9e4; color: #374151; font-size: 18px; cursor: pointer; }
+.botAdminNote, .botAdminHint, .botAdminPending { margin: 0; font-size: 12px; line-height: 1.5; color: #4b5563; overflow-wrap: anywhere; }
+.botAdminPending { padding: 7px 10px; border-radius: 9px; background: #fff7ed; color: #9a3412; }
+.botAdminTools { display: flex; gap: 6px; }
+.botAdminTools input { flex: 1; min-width: 0; height: 38px; padding: 0 10px; border: 1px solid #e5e0da; border-radius: 9px; font-size: 14px; background: #fff; color: inherit; }
+.botAdminList { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 4px; overflow-y: auto; }
+.botAdminList .muted { font-size: 13px; padding: 8px 2px; }
+.botAdminList button { flex: none; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 8px; min-height: 38px; padding: 6px 10px; border: 1px solid #f1ece6; border-radius: 9px; background: #fafaf9; color: inherit; text-align: left; cursor: pointer; }
+.botAdminList b { min-width: 0; font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.botAdminList span { font-size: 11px; color: #6b7280; white-space: nowrap; }
+.botAdminList em { font-style: normal; font-size: 11px; font-weight: 700; color: #9ca3af; white-space: nowrap; }
+.botAdminList em.edit { color: #ea580c; } .botAdminList em.new { color: #16a34a; } .botAdminList em.del { color: #dc2626; }
+.botAdminCode { flex: 1; min-height: 0; width: 100%; padding: 10px; border: 1px solid #e5e0da; border-radius: 9px; resize: none; overflow: auto; white-space: pre; font: 13px/1.5 ui-monospace, Consolas, "D2Coding", monospace; background: #0f172a; color: #e2e8f0; }
+.botAdminActions { display: flex; gap: 6px; }
+.botAdminActions .smallButton { flex: 1; }
+.botAdminActions .smallButton:disabled { opacity: .5; }
+.botAdminActions .smallButton.danger { background: #dc2626; color: #fff; }

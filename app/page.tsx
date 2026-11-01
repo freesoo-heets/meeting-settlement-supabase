@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { matchesHangul } from "../lib/hangulSearch";
 import GameHub, { type GameKind } from "./GameHub";
+import BotAdmin from "./BotAdmin";
 import { ChatLogModal, chatAgo, useLastChats } from "./ChatLog";
 
 type Member = {
@@ -185,6 +186,7 @@ export default function Home() {
   const [botPoints, setBotPoints] = useState<BotPoint[]>([]);
   const [showPointRanking, setShowPointRanking] = useState(false);
   const [showGames, setShowGames] = useState(false);
+  const [showBotAdmin, setShowBotAdmin] = useState(false);
   // 카톡 대국신청 링크(?omok= / ?alkkagi= / ?catch=)로 들어온 경우
   const [gameInvite, setGameInvite] = useState<{ kind: GameKind; id: string } | null>(null);
 
@@ -3475,6 +3477,11 @@ async function setAttendanceMembers(memberIds: string[]) {
             >
               앱 설치
             </button>
+            {isAdmin && (
+              <button className="logoutButton installButton" onClick={() => setShowBotAdmin(true)}>
+                봇관리
+              </button>
+            )}
             <button
               className="logoutButton"
               onClick={() => {
@@ -5647,6 +5654,8 @@ async function setAttendanceMembers(memberIds: string[]) {
           )}
         </div>
       )}
+
+      {showBotAdmin && isAdmin && <BotAdmin onClose={() => setShowBotAdmin(false)} />}
 
       {showGames && currentMember && (
         <GameHub
