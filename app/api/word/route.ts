@@ -12,11 +12,13 @@ import {
   splitWord,
   type WordGameRow,
 } from "../../../lib/wordGame";
+import { checkNewWords } from "../../../lib/wordVerify";
 
 /*
  * 단어게임 API (모든 쓰기는 여기서만)
  *  · start  → word_games(escrow) → 봇이 티켓 1장(없으면 50점 자동구매) 차감 · 정답을 word_secrets 에 넣고 playing
- *  · guess  → 단어장(word_dict)에 있는 단어만. 처음 보는 단어는 valid=null 로 넣고 봇이 AI 로 검증한다 (pending)
+ *  · guess  → 단어장(word_dict)에 있는 단어만. 처음 보는 단어는 여기서 바로 AI 로 검증한다 (lib/wordVerify)
+ *             AI 에 못 물으면 valid=null 로 넣고 봇이 검증한다 (pending)
  *  · 끝나면 won · lost + answer → 봇이 보상(1번 300 · 2번 150 · 3번 90 · 4번 50 · 5번 30점) 지급 · 카톡 전적에 합산
  *  · 단어장 고치기 → word_edits 에 넣으면 봇이 단어장 파일과 word_dict 를 고친다
  *      관리자: dictSearch · dictEdit(추가 · 바로 삭제) · dictDecide(애매한 요청 정하기)
@@ -24,7 +26,6 @@ import {
  */
 
 const ESCROW_CANCEL_MS = 60 * 1000; // 봇이 이만큼 처리 못 하면 취소할 수 있다
-const PENDING_MAX = 30; // AI 검증 대기 단어가 이보다 많으면 잠시 막는다
 const KEPT_DAYS = 30; // 유지로 판단한 단어는 이 기간 동안 다시 묻지 않는다
 const EDIT_COLUMNS = "id,word,action,source,name,state,result,reason,updated_at";
 const WORD_TEXT = /^[가-힣]{1,5}$/;
@@ -228,19 +229,12 @@ export async function POST(request: Request) {
       if (!rows.some((r) => r.valid === true)) {
         const words = composeWords(jamo);
         if (words.length === 0) return fail("글자를 만들 수 없는 자모 조합이에요. (기회 차감 없음)");
-        const fresh = words.filter((w) => !rows.some((r) => r.word === w));
-        if (fresh.length) {
-          const { count } = await admin.from("word_dict").select("word", { count: "exact", head: true }).is("valid", null);
-          if ((count ?? 0) >= PENDING_MAX) return fail("AI 검증할 단어가 밀려 있어요. 잠시 뒤 다시 입력해 주세요. (기회 차감 없음)");
-          await admin.from("word_dict").upsert(
-            fresh.map((word) => ({ word, jamo: key, valid: null })),
-            { onConflict: "word", ignoreDuplicates: true },
-          );
-        }
-        if (fresh.length || rows.some((r) => r.valid === null)) {
+        const checked = await checkNewWords(admin, key, words, rows);
+        if (checked === "busy") return fail("AI 검증할 단어가 밀려 있어요. 잠시 뒤 다시 입력해 주세요. (기회 차감 없음)");
+        if (checked === "pending") {
           return NextResponse.json({ ok: false, pending: true, words, error: `'${words.join(" · ")}' AI 검증 중…` });
         }
-        return fail(`'${words.join(" · ")}'(은)는 게임에 쓸 수 없는 단어예요. (기회 차감 없음)`);
+        if (checked === "refused") return fail(`'${words.join(" · ")}'(은)는 게임에 쓸 수 없는 단어예요. (기회 차감 없음)`);
       }
     }
 
