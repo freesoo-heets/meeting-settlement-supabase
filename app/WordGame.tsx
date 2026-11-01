@@ -251,16 +251,23 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
     };
   }, [gameId, playerId, gameCreated, currentMemberId, myName, addChat, refetch]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // 사이트에서 시작한 판도 카톡 !단어 로 가져가면 카톡 판이 되므로 진행 중에는 계속 확인한다
+  const gamePlaying = game?.status === "playing";
   useEffect(() => {
     setFromKakao(false);
     if (!gameId) return;
-    void supabase
-      .from("word_games")
-      .select("source")
-      .eq("id", gameId)
-      .maybeSingle()
-      .then(({ data }) => setFromKakao((data as { source?: string } | null)?.source === "kakao"));
-  }, [gameId]);
+    const check = () =>
+      void supabase
+        .from("word_games")
+        .select("source")
+        .eq("id", gameId)
+        .maybeSingle()
+        .then(({ data }) => setFromKakao((data as { source?: string } | null)?.source === "kakao"));
+    check();
+    if (!gamePlaying) return;
+    const timer = setInterval(check, 4000);
+    return () => clearInterval(timer);
+  }, [gameId, gamePlaying]);
 
   // 카톡에서 끝난 판도 기록에 바로 보이게
   const gameStatus = game?.status;
@@ -535,7 +542,7 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
   }
 
   const finished = game && (game.status === "won" || game.status === "lost");
-  const kakaoNote = !fromKakao || game?.status !== "playing" ? "" : spectating ? "📱 카톡에서 진행 중인 판이에요. 채팅은 카톡 스레드로 전달돼요" : "📱 카톡에서 시작한 판이에요. 여기서 이어서 입력하면 돼요";
+  const kakaoNote = !fromKakao || game?.status !== "playing" ? "" : spectating ? "📱 카톡과 이어진 판이에요. 채팅은 카톡 스레드로 전달돼요" : "📱 카톡과 이어진 판이에요. 어느 쪽에서 입력해도 돼요";
   const history = game?.history ?? [];
   const preview = typed.length === WORD_LEN ? composeWords(typed) : [];
   const record = games.filter((g) => g.status === "won" || g.status === "lost");

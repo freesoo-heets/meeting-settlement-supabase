@@ -6554,6 +6554,12 @@ button.meetingMetricCard {
 .wdMini i.g { background: #86df98; } .wdMini i.y { background: #ffe27a; }
 .wdResultButtons { display: grid; gap: 6px; width: 100%; }
 .gameHubCard.word { border-left: 4px solid #22c55e; }
+/* 도전 중인 사람: 이름 · 횟수만 작게. 많아지면 카드가 길어지지 않고 안에서 스크롤 */
+.wordLive { display: grid; grid-template-columns: repeat(auto-fill, minmax(82px, 1fr)); gap: 4px; max-height: 104px; overflow-y: auto; }
+.wordLive button { display: flex; align-items: center; justify-content: space-between; gap: 4px; min-width: 0; height: 30px; padding: 0 7px; border: 1px solid #fdba74; border-radius: 8px; background: #fff7ed; cursor: pointer; }
+.wordLive button.mine { border-color: #22c55e; background: #f0fdf4; }
+.wordLive b { min-width: 0; font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wordLive em { flex: none; font-style: normal; font-size: 11px; color: #ea580c; }
 
 @keyframes wdFlip { 0% { transform: rotateX(90deg); } 100% { transform: rotateX(0); } }
 @keyframes wdPop { 0% { transform: scale(.9); } 100% { transform: scale(1); } }

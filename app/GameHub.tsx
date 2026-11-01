@@ -143,7 +143,7 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
       supabase.from("alkkagi_games").select(STAKE_COLUMNS).in("status", ["open", "challenge", "escrow", "playing"]).order("created_at", { ascending: false }).limit(20),
       supabase.from("catch_rooms").select("id,status,host_name,players,max_players,turn_no,turn_total,is_test").in("status", ["waiting", "playing"]).order("created_at", { ascending: false }).limit(20),
       supabase.from("holdem_tables").select("id,status,host_name,is_friendly,max_seats,hand_no,view").in("status", ["waiting", "playing"]).order("created_at", { ascending: false }).limit(20),
-      supabase.from("word_games").select("id,name,status,tries,max_tries,member_id").eq("status", "playing").order("created_at", { ascending: false }).limit(10),
+      supabase.from("word_games").select("id,name,status,tries,max_tries,member_id").eq("status", "playing").order("created_at", { ascending: false }).limit(30),
     ]);
     setWordLive((w.data ?? []) as typeof wordLive);
     setHoldemTables((h.data ?? []) as typeof holdemTables);
@@ -393,18 +393,28 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
               </div>
               <button className="smallButton" onClick={() => setActive({ kind: "word", id: "" })}>시작하기</button>
             </div>
-            <div className="gameHubRooms">
-              {wordLive.length === 0 && <span className="muted">지금 도전 중인 사람이 없습니다.</span>}
-              {wordLive.map((row) => (
-                <button key={row.id} className="gameHubRoom hot" onClick={() => setActive({ kind: "word", id: row.member_id === currentMemberId ? "" : row.id })}>
-                  <span>
-                    <b>{row.name}님 도전 중</b>
-                    <em>{row.tries}/{row.max_tries}번째 · 같이 보며 채팅</em>
-                  </span>
-                  <i>{row.member_id === currentMemberId ? "이어하기 →" : "관전 →"}</i>
-                </button>
-              ))}
-            </div>
+            {wordLive.length === 0 ? (
+              <div className="gameHubRooms">
+                <span className="muted">지금 도전 중인 사람이 없습니다.</span>
+              </div>
+            ) : (
+              <div className="wordLive">
+                {[...wordLive].sort((a, b) => Number(b.member_id === currentMemberId) - Number(a.member_id === currentMemberId)).map((row) => {
+                  const mine = row.member_id === currentMemberId;
+                  return (
+                    <button
+                      key={row.id}
+                      className={mine ? "mine" : ""}
+                      aria-label={`${row.name} ${row.tries}/${row.max_tries}번째 ${mine ? "이어하기" : "관전"}`}
+                      onClick={() => setActive({ kind: "word", id: mine ? "" : row.id })}
+                    >
+                      <b>{row.name}</b>
+                      <em>{row.tries}/{row.max_tries}</em>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </article>
           <article className="gameHubCard holdem">
             <div className="gameHubHead">
