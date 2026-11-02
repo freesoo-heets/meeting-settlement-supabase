@@ -14,7 +14,7 @@ type RunRow = Command & { requested_by: string };
 type Result = { ok: boolean; error?: string; id?: string; rows?: Row[]; script?: Script; pending?: Script[]; log?: LogRow[]; runs?: RunRow[]; updatedAt?: string; command?: Command };
 type Editing = { name: string; text: string; saved: string; live: string | null; crlf: boolean; updatedAt: string | null };
 
-const KEEP_FILES = new Set(["irispy.py", "bot_updater.py"]);
+const KEEP_FILES = new Set(["irispy.py"]);
 const SECRET_MARK = "__BOT_SECRET_";
 const ACTION_LABEL: Record<string, string> = { edit: "수정", add: "새 파일", delete: "삭제", revert: "되돌림" };
 const RUN_LABEL: Record<string, string> = { apply: "적용", revert: "되돌리기", upload: "다시 올리기" };

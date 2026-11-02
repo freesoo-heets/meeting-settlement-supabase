@@ -11,8 +11,10 @@ import { fail, isAdminMember, loadMember, requireMemberId } from "../../../lib/g
 
 const NAME = /^[A-Za-z0-9_-]+\.py$/;
 const MAX_SIZE = 400000; // 봇 bot_updater.py 와 같게
-const KEEP_FILES = new Set(["irispy.py", "bot_updater.py"]); // 지울 수 없다
-const HIDDEN = "bot_guard.py"; // 자동 복구 장치라 고칠 수 없다
+const KEEP_FILES = new Set(["irispy.py"]); // 지울 수 없다
+// 화면에 보여 주지 않는다 (봇 bot_updater.py HIDDEN 과 같게). 고치다 망가지면 사이트로 되돌릴 수 없는 파일 · 운영진 권한
+const HIDDEN = ["bot_guard.py", "bot_updater.py", "admin_helper.py"];
+const NOT_HIDDEN = `(${HIDDEN.map((name) => `"${name}"`).join(",")})`;
 const LOG_LIMIT = 30;
 const RUN_LIMIT = 20;
 const COMMANDS = new Set(["apply", "revert", "upload"]);
@@ -34,6 +36,7 @@ export async function POST(request: Request) {
     const { data, error } = await admin
       .from("bot_scripts")
       .select("name,size,changed,deleted,is_new,updated_by,updated_at")
+      .not("name", "in", NOT_HIDDEN)
       .order("name");
     if (error) return fail(/bot_scripts/.test(error.message) ? MISSING : error.message);
     return NextResponse.json({ ok: true, rows: data ?? [] });
@@ -79,15 +82,16 @@ export async function POST(request: Request) {
 
   // 📜 변경 내역: 파일 이름이 있으면 그 파일만
   if (action === "changes") {
-    const logQuery = admin.from("bot_script_log").select("id,name,action,diff,plus,minus,edited_by,applied_by,applied_at").order("applied_at", { ascending: false }).limit(LOG_LIMIT);
-    const pendingQuery = admin.from("bot_scripts").select("name,content,live,changed,deleted,is_new,updated_at").eq("changed", true).order("name");
+    const logQuery = admin.from("bot_script_log").select("id,name,action,diff,plus,minus,edited_by,applied_by,applied_at").order("applied_at", { ascending: false }).not("name", "in", NOT_HIDDEN).limit(LOG_LIMIT);
+    const pendingQuery = admin.from("bot_scripts").select("name,content,live,changed,deleted,is_new,updated_at").eq("changed", true).not("name", "in", NOT_HIDDEN).order("name");
     const runQuery = admin.from("bot_commands").select("id,action,state,result,requested_by,created_at").order("created_at", { ascending: false }).limit(RUN_LIMIT);
     const [pending, log, runs] = await Promise.all([name ? pendingQuery.eq("name", name) : pendingQuery, name ? logQuery.eq("name", name) : logQuery, runQuery]);
     if (pending.error) return fail(/bot_scripts/.test(pending.error.message) ? MISSING : pending.error.message);
     return NextResponse.json({ ok: true, pending: pending.data ?? [], log: log.data ?? [], runs: runs.data ?? [] });
   }
 
-  if (!NAME.test(name) || name === HIDDEN) return fail("영문 · 숫자 · _ · - 로 된 .py 파일 이름만 쓸 수 있어요.");
+  if (!NAME.test(name)) return fail("영문 · 숫자 · _ · - 로 된 .py 파일 이름만 쓸 수 있어요.");
+  if (HIDDEN.includes(name)) return fail("보호된 파일이라 사이트에서 다룰 수 없어요.", 403);
 
   if (action === "read") {
     const { data } = await admin.from("bot_scripts").select("name,content,live,changed,deleted,is_new,updated_at").eq("name", name).maybeSingle();
