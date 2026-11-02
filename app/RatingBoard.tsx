@@ -41,9 +41,9 @@ export function useRatingChange(kind: Kind, gameId: string | null, enabled: bool
 
 const KIND_LABEL: Record<Kind, string> = { omok: "🏁 오목", alkkagi: "🥏 알까기" };
 
-export default function RatingBoard({ onClose }: { onClose: () => void }) {
-  const [kind, setKind] = useState<Kind>("omok");
-  const [period, setPeriod] = useState<"all" | "month">("all");
+export default function RatingBoard({ initialKind, onClose }: { initialKind: Kind; onClose: () => void }) {
+  const [kind, setKind] = useState<Kind>(initialKind);
+  const [period, setPeriod] = useState<"all" | "month">("month");
   const [data, setData] = useState<Partial<Record<Kind, Data>>>({});
   const [error, setError] = useState("");
 
@@ -109,8 +109,8 @@ export default function RatingBoard({ onClose }: { onClose: () => void }) {
           ))}
         </div>
         <div className="ratingTabs small">
-          <button className={period === "all" ? "active" : ""} onClick={() => setPeriod("all")}>누적</button>
           <button className={period === "month" ? "active" : ""} onClick={() => setPeriod("month")}>이번 달</button>
+          <button className={period === "all" ? "active" : ""} onClick={() => setPeriod("all")}>누적</button>
         </div>
 
         {error && <div className="omokMessage">{error}</div>}

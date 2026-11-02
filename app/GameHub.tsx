@@ -1,7 +1,7 @@
 "use client";
 
 import { useGameViewport } from "./useGameViewport";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { supabase } from "../lib/supabase";
 import OmokGame, { type Opponent } from "./OmokGame";
 import AlkkagiGame from "./AlkkagiGame";
@@ -47,6 +47,7 @@ type Props = {
   myTickets: number | null;
   opponents: Opponent[];
   isAdmin?: boolean;
+  pointBoard: (onClose: () => void) => ReactNode;
 };
 
 const STAKE_COLUMNS = "id,status,stake,host_member,host_name,guest_member,guest_name,target_member,is_test,is_friendly";
@@ -73,7 +74,7 @@ async function callCatchCleanup(force: boolean) {
   };
 }
 
-export default function GameHub({ onClose, initial, currentMemberId, myName, myPoints: pagePoints, myTickets: pageTickets, opponents, isAdmin }: Props) {
+export default function GameHub({ onClose, initial, currentMemberId, myName, myPoints: pagePoints, myTickets: pageTickets, opponents, isAdmin, pointBoard }: Props) {
   // 🎫 사이트에서 산 직후에는 봇이 알려 준 점수 · 티켓을 먼저 보여 준다 (점수판이 새로 오면 그것으로)
   const [bought, setBought] = useState<{ exp: number; tickets: number } | null>(null);
   useEffect(() => setBought(null), [pagePoints, pageTickets]);
@@ -87,12 +88,13 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
   const [catchRooms, setCatchRooms] = useState<CatchRow[]>([]);
   const [holdemTables, setHoldemTables] = useState<Array<{ id: string; status: string; host_name: string; is_friendly: boolean; max_seats: number; hand_no: number; view: { players?: Array<{ name: string; empty?: boolean }> } }>>([]);
   const [wordLive, setWordLive] = useState<Array<{ id: string; name: string; status: string; tries: number; max_tries: number; member_id: string }>>([]);
-  const [showRating, setShowRating] = useState(false);
+  const [ratingKind, setRatingKind] = useState<"omok" | "alkkagi" | null>(null);
+  const [showPoints, setShowPoints] = useState(false);
 
   // 📱 휴대폰 · 브라우저 뒤로가기: 사이트를 떠나지 않고 창을 한 단계씩 닫는다
   //  화면을 열 때 기록을 한 칸씩 넣고, 뒤로가기는 그 칸을 빼기만 한다
   //  (뒤로가기 뒤에 칸을 다시 넣으면 터치 없이 만든 기록이 되어 브라우저가 건너뛰고 사이트를 나가 버린다)
-  const level = 1 + (active ? 1 : 0) + (showTicket || showRating ? 1 : 0);
+  const level = 1 + (active ? 1 : 0) + (showTicket || ratingKind || showPoints ? 1 : 0);
   const pushed = useRef(0);
   const ownPops = useRef(0); // ‹ · × 로 닫으며 직접 뺀 칸 (뒤로가기가 아니다)
   const closeHub = useRef(onClose);
@@ -123,7 +125,8 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
         return;
       }
       setShowTicket(false);
-      setShowRating(false);
+      setRatingKind(null);
+      setShowPoints(false);
       setActive(null);
     };
     window.addEventListener("popstate", onBackKey);
@@ -325,12 +328,13 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
             <h2>🎮 게임</h2>
           </div>
           <div className="gameHubTools">
-            <button className="smallButton" onClick={() => setShowRating(true)}>🏆 랭킹</button>
+            <button className="smallButton" onClick={() => setShowPoints(true)}>🏆 점수순위</button>
             <button className="smallButton" onClick={() => setShowTicket(true)}>🎫 티켓구매</button>
           </div>
           <button className="modalCloseButton" onClick={onClose}>×</button>
         </div>
-        {showRating && <RatingBoard onClose={() => setShowRating(false)} />}
+        {ratingKind && <RatingBoard initialKind={ratingKind} onClose={() => setRatingKind(null)} />}
+        {showPoints && pointBoard(() => setShowPoints(false))}
         {showTicket && (
           <TicketBuy
             myPoints={myPoints}
@@ -352,6 +356,9 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
                     <strong>{game.name}</strong>
                     <span>{game.desc}</span>
                   </div>
+                  {game.kind !== "catch" && (
+                    <button className="smallButton gameHubRank" onClick={() => setRatingKind(game.kind as "omok" | "alkkagi")}>🏆 랭킹</button>
+                  )}
                   <button className="smallButton" onClick={() => setActive({ kind: game.kind, id: "" })}>
                     {game.kind === "catch" ? "방 만들기" : "대국 만들기"}
                   </button>

@@ -4794,6 +4794,34 @@ button.meetingMetricCard {
 .pointRankScore strong { font-size: 14px; }
 .pointRankScore em { font-style: normal; font-size: 12px; color: #64748b; margin-left: 2px; }
 
+.pointRankingList.manage li { grid-template-columns: 34px 1fr 32px auto; gap: 6px; }
+.pointRankManage {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+  background: #f8fafc;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+.pointAdminBox { text-align: left; max-height: 100%; overflow-y: auto; }
+.pointAdminBox > strong, .pointAdminBox > .ticketBuyHave, .pointAdminBox > .ticketBuyCost { text-align: center; }
+.pointAdminRow { display: grid; grid-template-columns: 32px 1fr 84px; align-items: center; gap: 6px; }
+.pointAdminRow b { font-size: 13px; }
+.pointAdminSign { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.pointAdminSign button { padding: 8px 0; border: 1px solid #e2e8f0; border-radius: 9px; background: #f8fafc; color: #475569; font-size: 13px; font-weight: 700; cursor: pointer; }
+.pointAdminSign button.on { border-color: #16a34a; background: #e8f7ee; color: #17663a; }
+.pointAdminSign button.on.down { border-color: #dc2626; background: #fdecea; color: #a52a1f; }
+.pointAdminRow label { display: flex; align-items: center; gap: 4px; font-size: 13px; }
+.pointAdminRow input { width: 100%; min-width: 0; padding: 8px 6px; border: 1px solid #e2e8f0; border-radius: 9px; font-size: 16px; text-align: right; }
+.pointAdminReason { width: 100%; box-sizing: border-box; padding: 9px 10px; border: 1px solid #e2e8f0; border-radius: 9px; font-size: 16px; }
+
+@media (max-width: 760px) {
+  .gameBackdrop > .pointRankingModal { align-self: end; }
+}
+
 .pointRankingFoot {
   margin: 10px 0 0;
   font-size: 11px;
@@ -5051,6 +5079,8 @@ button.meetingMetricCard {
 .gameHubHead > div { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
 .gameHubHead strong { font-size: 16px; }
 .gameHubHead span { font-size: 12px; color: #64748b; }
+.gameHubHead .smallButton { flex: none; white-space: nowrap; }
+.gameHubHead .gameHubRank { padding-inline: 9px; }
 .gameHubIcon { font-size: 26px; line-height: 1; }
 .gameHubRooms { display: flex; flex-direction: column; gap: 4px; }
 .gameHubRooms > .muted { font-size: 12px; padding: 2px 2px 4px; }

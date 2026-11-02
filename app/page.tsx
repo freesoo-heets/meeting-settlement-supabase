@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { matchesHangul } from "../lib/hangulSearch";
+import PointRanking from "./PointRanking";
 import GameHub, { type GameKind } from "./GameHub";
 import BotAdmin from "./BotAdmin";
 import { ChatLogModal, chatAgo, useLastChats } from "./ChatLog";
@@ -648,6 +649,23 @@ export default function Home() {
     }
     return latest;
   }, [botPoints]);
+
+  // 🏆 점수 순위 창 (첫 화면 · 게임 목록 공용). 관리자 조정 결과는 봇 연동을 기다리지 않고 먼저 보여 준다
+  const pointBoard = (onClose: () => void, inGame = false) => (
+    <PointRanking
+      rows={pointRanking.rows}
+      hidden={pointRanking.hidden}
+      season={pointRanking.season}
+      syncedAt={botPointsSyncedAt}
+      myUid={currentMember ? (pointsByMember[currentMember.id]?.kakao_uid ?? null) : null}
+      isAdmin={isAdmin}
+      inGame={inGame}
+      onAdjusted={(uid, exp, tickets) =>
+        setBotPoints((rows) => rows.map((row) => (row.kakao_uid === uid ? { ...row, exp, tickets } : row)))
+      }
+      onClose={onClose}
+    />
+  );
 
   const lastAttendanceByMember = useMemo(() => {
     const map: Record<string, string | null> = Object.fromEntries(
@@ -5673,6 +5691,7 @@ async function setAttendanceMembers(memberIds: string[]) {
           }}
           initial={gameInvite}
           isAdmin={isAdmin}
+          pointBoard={(close) => pointBoard(close, true)}
           currentMemberId={currentMember.id}
           myPoints={pointsByMember[currentMember.id]?.exp ?? null}
           myTickets={pointsByMember[currentMember.id]?.tickets ?? null}
@@ -5684,69 +5703,8 @@ async function setAttendanceMembers(memberIds: string[]) {
         />
       )}
 
-      {showPointRanking && (
-        <div
-          className="meetingModalBackdrop"
-          role="presentation"
-          onClick={(event) => {
-            if (event.target === event.currentTarget) setShowPointRanking(false);
-          }}
-        >
-          <section className="meetingModal pointRankingModal" role="dialog" aria-modal="true">
-            <div className="meetingModalHeader">
-              <div>
-                <span>
-                  카톡 봇 점수판{pointRanking.season ? ` · 시즌 ${pointRanking.season}` : ""}
-                </span>
-                <h2>🏆 점수 순위</h2>
-              </div>
-              <button className="modalCloseButton" onClick={() => setShowPointRanking(false)}>×</button>
-            </div>
+      {showPointRanking && pointBoard(() => setShowPointRanking(false))}
 
-            {pointRanking.rows.length >= 3 && (
-              <div className="pointPodium">
-                {[1, 0, 2].map((index) => {
-                  const row = pointRanking.rows[index];
-                  return (
-                    <div key={row.kakao_uid} className={`pointPodiumItem place${row.place}`}>
-                      <span className="pointPodiumMedal">{["🥇", "🥈", "🥉"][index]}</span>
-                      <strong>{row.name}</strong>
-                      <em>{row.exp.toLocaleString("ko-KR")}점</em>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            <ol className="pointRankingList">
-              {pointRanking.rows.map((row) => {
-                const isMe = !!currentMember && pointsByMember[currentMember.id]?.kakao_uid === row.kakao_uid;
-                return (
-                  <li key={row.kakao_uid} className={isMe ? "me" : ""}>
-                    <span className={`pointRankNo ${row.place <= 3 ? "top" : ""}`}>{row.place}</span>
-                    <span className="pointRankName">
-                      <strong>{row.name}</strong>
-                      {isMe && <em className="pointRankMe">나</em>}
-                      {row.trophies && <em className="pointRankTrophies">{row.trophies}</em>}
-                    </span>
-                    <span className="pointRankScore">
-                      <strong>{row.exp.toLocaleString("ko-KR")}</strong>
-                      <em>점{row.tickets ? ` · 🎫${row.tickets}` : ""}</em>
-                    </span>
-                  </li>
-                );
-              })}
-            </ol>
-
-            <p className="pointRankingFoot">
-              {pointRanking.hidden > 0 && `💤 7일 이상 미활동 ${pointRanking.hidden}명 숨김 · `}
-              {botPointsSyncedAt &&
-                `${new Date(botPointsSyncedAt).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })} 갱신 · 1분마다 반영`}
-            </p>
-          </section>
-        </div>
-      )}
-    
       {showMyActivity && currentMember && (
         <div className="meetingModalBackdrop" role="presentation">
           <section className="meetingModal" role="dialog" aria-modal="true">
