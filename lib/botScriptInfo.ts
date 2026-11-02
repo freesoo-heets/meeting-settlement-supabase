@@ -7,7 +7,7 @@ export const BOT_SCRIPT_INFO: Record<string, string> = {
   // 게임 · 점수
   "point_helper.py": "점수판 · 랭킹 · 메달 · 시즌 초기화 (!내점수 !랭킹)",
   "ticket_helper.py": "티켓 지급 · 사용 전담",
-  "point_admin.py": "사이트 점수 순위 ⚙️ 관리 요청을 점수판에 반영 (점수 · 티켓)",
+  "point_admin.py": "사이트 ⚙️ 점수 · 티켓 · 메달 요청 반영 · 📜 점수 내역을 사이트로",
   "attendance_helper.py": "출석 · 경마 베팅 (!출석 !ㅊㅊ !경마베팅)",
   "quiz_helper.py": "자음퀴즈 · 상식퀴즈 (!자음퀴즈 !상식퀴즈)",
   "song_quiz_helper.py": "노래 맞추기 (!노래퀴즈 !노래힌트)",

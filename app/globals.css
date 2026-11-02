@@ -4760,9 +4760,9 @@ button.meetingMetricCard {
 }
 .pointRankingList li {
   display: grid;
-  grid-template-columns: 34px 1fr auto;
+  grid-template-columns: 30px 1fr auto 32px;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
   padding: 9px 4px;
   border-bottom: 1px solid #f1ece6;
 }
@@ -4794,7 +4794,7 @@ button.meetingMetricCard {
 .pointRankScore strong { font-size: 14px; }
 .pointRankScore em { font-style: normal; font-size: 12px; color: #64748b; margin-left: 2px; }
 
-.pointRankingList.manage li { grid-template-columns: 34px 1fr 32px auto; gap: 6px; }
+.pointRankingList.manage li { grid-template-columns: 24px 1fr 32px auto 32px; gap: 5px; }
 .pointRankManage {
   width: 32px;
   height: 32px;
@@ -4816,6 +4816,26 @@ button.meetingMetricCard {
 .pointAdminSign button.on.down { border-color: #dc2626; background: #fdecea; color: #a52a1f; }
 .pointAdminRow label { display: flex; align-items: center; gap: 4px; font-size: 13px; }
 .pointAdminRow input { width: 100%; min-width: 0; padding: 8px 6px; border: 1px solid #e2e8f0; border-radius: 9px; font-size: 16px; text-align: right; }
+.pointAdminMedals { display: grid; gap: 7px; padding-top: 10px; border-top: 1px solid #eee7e0; }
+.pointAdminMedals > b { font-size: 13px; }
+.pointAdminMedals > b em { margin-left: 4px; font-style: normal; font-size: 11px; font-weight: 500; color: #94a3b8; }
+.pointMedalChips { display: flex; flex-wrap: wrap; gap: 5px; min-height: 30px; align-items: center; font-size: 12px; color: #94a3b8; }
+.pointMedalChips button { display: inline-flex; align-items: center; gap: 3px; padding: 4px 7px; border: 1px solid #e2e8f0; border-radius: 999px; background: #f8fafc; font-size: 15px; cursor: pointer; }
+.pointMedalChips i { font-style: normal; font-size: 12px; color: #dc2626; }
+.pointMedalAdd { display: grid; grid-template-columns: repeat(5, 1fr) 2fr 1.4fr; gap: 4px; }
+.pointMedalAdd button { min-width: 0; padding: 7px 0; border: 1px solid #e2e8f0; border-radius: 9px; background: #f8fafc; font-size: 15px; cursor: pointer; }
+.pointMedalAdd button.add { font-size: 13px; font-weight: 700; color: #475569; }
+.pointMedalAdd input { width: 100%; min-width: 0; box-sizing: border-box; padding: 7px 4px; border: 1px solid #e2e8f0; border-radius: 9px; font-size: 16px; text-align: center; }
+.pointAdminMedals button:disabled, .pointMedalAdd input:disabled { opacity: .5; cursor: default; }
+.pointHistoryBox { width: min(420px, 100%); max-height: 100%; overflow: hidden; grid-template-rows: auto auto minmax(0, 1fr) auto auto; }
+.pointHistoryList { list-style: none; margin: 0; padding: 0; min-height: 0; overflow-y: auto; text-align: left; border-top: 1px solid #eee7e0; }
+.pointHistoryList li { padding: 7px 2px; border-bottom: 1px solid #f1ece6; }
+.pointHistoryList li > div { display: flex; align-items: baseline; gap: 6px; font-size: 13px; }
+.pointHistoryList time { flex: 1; font-size: 11px; color: #94a3b8; }
+.pointHistoryList b.plus { color: #17663a; }
+.pointHistoryList b.minus { color: #a52a1f; }
+.pointHistoryList em { font-style: normal; font-size: 12px; color: #64748b; }
+.pointHistoryList p { margin: 2px 0 0; font-size: 13px; color: #334155; overflow-wrap: anywhere; }
 .pointAdminReason { width: 100%; box-sizing: border-box; padding: 9px 10px; border: 1px solid #e2e8f0; border-radius: 9px; font-size: 16px; }
 
 @media (max-width: 760px) {

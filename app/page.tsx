@@ -660,8 +660,8 @@ export default function Home() {
       myUid={currentMember ? (pointsByMember[currentMember.id]?.kakao_uid ?? null) : null}
       isAdmin={isAdmin}
       inGame={inGame}
-      onAdjusted={(uid, exp, tickets) =>
-        setBotPoints((rows) => rows.map((row) => (row.kakao_uid === uid ? { ...row, exp, tickets } : row)))
+      onAdjusted={(uid, patch) =>
+        setBotPoints((rows) => rows.map((row) => (row.kakao_uid === uid ? { ...row, ...patch } : row)))
       }
       onClose={onClose}
     />
