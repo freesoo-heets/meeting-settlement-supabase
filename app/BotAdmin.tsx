@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { diffCount, parseDiff, unifiedDiff } from "../lib/lineDiff";
+import { BOT_SCRIPT_INFO } from "../lib/botScriptInfo";
 
 // 🤖 봇관리 (관리자): 봇 스크립트 목록 · 수정 · 추가 · 삭제 · 변경 내역. 저장은 초안이고, 운영진방 !봇적용 때 봇에 반영된다
 
@@ -187,7 +188,7 @@ export default function BotAdmin({ onClose }: { onClose: () => void }) {
 
   const shown = useMemo(() => {
     const word = search.trim().toLowerCase();
-    return (rows ?? []).filter((row) => row.name.toLowerCase().includes(word));
+    return (rows ?? []).filter((row) => `${row.name} ${BOT_SCRIPT_INFO[row.name] ?? ""}`.toLowerCase().includes(word));
   }, [rows, search]);
   const pending = (rows ?? []).filter((row) => row.changed).length;
   const dirty = !!editing && editing.text !== editing.saved;
@@ -371,7 +372,7 @@ export default function BotAdmin({ onClose }: { onClose: () => void }) {
       ) : (
         <>
           <div className="botAdminTools">
-            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="파일 검색" autoComplete="off" aria-label="파일 검색" />
+            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="파일 · 기능 검색" autoComplete="off" aria-label="파일 · 기능 검색" />
             <button className="smallButton ghost" disabled={busy} onClick={() => void showChanges()}>변경 내역</button>
             <button className="smallButton" onClick={() => setNewName(newName === null ? "" : null)}>새 파일</button>
           </div>
@@ -404,6 +405,7 @@ export default function BotAdmin({ onClose }: { onClose: () => void }) {
                   <b>{item.name}</b>
                   <span>{sizeText(item.size)}{item.changed && item.updated_by ? ` · ${item.updated_by}` : ""}</span>
                   <em className={status.tone}>{status.label}</em>
+                  {BOT_SCRIPT_INFO[item.name] && <small>{BOT_SCRIPT_INFO[item.name]}</small>}
                 </button>
               );
             })}

@@ -6758,3 +6758,5 @@ button.meetingMetricCard {
 .botRun { display: grid; gap: 6px; padding: 8px 10px; border-radius: 9px; background: #fff7ed; font-size: 12px; line-height: 1.5; color: #9a3412; }
 .botRun p { margin: 0; }
 .botRun .botLog { border-radius: 8px; max-height: 120px; }
+
+.botAdminList small { grid-column: 1 / -1; font-size: 11px; line-height: 1.4; color: #6b7280; overflow-wrap: anywhere; }
