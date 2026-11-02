@@ -6731,3 +6731,26 @@ button.meetingMetricCard {
 .botAdminActions .smallButton { flex: 1; }
 .botAdminActions .smallButton:disabled { opacity: .5; }
 .botAdminActions .smallButton.danger { background: #dc2626; color: #fff; }
+
+.botAdminTabs { display: flex; gap: 4px; }
+.botAdminTabs button { flex: 1; height: 34px; border: 0; border-radius: 9px; background: #eee9e4; color: #5e5650; font-size: 13px; font-weight: 700; cursor: pointer; }
+.botAdminTabs button.on { background: #7c3aed; color: #fff; }
+.botAdminScroll { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; overflow-y: auto; }
+.botAdminTitle { font-size: 13px; font-weight: 800; padding-top: 4px; }
+.botChange { flex: none; border: 1px solid #f1ece6; border-radius: 9px; background: #fafaf9; }
+.botChange summary { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 8px 10px; font-size: 12px; cursor: pointer; }
+.botChange summary b { min-width: 0; font-size: 13px; overflow-wrap: anywhere; }
+.botChange summary em { font-style: normal; font-weight: 700; color: #6b7280; }
+.botChange summary em.edit { color: #ea580c; } .botChange summary em.new { color: #16a34a; } .botChange summary em.del { color: #dc2626; }
+.botChange summary u { color: #16a34a; text-decoration: none; font-weight: 700; } .botChange summary s { color: #dc2626; text-decoration: none; font-weight: 700; }
+.botChange summary small { color: #6b7280; }
+.botChange .botAdminHint { padding: 0 10px 8px; }
+.botDiff { overflow-x: auto; background: #0f172a; border-radius: 8px; padding: 6px 0; font: 12px/1.5 ui-monospace, Consolas, "D2Coding", monospace; color: #e2e8f0; }
+.botDiffLine { display: flex; width: max-content; min-width: 100%; }
+.botDiffLine i { flex: none; width: 34px; padding-right: 6px; font-style: normal; text-align: right; color: #64748b; user-select: none; }
+.botDiffLine code { font: inherit; white-space: pre; padding: 0 8px 0 2px; }
+.botDiffLine.add { background: rgba(34, 197, 94, .22); }
+.botDiffLine.del { background: rgba(239, 68, 68, .24); }
+.botDiffLine.hunk { color: #7dd3fc; }
+
+.botLog { margin: 0; max-height: 240px; overflow: auto; padding: 8px 10px; border-radius: 0 0 8px 8px; background: #0f172a; color: #e2e8f0; font: 12px/1.5 ui-monospace, Consolas, "D2Coding", monospace; white-space: pre-wrap; overflow-wrap: anywhere; }

@@ -4,14 +4,19 @@ import { fail, isAdminMember, loadMember, requireMemberId } from "../../../lib/g
 
 /*
  * 🤖 봇 스크립트 관리 API (관리자만)
- *  · list · read · save(추가 · 수정) · remove · revert(고친 내용 취소)
- *  · 여기서는 초안만 바뀐다. 실제 파일은 운영진방 !봇적용 때 봇이 고친다 (봇 bot_updater.py)
+ *  · list · read · changes(적용 대기 · 적용 기록) · save(추가 · 수정) · remove · revert(고친 내용 취소)
+ *  · 여기서는 초안만 바뀐다. 실제 파일은 운영진방 !봇적용 또는 run(적용 · 되돌리기 · 다시 올리기 요청) 때 봇이 고친다 (봇 bot_updater.py)
+ *    run 은 bot_commands 에 넣고 봇이 처리한다. 요청할 때마다 운영진방에 알림이 올라간다
  */
 
 const NAME = /^[A-Za-z0-9_-]+\.py$/;
 const MAX_SIZE = 400000; // 봇 bot_updater.py 와 같게
 const KEEP_FILES = new Set(["irispy.py", "bot_updater.py"]); // 지울 수 없다
 const HIDDEN = "bot_guard.py"; // 자동 복구 장치라 고칠 수 없다
+const LOG_LIMIT = 30;
+const RUN_LIMIT = 20;
+const COMMANDS = new Set(["apply", "revert", "upload"]);
+const COMMAND_WAIT_MS = 2 * 60 * 1000; // 봇이 처리 중인 요청이 있으면 이 시간 동안 새 요청을 받지 않는다
 const MISSING = "봇관리 설정이 아직 안 됐어요. (운영진: SQL 실행 필요)";
 
 export async function POST(request: Request) {
@@ -33,10 +38,40 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, rows: data ?? [] });
   }
 
+  // ▶️ 적용 · 되돌리기 · 다시 올리기 (봇이 3초마다 확인해서 처리한다)
+  if (action === "run") {
+    const command = String(body.command ?? "");
+    if (!COMMANDS.has(command)) return fail("알 수 없는 요청입니다.");
+    const since = new Date(Date.now() - COMMAND_WAIT_MS).toISOString();
+    const { data: running, error: checkError } = await admin.from("bot_commands").select("id").in("state", ["requested", "running"]).gte("created_at", since).limit(1);
+    if (checkError) return fail(/bot_commands/.test(checkError.message) ? MISSING : checkError.message);
+    if (running?.length) return fail("봇이 앞선 요청을 처리하는 중이에요. 잠시 뒤 다시 해 주세요.");
+    const member = await loadMember(admin, auth.memberId);
+    if ("error" in member) return fail(member.error, member.status);
+    const { data, error } = await admin.from("bot_commands").insert({ action: command, member_id: member.id, requested_by: member.name }).select("id").single();
+    if (error) return fail(error.message);
+    return NextResponse.json({ ok: true, id: data.id });
+  }
+
+  if (action === "runStatus") {
+    const { data } = await admin.from("bot_commands").select("state,result").eq("id", String(body.id ?? "")).maybeSingle();
+    return data ? NextResponse.json({ ok: true, command: data }) : fail("요청을 찾지 못했어요.", 404);
+  }
+
+  // 📜 변경 내역: 파일 이름이 있으면 그 파일만
+  if (action === "changes") {
+    const logQuery = admin.from("bot_script_log").select("id,name,action,diff,plus,minus,edited_by,applied_by,applied_at").order("applied_at", { ascending: false }).limit(LOG_LIMIT);
+    const pendingQuery = admin.from("bot_scripts").select("name,content,live,changed,deleted,is_new,updated_at").eq("changed", true).order("name");
+    const runQuery = admin.from("bot_commands").select("id,action,state,result,requested_by,created_at").order("created_at", { ascending: false }).limit(RUN_LIMIT);
+    const [pending, log, runs] = await Promise.all([name ? pendingQuery.eq("name", name) : pendingQuery, name ? logQuery.eq("name", name) : logQuery, runQuery]);
+    if (pending.error) return fail(/bot_scripts/.test(pending.error.message) ? MISSING : pending.error.message);
+    return NextResponse.json({ ok: true, pending: pending.data ?? [], log: log.data ?? [], runs: runs.data ?? [] });
+  }
+
   if (!NAME.test(name) || name === HIDDEN) return fail("영문 · 숫자 · _ · - 로 된 .py 파일 이름만 쓸 수 있어요.");
 
   if (action === "read") {
-    const { data } = await admin.from("bot_scripts").select("name,content,changed,deleted,is_new,updated_at").eq("name", name).maybeSingle();
+    const { data } = await admin.from("bot_scripts").select("name,content,live,changed,deleted,is_new,updated_at").eq("name", name).maybeSingle();
     return data ? NextResponse.json({ ok: true, script: data }) : fail("파일을 찾지 못했어요.", 404);
   }
 
