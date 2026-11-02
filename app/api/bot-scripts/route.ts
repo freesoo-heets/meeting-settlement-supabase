@@ -6,6 +6,8 @@ import { fail, isAdminMember, loadMember, requireMemberId } from "../../../lib/g
  * 🤖 봇 스크립트 관리 API (관리자만)
  *  · list · read · changes(적용 대기 · 적용 기록) · save(추가 · 수정) · remove · revert(고친 내용 취소)
  *  · about: 파일 설명 저장 (코드가 아니라서 봇 적용 없이 바로 반영). 비우면 기본 설명으로 돌아간다
+ *  · resolve: 초안을 만든 뒤 파일이 직접 수정된 충돌 표시를 지운다 (초안을 그대로 쓰기로 함)
+ *  · export: PC 사본 (키가 가려진 상태). PC 의 bot_pull.py 로 맞춘다
  *  · 여기서는 초안만 바뀐다. 실제 파일은 운영진방 !봇적용 또는 run(적용 · 되돌리기 · 다시 올리기 요청) 때 봇이 고친다 (봇 bot_updater.py)
  *    run 은 bot_commands 에 넣고 봇이 처리한다. 요청할 때마다 운영진방에 알림이 올라간다
  */
@@ -23,6 +25,10 @@ const COMMANDS = new Set(["apply", "revert", "upload"]);
 const COMMAND_WAIT_MS = 3 * 60 * 1000; // 봇이 처리 중인 요청이 있으면 이 시간 동안 새 요청을 받지 않는다
 const COMMAND_COLUMNS = "id,action,state,result,created_at";
 const MISSING = "봇관리 설정이 아직 안 됐어요. (운영진: SQL 실행 필요)";
+
+async function clearConflict(admin: ReturnType<typeof getServerAdmin>, name: string) {
+  await admin.from("bot_script_meta").update({ conflict: false }).eq("name", name); // 표가 없어도 저장은 된다
+}
 
 export async function POST(request: Request) {
   const admin = getServerAdmin();
@@ -43,7 +49,21 @@ export async function POST(request: Request) {
     if (error) return fail(/bot_scripts/.test(error.message) ? MISSING : error.message);
     const { data: abouts } = await admin.from("bot_script_about").select("name,about"); // 표가 없어도 목록은 보여 준다
     const aboutOf = new Map((abouts ?? []).map((row) => [row.name as string, row.about as string]));
-    return NextResponse.json({ ok: true, rows: (data ?? []).map((row) => ({ ...row, about: aboutOf.get(row.name) ?? null })) });
+    const { data: metas } = await admin.from("bot_script_meta").select("name,file_at,conflict");
+    const metaOf = new Map((metas ?? []).map((row) => [row.name as string, row]));
+    return NextResponse.json({
+      ok: true,
+      rows: (data ?? []).map((row) => ({ ...row, about: aboutOf.get(row.name) ?? null, file_at: metaOf.get(row.name)?.file_at ?? null, conflict: !!metaOf.get(row.name)?.conflict })),
+    });
+  }
+
+  // 💾 PC 사본: 지금 봇이 쓰는 내용 (live)
+  if (action === "export") {
+    const { data, error } = await admin.from("bot_scripts").select("name,live").not("live", "is", null).not("name", "in", NOT_HIDDEN).order("name");
+    if (error) return fail(/bot_scripts/.test(error.message) ? MISSING : error.message);
+    const { data: metas } = await admin.from("bot_script_meta").select("name,file_at");
+    const atOf = new Map((metas ?? []).map((row) => [row.name as string, row.file_at as string]));
+    return NextResponse.json({ ok: true, export: { exported_at: new Date().toISOString(), rows: (data ?? []).map((row) => ({ ...row, file_at: atOf.get(row.name) ?? null })) } });
   }
 
   // ▶️ 적용 · 되돌리기 · 다시 올리기 (봇이 3초마다 확인해서 처리한다)
@@ -129,7 +149,13 @@ export async function POST(request: Request) {
     const { data, error } = await admin.from("bot_scripts").update(row).eq("name", name).eq("updated_at", String(body.expected)).select("name");
     if (error) return fail(error.message);
     if (!data?.length) return fail("다른 곳에서 먼저 고쳤어요. 다시 열어서 확인해 주세요.");
+    await clearConflict(admin, name); // 충돌을 보고 고쳐서 저장했다
     return NextResponse.json({ ok: true, updatedAt: now });
+  }
+
+  if (action === "resolve") {
+    await clearConflict(admin, name);
+    return NextResponse.json({ ok: true });
   }
 
   const { data: row } = await admin.from("bot_scripts").select("live").eq("name", name).maybeSingle();
@@ -144,7 +170,9 @@ export async function POST(request: Request) {
     }
     const change = action === "remove" ? { deleted: true } : { deleted: false, content: row.live as string };
     const { error } = await admin.from("bot_scripts").update({ ...change, updated_by: member.name, updated_at: now }).eq("name", name);
-    return error ? fail(error.message) : NextResponse.json({ ok: true });
+    if (error) return fail(error.message);
+    if (action === "revert") await clearConflict(admin, name);
+    return NextResponse.json({ ok: true });
   }
 
   return fail("알 수 없는 요청입니다.");

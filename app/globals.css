@@ -6765,3 +6765,9 @@ button.meetingMetricCard {
 .botAdminNew { flex-wrap: wrap; }
 .botAdminNew input { flex: 1 1 100%; }
 .botAdminNew .smallButton { flex: 1 1 100%; }
+
+.botConflict { display: grid; gap: 6px; padding: 8px 10px; border-radius: 9px; background: #fef2f2; color: #991b1b; font-size: 12px; line-height: 1.5; }
+.botConflict p { margin: 0; }
+.botConflict div { display: flex; gap: 6px; }
+.botConflict .smallButton { flex: 1; }
+.botAdminLink { align-self: flex-start; border: 0; padding: 2px 0; background: none; color: #6d28d9; font-size: 12px; font-weight: 700; cursor: pointer; }

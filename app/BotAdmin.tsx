@@ -7,12 +7,12 @@ import { BOT_SCRIPT_INFO } from "../lib/botScriptInfo";
 
 // 🤖 봇관리 (관리자): 봇 스크립트 목록 · 수정 · 추가 · 삭제 · 변경 내역. 저장은 초안이고, 운영진방 !봇적용 때 봇에 반영된다
 
-type Row = { name: string; size: number; changed: boolean; deleted: boolean; is_new: boolean; updated_by: string | null; updated_at: string; about?: string | null };
+type Row = { name: string; size: number; changed: boolean; deleted: boolean; is_new: boolean; updated_by: string | null; updated_at: string; about?: string | null; file_at?: string | null; conflict?: boolean };
 type Script = { name: string; content: string; live: string | null; changed: boolean; deleted: boolean; is_new: boolean; updated_at: string };
 type LogRow = { id: string; name: string; action: string; diff: string; plus: number; minus: number; edited_by: string | null; applied_by: string | null; applied_at: string };
 type Command = { id: string; action: string; state: string; result: string | null; created_at: string };
 type RunRow = Command & { requested_by: string };
-type Result = { ok: boolean; error?: string; id?: string; rows?: Row[]; script?: Script; pending?: Script[]; log?: LogRow[]; runs?: RunRow[]; updatedAt?: string; command?: Command };
+type Result = { ok: boolean; error?: string; id?: string; rows?: Row[]; script?: Script; pending?: Script[]; log?: LogRow[]; runs?: RunRow[]; updatedAt?: string; command?: Command; export?: { exported_at: string; rows: unknown[] } };
 type Editing = { name: string; text: string; saved: string; live: string | null; crlf: boolean; updatedAt: string | null; about: string; savedAbout: string };
 
 const KEEP_FILES = new Set(["irispy.py"]);
@@ -54,6 +54,11 @@ function statusOf(row: { changed: boolean; deleted: boolean; is_new: boolean }) 
   return row.changed ? { label: "수정됨", tone: "edit" } : { label: "적용됨", tone: "" };
 }
 
+const pad = (n: number) => String(n).padStart(2, "0");
+const fullTime = (at: string) => {
+  const d = new Date(at);
+  return `${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
 const sizeText = (size: number) => (size < 1024 ? `${size}B` : `${Math.round(size / 1024)}KB`);
 const whenText = (at: string) => new Date(at).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
 
@@ -215,6 +220,30 @@ export default function BotAdmin({ onClose }: { onClose: () => void }) {
     setEditing({ name, text, saved: text, live, crlf: content.includes("\r\n"), updatedAt: updated_at, about, savedAbout: about });
   }
 
+  async function resolveConflict(name: string) {
+    if (!window.confirm(`${name} 의 초안을 그대로 쓸까요?\n\n적용하면 파일을 직접 고친 내용은 사라집니다. 변경 내역을 먼저 확인해 주세요.`)) return;
+    setBusy(true);
+    const result = await callBot({ action: "resolve", name });
+    setBusy(false);
+    if (!result.ok) return setNote(`❌ ${result.error ?? "처리하지 못했습니다."}`);
+    setNote("✅ 초안을 유지합니다. '봇에 적용'을 할 수 있어요.");
+    await refresh();
+  }
+
+  async function exportForPc() {
+    setBusy(true);
+    const result = await callBot({ action: "export" });
+    setBusy(false);
+    if (!result.ok || !result.export) return setNote(`❌ ${result.error ?? "내려받지 못했습니다."}`);
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[-:]/g, "").replace("T", "-");
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(new Blob([JSON.stringify(result.export)], { type: "application/json" }));
+    link.download = `bot_scripts_${stamp}.json`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+    setNote(`💾 PC 사본을 받았어요. (${result.export.rows.length}개 · API 키는 가려져 있어요)`);
+  }
+
   async function showFileDiff() {
     if (!editing) return;
     setTab("diff");
@@ -338,6 +367,22 @@ export default function BotAdmin({ onClose }: { onClose: () => void }) {
 
       {editing ? (
         <>
+          {row?.conflict && (
+            <div className="botConflict">
+              <b>⚠️ 충돌: 초안을 만든 뒤 파일이 직접 수정됐어요</b>
+              <p>그대로 적용하면 직접 고친 내용이 사라져요. 변경 내역을 확인하고 골라 주세요. 빨간 줄이 지금 파일에서 사라지는 내용입니다.</p>
+              <div>
+                <button className="smallButton" disabled={busy} onClick={() => void resolveConflict(editing.name)}>초안 유지</button>
+                <button className="smallButton ghost" disabled={busy} onClick={() => void change("revert", editing.name, `초안을 버리고 지금 파일을 그대로 쓸까요?`)}>변경 취소</button>
+              </div>
+            </div>
+          )}
+          {row && (
+            <p className="botAdminHint">
+              📄 파일 수정 {row.file_at ? fullTime(row.file_at) : "기록 없음"} · {sizeText(row.size)}
+              {row.changed ? ` · ✏️ 초안 저장 ${fullTime(row.updated_at)}${row.updated_by ? ` ${row.updated_by}` : ""}` : ""}
+            </p>
+          )}
           <div className="botAdminTabs">
             <button className={tab === "code" ? "on" : ""} onClick={() => setTab("code")}>코드</button>
             <button className={tab === "diff" ? "on" : ""} onClick={() => void showFileDiff()}>변경 내역</button>
@@ -431,8 +476,8 @@ export default function BotAdmin({ onClose }: { onClose: () => void }) {
               return (
                 <button key={item.name} disabled={busy} onClick={() => void open(item.name)}>
                   <b>{item.name}</b>
-                  <span>{sizeText(item.size)}{item.changed && item.updated_by ? ` · ${item.updated_by}` : ""}</span>
-                  <em className={status.tone}>{status.label}</em>
+                  <span>{fullTime(item.changed ? item.updated_at : item.file_at ?? item.updated_at)}</span>
+                  <em className={item.conflict ? "del" : status.tone}>{item.conflict ? "⚠️ 충돌" : status.label}</em>
                   {aboutOf(item) && <small>{aboutOf(item)}</small>}
                 </button>
               );
@@ -443,6 +488,7 @@ export default function BotAdmin({ onClose }: { onClose: () => void }) {
             <button className="smallButton ghost" disabled={busy} onClick={() => void run("revert")}>되돌리기</button>
             <button className="smallButton ghost" disabled={busy} onClick={() => void run("upload")}>다시 올리기</button>
           </div>
+          <button className="botAdminLink" disabled={busy} onClick={() => void exportForPc()}>💾 PC 사본 받기</button>
           <p className="botAdminHint">저장만으로는 봇이 바뀌지 않아요. 운영진방 <b>!봇적용</b> · <b>!봇변경</b> · <b>!봇되돌리기</b> · <b>!봇올리기</b> 도 같습니다.</p>
         </>
       )}
