@@ -6754,3 +6754,7 @@ button.meetingMetricCard {
 .botDiffLine.hunk { color: #7dd3fc; }
 
 .botLog { margin: 0; max-height: 240px; overflow: auto; padding: 8px 10px; border-radius: 0 0 8px 8px; background: #0f172a; color: #e2e8f0; font: 12px/1.5 ui-monospace, Consolas, "D2Coding", monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.botRun { display: grid; gap: 6px; padding: 8px 10px; border-radius: 9px; background: #fff7ed; font-size: 12px; line-height: 1.5; color: #9a3412; }
+.botRun p { margin: 0; }
+.botRun .botLog { border-radius: 8px; max-height: 120px; }

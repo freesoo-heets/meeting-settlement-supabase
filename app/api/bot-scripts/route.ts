@@ -16,7 +16,8 @@ const HIDDEN = "bot_guard.py"; // 자동 복구 장치라 고칠 수 없다
 const LOG_LIMIT = 30;
 const RUN_LIMIT = 20;
 const COMMANDS = new Set(["apply", "revert", "upload"]);
-const COMMAND_WAIT_MS = 2 * 60 * 1000; // 봇이 처리 중인 요청이 있으면 이 시간 동안 새 요청을 받지 않는다
+const COMMAND_WAIT_MS = 3 * 60 * 1000; // 봇이 처리 중인 요청이 있으면 이 시간 동안 새 요청을 받지 않는다
+const COMMAND_COLUMNS = "id,action,state,result,created_at";
 const MISSING = "봇관리 설정이 아직 안 됐어요. (운영진: SQL 실행 필요)";
 
 export async function POST(request: Request) {
@@ -45,7 +46,7 @@ export async function POST(request: Request) {
     const since = new Date(Date.now() - COMMAND_WAIT_MS).toISOString();
     const { data: running, error: checkError } = await admin.from("bot_commands").select("id").in("state", ["requested", "running"]).gte("created_at", since).limit(1);
     if (checkError) return fail(/bot_commands/.test(checkError.message) ? MISSING : checkError.message);
-    if (running?.length) return fail("봇이 앞선 요청을 처리하는 중이에요. 잠시 뒤 다시 해 주세요.");
+    if (running?.length) return NextResponse.json({ ok: false, id: running[0].id, error: "봇이 앞선 요청을 처리하는 중이에요." }); // 화면이 그 요청을 이어서 보여 준다
     const member = await loadMember(admin, auth.memberId);
     if ("error" in member) return fail(member.error, member.status);
     const { data, error } = await admin.from("bot_commands").insert({ action: command, member_id: member.id, requested_by: member.name }).select("id").single();
@@ -54,8 +55,26 @@ export async function POST(request: Request) {
   }
 
   if (action === "runStatus") {
-    const { data } = await admin.from("bot_commands").select("state,result").eq("id", String(body.id ?? "")).maybeSingle();
+    const { data } = await admin.from("bot_commands").select(COMMAND_COLUMNS).eq("id", String(body.id ?? "")).maybeSingle();
     return data ? NextResponse.json({ ok: true, command: data }) : fail("요청을 찾지 못했어요.", 404);
+  }
+
+  // 새로고침해도 진행 중인 요청을 이어서 보여 준다
+  if (action === "runActive") {
+    const since = new Date(Date.now() - COMMAND_WAIT_MS).toISOString();
+    const { data } = await admin.from("bot_commands").select(COMMAND_COLUMNS).in("state", ["requested", "running"]).gte("created_at", since).order("created_at", { ascending: false }).limit(1);
+    return NextResponse.json({ ok: true, command: data?.[0] ?? null });
+  }
+
+  // 봇이 받지 않은 요청 · 시간이 지나도 끝나지 않은 요청을 치운다
+  if (action === "runCancel") {
+    const id = String(body.id ?? "");
+    const { data } = await admin.from("bot_commands").select("state,created_at").eq("id", id).maybeSingle();
+    if (!data) return fail("요청을 찾지 못했어요.", 404);
+    const stuck = Date.now() - new Date(data.created_at as string).getTime() > COMMAND_WAIT_MS;
+    if (data.state !== "requested" && !(data.state === "running" && stuck)) return fail("봇이 처리 중이라 취소할 수 없어요.");
+    const { error } = await admin.from("bot_commands").update({ state: "failed", result: "사이트에서 요청을 취소했습니다.", updated_at: new Date().toISOString() }).eq("id", id).eq("state", data.state as string);
+    return error ? fail(error.message) : NextResponse.json({ ok: true });
   }
 
   // 📜 변경 내역: 파일 이름이 있으면 그 파일만

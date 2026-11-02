@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { diffCount, parseDiff, unifiedDiff } from "../lib/lineDiff";
 
@@ -9,8 +9,8 @@ import { diffCount, parseDiff, unifiedDiff } from "../lib/lineDiff";
 type Row = { name: string; size: number; changed: boolean; deleted: boolean; is_new: boolean; updated_by: string | null; updated_at: string };
 type Script = { name: string; content: string; live: string | null; changed: boolean; deleted: boolean; is_new: boolean; updated_at: string };
 type LogRow = { id: string; name: string; action: string; diff: string; plus: number; minus: number; edited_by: string | null; applied_by: string | null; applied_at: string };
-type Command = { state: string; result: string | null };
-type RunRow = Command & { id: string; action: string; requested_by: string; created_at: string };
+type Command = { id: string; action: string; state: string; result: string | null; created_at: string };
+type RunRow = Command & { requested_by: string };
 type Result = { ok: boolean; error?: string; id?: string; rows?: Row[]; script?: Script; pending?: Script[]; log?: LogRow[]; runs?: RunRow[]; updatedAt?: string; command?: Command };
 type Editing = { name: string; text: string; saved: string; live: string | null; crlf: boolean; updatedAt: string | null };
 
@@ -25,11 +25,12 @@ const RUN_STATE: Record<string, { label: string; tone: string }> = {
   failed: { label: "실패", tone: "del" },
 };
 const RUN_POLL_MS = 2000;
-const RUN_WAIT_MS = 150000; // 재시작 · 자동 복구까지 기다리는 시간 (봇 bot_guard 의 CHECK_TIMEOUT 보다 길게)
-const RUN_TEXT: Record<string, { ask: string; wait: string }> = {
-  apply: { ask: "봇에 적용하고 재시작할까요?", wait: "⏳ 봇이 적용하고 재시작하는 중… (약 30초)" },
-  revert: { ask: "마지막 적용을 되돌리고 재시작할까요?", wait: "⏳ 봇이 되돌리고 재시작하는 중… (약 30초)" },
-  upload: { ask: "봇의 지금 파일을 사이트에 다시 올릴까요?", wait: "⏳ 봇이 파일을 올리는 중…" },
+const RUN_WAIT_MS = 180000; // 재시작 · 자동 복구까지 기다리는 시간 (API COMMAND_WAIT_MS 와 같게, 봇 bot_guard 의 CHECK_TIMEOUT 보다 길게)
+const RUN_LATE_MS = 15000; // 봇은 3초마다 확인하므로 이만큼 지나도 안 받으면 문제가 있다
+const RUN_ASK: Record<string, string> = {
+  apply: "봇에 적용하고 재시작할까요?",
+  revert: "마지막 적용을 되돌리고 재시작할까요?",
+  upload: "봇의 지금 파일을 사이트에 다시 올릴까요?",
 };
 
 async function callBot(payload: Record<string, unknown>): Promise<Result> {
@@ -124,6 +125,9 @@ export default function BotAdmin({ onClose }: { onClose: () => void }) {
   const [newName, setNewName] = useState<string | null>(null);
   const [changes, setChanges] = useState<{ pending: Script[]; log: LogRow[]; runs: RunRow[] } | null>(null);
   const [runLog, setRunLog] = useState("");
+  const [live, setLive] = useState<Command | null>(null);
+  const [now, setNow] = useState(0);
+  const watching = useRef("");
   const [fileLog, setFileLog] = useState<LogRow[]>([]);
 
   const refresh = useCallback(async () => {
@@ -132,9 +136,54 @@ export default function BotAdmin({ onClose }: { onClose: () => void }) {
     setRows(result.rows ?? []);
   }, []);
 
+  // 요청 하나를 끝날 때까지 지켜본다. 창을 닫아도 봇은 처리하고 결과는 운영진방에 올라간다
+  const watch = useCallback(async (first: Command) => {
+    watching.current = first.id;
+    setBusy(true);
+    setRunLog("");
+    setNote("");
+    setLive(first);
+    const deadline = new Date(first.created_at).getTime() + RUN_WAIT_MS;
+    let done: Command | undefined;
+    while (watching.current === first.id && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, RUN_POLL_MS));
+      if (watching.current !== first.id) return;
+      const status = await callBot({ action: "runStatus", id: first.id });
+      if (!status.command) continue;
+      setLive(status.command);
+      if (status.command.state !== "requested" && status.command.state !== "running") {
+        done = status.command;
+        break;
+      }
+    }
+    if (watching.current !== first.id) return;
+    if (done) {
+      watching.current = "";
+      setLive(null);
+      setBusy(false);
+      setNote(done.state === "failed" ? "❌ 처리하지 못했어요. 아래 로그를 확인해 주세요." : "✅ 끝났어요.");
+      setRunLog(done.result ?? "");
+      return void refresh();
+    }
+    setNow(Date.now()); // 시간이 지났다: 진행 표시는 남기고 취소 버튼을 보여 준다
+  }, [refresh]);
+
   useEffect(() => {
     void refresh();
-  }, [refresh]);
+    void callBot({ action: "runActive" }).then((result) => {
+      if (result.command) void watch(result.command);
+    });
+    return () => {
+      watching.current = "";
+    };
+  }, [refresh, watch]);
+
+  useEffect(() => {
+    if (!live) return;
+    setNow(Date.now());
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [live?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const shown = useMemo(() => {
     const word = search.trim().toLowerCase();
@@ -168,33 +217,28 @@ export default function BotAdmin({ onClose }: { onClose: () => void }) {
     setFileLog(result.log ?? []);
   }
 
-  // 봇에게 요청하고 끝날 때까지 기다린다. 창을 닫아도 봇은 처리하고 결과는 운영진방에 올라간다
   async function run(command: "apply" | "revert" | "upload") {
     const files = (rows ?? []).filter((item) => item.changed).map((item) => item.name);
     const list = command === "apply" && files.length ? `\n\n${files.join("\n")}` : "";
-    if (!window.confirm(`${RUN_TEXT[command].ask}${list}\n\n운영진방에 알림이 올라갑니다.`)) return;
+    if (!window.confirm(`${RUN_ASK[command]}${list}\n\n운영진방에 알림이 올라갑니다.`)) return;
     setBusy(true);
-    setRunLog("");
     const started = await callBot({ action: "run", command });
-    if (!started.ok || !started.id) {
-      setBusy(false);
-      return setNote(`❌ ${started.error ?? "요청하지 못했습니다."}`);
-    }
-    setNote(RUN_TEXT[command].wait);
-    const deadline = Date.now() + RUN_WAIT_MS;
-    let done: Command | undefined;
-    while (Date.now() < deadline) {
-      await new Promise((resolve) => setTimeout(resolve, RUN_POLL_MS));
-      const status = await callBot({ action: "runStatus", id: started.id });
-      if (status.command && status.command.state !== "requested" && status.command.state !== "running") {
-        done = status.command;
-        break;
-      }
+    if (started.id) {
+      const status = await callBot({ action: "runStatus", id: started.id }); // 앞선 요청이 있으면 그 요청을 이어서 본다
+      if (status.command) return void watch(status.command);
     }
     setBusy(false);
-    setNote(done ? (done.state === "failed" ? "❌ 적용하지 못했어요. 아래 로그를 확인해 주세요." : "✅ 끝났어요.") : "⚠️ 봇이 아직 답하지 않아요. 켜져 있는지 확인해 주세요. 결과는 운영진방에 올라갑니다.");
-    setRunLog(done?.result ?? "");
-    await refresh();
+    setNote(`❌ ${started.error ?? "요청하지 못했습니다."}`);
+  }
+
+  async function cancelRun() {
+    if (!live) return;
+    const result = await callBot({ action: "runCancel", id: live.id });
+    if (!result.ok) return setNote(`❌ ${result.error ?? "취소하지 못했습니다."}`);
+    watching.current = "";
+    setLive(null);
+    setBusy(false);
+    setNote("↩️ 요청을 취소했어요. 다시 적용할 수 있습니다.");
   }
 
   async function showChanges() {
@@ -252,6 +296,9 @@ export default function BotAdmin({ onClose }: { onClose: () => void }) {
   }
 
   const row = editing ? rows?.find((item) => item.name === editing.name) : undefined;
+  const liveAge = live && now ? now - new Date(live.created_at).getTime() : 0;
+  const liveLate = !!live && live.state === "requested" && liveAge > RUN_LATE_MS;
+  const liveExpired = !!live && liveAge > RUN_WAIT_MS;
 
   return (
     <div className="botAdmin" role="dialog" aria-modal="true" aria-label="봇관리">
@@ -260,6 +307,15 @@ export default function BotAdmin({ onClose }: { onClose: () => void }) {
         <button aria-label={editing || changes ? "목록으로" : "닫기"} onClick={close}>{editing || changes ? "←" : "×"}</button>
       </div>
       {note && <p className="botAdminNote">{note}</p>}
+      {live && (
+        <div className="botRun">
+          <b>⏳ {RUN_LABEL[live.action] ?? live.action} 진행 중 · {Math.max(0, Math.round(liveAge / 1000))}초</b>
+          <pre className="botLog">{live.result ?? "봇이 요청을 받기를 기다리는 중…"}</pre>
+          {liveLate && <p>⚠️ 봇이 요청을 받지 못하고 있어요. 봇이 꺼져 있거나, bot_updater.py 를 교체하고 재시작하기 전일 수 있어요.</p>}
+          {liveExpired && !liveLate && <p>⚠️ 시간이 오래 지났어요. 운영진방 알림과 봇 터미널의 [봇관리] 줄을 확인해 주세요.</p>}
+          {(live.state === "requested" || liveExpired) && <button className="smallButton ghost" onClick={() => void cancelRun()}>요청 취소</button>}
+        </div>
+      )}
 
       {editing ? (
         <>
