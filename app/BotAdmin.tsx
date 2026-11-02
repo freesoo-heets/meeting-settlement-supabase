@@ -7,15 +7,17 @@ import { BOT_SCRIPT_INFO } from "../lib/botScriptInfo";
 
 // 🤖 봇관리 (관리자): 봇 스크립트 목록 · 수정 · 추가 · 삭제 · 변경 내역. 저장은 초안이고, 운영진방 !봇적용 때 봇에 반영된다
 
-type Row = { name: string; size: number; changed: boolean; deleted: boolean; is_new: boolean; updated_by: string | null; updated_at: string };
+type Row = { name: string; size: number; changed: boolean; deleted: boolean; is_new: boolean; updated_by: string | null; updated_at: string; about?: string | null };
 type Script = { name: string; content: string; live: string | null; changed: boolean; deleted: boolean; is_new: boolean; updated_at: string };
 type LogRow = { id: string; name: string; action: string; diff: string; plus: number; minus: number; edited_by: string | null; applied_by: string | null; applied_at: string };
 type Command = { id: string; action: string; state: string; result: string | null; created_at: string };
 type RunRow = Command & { requested_by: string };
 type Result = { ok: boolean; error?: string; id?: string; rows?: Row[]; script?: Script; pending?: Script[]; log?: LogRow[]; runs?: RunRow[]; updatedAt?: string; command?: Command };
-type Editing = { name: string; text: string; saved: string; live: string | null; crlf: boolean; updatedAt: string | null };
+type Editing = { name: string; text: string; saved: string; live: string | null; crlf: boolean; updatedAt: string | null; about: string; savedAbout: string };
 
 const KEEP_FILES = new Set(["irispy.py"]);
+const ABOUT_MAX = 100;
+const aboutOf = (row: Pick<Row, "name" | "about">) => row.about || BOT_SCRIPT_INFO[row.name] || "";
 const SECRET_MARK = "__BOT_SECRET_";
 const ACTION_LABEL: Record<string, string> = { edit: "수정", add: "새 파일", delete: "삭제", revert: "되돌림" };
 const RUN_LABEL: Record<string, string> = { apply: "적용", revert: "되돌리기", upload: "다시 올리기" };
@@ -124,6 +126,7 @@ export default function BotAdmin({ onClose }: { onClose: () => void }) {
   const [editing, setEditing] = useState<Editing | null>(null);
   const [tab, setTab] = useState<"code" | "diff">("code");
   const [newName, setNewName] = useState<string | null>(null);
+  const [newAbout, setNewAbout] = useState("");
   const [changes, setChanges] = useState<{ pending: Script[]; log: LogRow[]; runs: RunRow[] } | null>(null);
   const [runLog, setRunLog] = useState("");
   const [live, setLive] = useState<Command | null>(null);
@@ -188,10 +191,10 @@ export default function BotAdmin({ onClose }: { onClose: () => void }) {
 
   const shown = useMemo(() => {
     const word = search.trim().toLowerCase();
-    return (rows ?? []).filter((row) => `${row.name} ${BOT_SCRIPT_INFO[row.name] ?? ""}`.toLowerCase().includes(word));
+    return (rows ?? []).filter((row) => `${row.name} ${aboutOf(row)}`.toLowerCase().includes(word));
   }, [rows, search]);
   const pending = (rows ?? []).filter((row) => row.changed).length;
-  const dirty = !!editing && editing.text !== editing.saved;
+  const dirty = !!editing && (editing.text !== editing.saved || editing.about.trim() !== editing.savedAbout);
   const editingDiff = useMemo(
     () => (editing && tab === "diff" ? unifiedDiff(editing.live ?? "", editing.text) : ""),
     [editing, tab],
@@ -208,7 +211,8 @@ export default function BotAdmin({ onClose }: { onClose: () => void }) {
     setNote("");
     setTab("code");
     setFileLog([]);
-    setEditing({ name, text, saved: text, live, crlf: content.includes("\r\n"), updatedAt: updated_at });
+    const about = aboutOf((rows ?? []).find((item) => item.name === name) ?? { name });
+    setEditing({ name, text, saved: text, live, crlf: content.includes("\r\n"), updatedAt: updated_at, about, savedAbout: about });
   }
 
   async function showFileDiff() {
@@ -258,20 +262,34 @@ export default function BotAdmin({ onClose }: { onClose: () => void }) {
     if ((rows ?? []).some((row) => row.name === file)) return setNote("❌ 같은 이름의 파일이 이미 있어요.");
     setNote("");
     setNewName(null);
+    setNewAbout("");
     setTab("code");
     setFileLog([]);
-    setEditing({ name: file, text: "", saved: "", live: null, crlf: false, updatedAt: null });
+    // 설명은 코드와 함께 저장한다 (만들기만 하고 나가면 아무것도 남지 않게)
+    setEditing({ name: file, text: "", saved: "", live: null, crlf: false, updatedAt: null, about: newAbout.trim(), savedAbout: "" });
   }
 
   async function save() {
     if (!editing) return;
+    const textChanged = editing.text !== editing.saved || editing.updatedAt === null;
+    const about = editing.about.trim();
     setBusy(true);
-    const content = editing.crlf ? editing.text.replace(/\n/g, "\r\n") : editing.text;
-    const result = await callBot({ action: "save", name: editing.name, content, expected: editing.updatedAt });
+    let updatedAt = editing.updatedAt;
+    if (textChanged) {
+      const content = editing.crlf ? editing.text.replace(/\n/g, "\r\n") : editing.text;
+      const result = await callBot({ action: "save", name: editing.name, content, expected: editing.updatedAt });
+      if (!result.ok) {
+        setBusy(false);
+        return setNote(`❌ ${result.error ?? "저장하지 못했습니다."}`);
+      }
+      updatedAt = result.updatedAt ?? updatedAt;
+    }
+    const aboutResult = about === editing.savedAbout ? null : await callBot({ action: "about", name: editing.name, about });
     setBusy(false);
-    if (!result.ok) return setNote(`❌ ${result.error ?? "저장하지 못했습니다."}`);
-    setEditing({ ...editing, saved: editing.text, updatedAt: result.updatedAt ?? editing.updatedAt });
-    setNote("✅ 저장했어요. 목록의 '봇에 적용'을 누르면 봇에 반영됩니다.");
+    const aboutFailed = aboutResult && !aboutResult.ok;
+    setEditing({ ...editing, about, saved: editing.text, savedAbout: aboutFailed ? editing.savedAbout : about, updatedAt });
+    if (aboutFailed) setNote(`❌ ${aboutResult.error ?? "설명을 저장하지 못했습니다."}`);
+    else setNote(textChanged ? "✅ 저장했어요. 목록의 '봇에 적용'을 누르면 봇에 반영됩니다." : "✅ 설명을 저장했어요. 바로 반영돼요.");
     await refresh();
   }
 
@@ -326,6 +344,15 @@ export default function BotAdmin({ onClose }: { onClose: () => void }) {
           </div>
           {tab === "code" ? (
             <>
+              <input
+                className="botAdminAbout"
+                value={editing.about}
+                onChange={(event) => setEditing({ ...editing, about: event.target.value })}
+                placeholder="어떤 기능을 하는 파일인가요?"
+                maxLength={ABOUT_MAX}
+                autoComplete="off"
+                aria-label="파일 기능 설명"
+              />
               {editing.text.includes(SECRET_MARK) && <p className="botAdminHint">🔒 __BOT_SECRET_…__ 은 API 키를 가린 표시예요. 그대로 두면 적용할 때 원래 키로 채워집니다.</p>}
               <textarea
                 className="botAdminCode"
@@ -378,13 +405,14 @@ export default function BotAdmin({ onClose }: { onClose: () => void }) {
           </div>
           {newName !== null && (
             <form
-              className="botAdminTools"
+              className="botAdminTools botAdminNew"
               onSubmit={(event) => {
                 event.preventDefault();
                 create();
               }}
             >
               <input value={newName} onChange={(event) => setNewName(event.target.value)} placeholder="파일 이름 (예: my_helper.py)" autoComplete="off" autoFocus aria-label="새 파일 이름" />
+              <input value={newAbout} onChange={(event) => setNewAbout(event.target.value)} placeholder="어떤 기능을 하는 파일인가요?" maxLength={ABOUT_MAX} autoComplete="off" aria-label="새 파일 기능 설명" />
               <button type="submit" className="smallButton">만들기</button>
             </form>
           )}
@@ -405,7 +433,7 @@ export default function BotAdmin({ onClose }: { onClose: () => void }) {
                   <b>{item.name}</b>
                   <span>{sizeText(item.size)}{item.changed && item.updated_by ? ` · ${item.updated_by}` : ""}</span>
                   <em className={status.tone}>{status.label}</em>
-                  {BOT_SCRIPT_INFO[item.name] && <small>{BOT_SCRIPT_INFO[item.name]}</small>}
+                  {aboutOf(item) && <small>{aboutOf(item)}</small>}
                 </button>
               );
             })}

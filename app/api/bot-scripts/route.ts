@@ -5,6 +5,7 @@ import { fail, isAdminMember, loadMember, requireMemberId } from "../../../lib/g
 /*
  * 🤖 봇 스크립트 관리 API (관리자만)
  *  · list · read · changes(적용 대기 · 적용 기록) · save(추가 · 수정) · remove · revert(고친 내용 취소)
+ *  · about: 파일 설명 저장 (코드가 아니라서 봇 적용 없이 바로 반영). 비우면 기본 설명으로 돌아간다
  *  · 여기서는 초안만 바뀐다. 실제 파일은 운영진방 !봇적용 또는 run(적용 · 되돌리기 · 다시 올리기 요청) 때 봇이 고친다 (봇 bot_updater.py)
  *    run 은 bot_commands 에 넣고 봇이 처리한다. 요청할 때마다 운영진방에 알림이 올라간다
  */
@@ -15,6 +16,7 @@ const KEEP_FILES = new Set(["irispy.py"]); // 지울 수 없다
 // 화면에 보여 주지 않는다 (봇 bot_updater.py HIDDEN 과 같게). 고치다 망가지면 사이트로 되돌릴 수 없는 파일 · 운영진 권한
 const HIDDEN = ["bot_guard.py", "bot_updater.py", "admin_helper.py"];
 const NOT_HIDDEN = `(${HIDDEN.map((name) => `"${name}"`).join(",")})`;
+const ABOUT_MAX = 100;
 const LOG_LIMIT = 30;
 const RUN_LIMIT = 20;
 const COMMANDS = new Set(["apply", "revert", "upload"]);
@@ -39,7 +41,9 @@ export async function POST(request: Request) {
       .not("name", "in", NOT_HIDDEN)
       .order("name");
     if (error) return fail(/bot_scripts/.test(error.message) ? MISSING : error.message);
-    return NextResponse.json({ ok: true, rows: data ?? [] });
+    const { data: abouts } = await admin.from("bot_script_about").select("name,about"); // 표가 없어도 목록은 보여 준다
+    const aboutOf = new Map((abouts ?? []).map((row) => [row.name as string, row.about as string]));
+    return NextResponse.json({ ok: true, rows: (data ?? []).map((row) => ({ ...row, about: aboutOf.get(row.name) ?? null })) });
   }
 
   // ▶️ 적용 · 되돌리기 · 다시 올리기 (봇이 3초마다 확인해서 처리한다)
@@ -101,6 +105,15 @@ export async function POST(request: Request) {
   const member = await loadMember(admin, auth.memberId);
   if ("error" in member) return fail(member.error, member.status);
   const now = new Date().toISOString();
+
+  if (action === "about") {
+    const about = String(body.about ?? "").trim().slice(0, ABOUT_MAX);
+    const { error } = about
+      ? await admin.from("bot_script_about").upsert({ name, about, updated_by: member.name, updated_at: now }, { onConflict: "name" })
+      : await admin.from("bot_script_about").delete().eq("name", name);
+    if (error) return fail(/bot_script_about/.test(error.message) ? "파일 설명 설정이 아직 안 됐어요. (운영진: SQL 실행 필요)" : error.message);
+    return NextResponse.json({ ok: true });
+  }
 
   if (action === "save") {
     const content = String(body.content ?? "");

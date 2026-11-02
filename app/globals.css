@@ -6760,3 +6760,8 @@ button.meetingMetricCard {
 .botRun .botLog { border-radius: 8px; max-height: 120px; }
 
 .botAdminList small { grid-column: 1 / -1; font-size: 11px; line-height: 1.4; color: #6b7280; overflow-wrap: anywhere; }
+
+.botAdminAbout { flex: none; height: 38px; padding: 0 10px; border: 1px solid #e5e0da; border-radius: 9px; font-size: 13px; background: #fff; color: inherit; }
+.botAdminNew { flex-wrap: wrap; }
+.botAdminNew input { flex: 1 1 100%; }
+.botAdminNew .smallButton { flex: 1 1 100%; }
