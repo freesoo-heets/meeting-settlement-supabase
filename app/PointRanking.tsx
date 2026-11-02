@@ -82,55 +82,44 @@ function AmountRow({ label, unit, up, down, sign, value, disabled, onSign, onVal
   );
 }
 
-const HISTORY_PAGE = 100;
-
-// 최신순 100건씩. 사이트에 쌓인 내역이 아직 없으면(SQL · 봇 교체 전) 예전 표의 내역을 같은 방식으로 나눈다
-async function loadHistory(uid: string, page: number) {
-  const from = page * HISTORY_PAGE;
-  const { data, count, error } = await supabase
-    .from("bot_point_logs")
-    .select("t,amt,after:after_exp,why,by:actor", { count: "exact" })
-    .eq("uid", uid)
-    .order("t", { ascending: false })
-    .order("id", { ascending: false })
-    .range(from, from + HISTORY_PAGE - 1);
-  if (!error && count) return { logs: (data ?? []) as unknown as PointLog[], total: count };
-  const old = await supabase.from("bot_point_details").select("logs").eq("uid", uid).maybeSingle();
-  if (old.error || !old.data) return null;
-  const logs = (old.data.logs as PointLog[]).slice().reverse();
-  return { logs: logs.slice(from, from + HISTORY_PAGE), total: logs.length };
-}
+const HISTORY_MAX = 100;
+const HISTORY_PAGE = 20;
 
 function PointHistoryBox({ row, onClose }: { row: PointRow; onClose: () => void }) {
-  const [page, setPage] = useState(0);
-  const [view, setView] = useState<{ page: number; logs: PointLog[]; total: number } | null>(null);
+  const [logs, setLogs] = useState<PointLog[] | null>(null);
   const [failed, setFailed] = useState(false);
+  const [page, setPage] = useState(0);
   useEffect(() => {
     let alive = true;
-    void loadHistory(row.kakao_uid, page).then((result) => {
-      if (!alive) return;
-      if (result) setView({ page, ...result });
-      else setFailed(true);
-    });
+    void supabase
+      .from("bot_point_details")
+      .select("logs")
+      .eq("uid", row.kakao_uid)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (!alive) return;
+        if (error || !data) setFailed(true);
+        else setLogs((data.logs as PointLog[]).slice(-HISTORY_MAX).reverse()); // 최신이 위로
+      });
     return () => {
       alive = false;
     };
-  }, [row.kakao_uid, page]);
+  }, [row.kakao_uid]);
 
-  const pages = view ? Math.max(1, Math.ceil(view.total / HISTORY_PAGE)) : 1;
-  const waiting = view?.page !== page;
+  const pages = Math.max(1, Math.ceil((logs?.length ?? 0) / HISTORY_PAGE));
+  const shown = logs?.slice(page * HISTORY_PAGE, (page + 1) * HISTORY_PAGE) ?? [];
 
   return (
     <div className="ticketBuyBack" onClick={onClose}>
       <div className="ticketBuyBox pointHistoryBox" role="dialog" aria-modal="true" aria-label={`${row.name} 점수 내역`} onClick={(event) => event.stopPropagation()}>
         <strong>📜 {row.name}님의 점수 내역</strong>
-        <p className="ticketBuyHave">💎 현재 점수: {fmt(row.exp)}점{view ? ` · 총 ${fmt(view.total)}건` : ""}</p>
+        <p className="ticketBuyHave">💎 현재 점수: {fmt(row.exp)}점{logs ? ` · 최근 ${logs.length}건` : ""}</p>
         {failed && <p className="ticketBuyNote">아직 내역이 올라오지 않았어요. 잠시 뒤 다시 봐 주세요.</p>}
-        {!view && !failed && <p className="muted">불러오는 중…</p>}
-        {view?.total === 0 && <p className="ticketBuyNote">점수 내역이 없습니다.</p>}
-        {!!view?.logs.length && (
-          <ol className="pointHistoryList" key={view.page}>
-            {view.logs.map((log, index) => (
+        {!logs && !failed && <p className="muted">불러오는 중…</p>}
+        {logs?.length === 0 && <p className="ticketBuyNote">점수 내역이 없습니다.</p>}
+        {shown.length > 0 && (
+          <ol className="pointHistoryList" key={page}>
+            {shown.map((log, index) => (
               <li key={`${log.t}-${index}`}>
                 <div>
                   <time>{log.t}</time>
@@ -146,9 +135,9 @@ function PointHistoryBox({ row, onClose }: { row: PointRow; onClose: () => void 
         )}
         {pages > 1 && (
           <div className="pointHistoryPager">
-            <button disabled={waiting || page === 0} onClick={() => setPage(page - 1)}>‹ 최신</button>
+            <button disabled={page === 0} onClick={() => setPage(page - 1)}>‹ 최신</button>
             <span>{page + 1} / {pages}</span>
-            <button disabled={waiting || page >= pages - 1} onClick={() => setPage(page + 1)}>이전 ›</button>
+            <button disabled={page >= pages - 1} onClick={() => setPage(page + 1)}>이전 ›</button>
           </div>
         )}
         <p className="pointRankingFoot">※ 채팅으로 쌓이는 점수는 제외됩니다.</p>
