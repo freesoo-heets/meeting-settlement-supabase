@@ -5554,6 +5554,16 @@ button.meetingMetricCard {
 @media (prefers-reduced-motion: reduce) { .cmIdleWarn { animation: none; } }
 
 
+/* ───────── 게임 창: 뒤 배경 흐림 없음 ─────────
+   배경 흐림(backdrop-filter)은 게임 화면이 바뀔 때마다(시계 · 애니메이션) 화면 전체를 다시 흐리게 계산한다.
+   PC 큰 화면에서 GPU 작업이 약 16배로 늘어 게임이 버벅였다 (1920×1080 측정: 1146ms → 72ms / 5초).
+   흐림 대신 조금 더 어둡게 덮는다. 다른 창(모임 등)의 흐림은 그대로 둔다. */
+.meetingModalBackdrop.gameBackdrop {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: rgba(28, 24, 21, .62);
+}
+
 /* ───────── 게임 창: 휴대폰 사용감 ───────── */
 .gameModal {
   touch-action: manipulation;      /* 두 번 탭 확대 방지 */
