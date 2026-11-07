@@ -1194,6 +1194,39 @@ export default function Home() {
     [members, currentProfile]
   );
 
+  // 🎮 게임 창이 열려 있는 동안 내 점수 · 티켓을 다시 읽는다.
+  // 봇은 게임 정산 · 티켓 차감 직후 bot_points 를 올리지만, 화면은 페이지를 열 때 한 번만 읽어서 게임 뒤에도 옛 값이 남았다.
+  // 내 줄 하나만 읽고, 값이 바뀐 때만 상태를 고친다 (게임 화면이 4초마다 다시 그려지지 않게)
+  const myPointUid = currentMember ? (pointsByMember[currentMember.id]?.kakao_uid ?? "") : "";
+  useEffect(() => {
+    if (!showGames || !myPointUid) return;
+    let stopped = false;
+    const refresh = async () => {
+      if (document.visibilityState === "hidden") return;
+      const { data, error } = await supabase
+        .from("bot_points")
+        .select("kakao_uid,name,exp,rank,trophies,tickets,season,last_active,synced_at")
+        .eq("kakao_uid", myPointUid)
+        .maybeSingle();
+      if (stopped || error || !data) return;
+      const fresh = data as BotPoint;
+      setBotPoints((rows) => {
+        const old = rows.find((row) => row.kakao_uid === fresh.kakao_uid);
+        if (old && old.exp === fresh.exp && old.tickets === fresh.tickets && old.trophies === fresh.trophies) return rows;
+        return old ? rows.map((row) => (row.kakao_uid === fresh.kakao_uid ? fresh : row)) : [...rows, fresh];
+      });
+    };
+    void refresh();
+    const timer = window.setInterval(() => void refresh(), 4000);
+    const onVisible = () => void refresh();
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [showGames, myPointUid]);
+
   useEffect(() => {
     if (!gameInvite || !currentMember) return;
     setShowGames(true);
