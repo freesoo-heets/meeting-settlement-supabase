@@ -57,11 +57,13 @@ type SeatRow = {
   rebuy_want?: number | null;
   rebuy_total?: number;
   renew_state?: string;
+  seated_at?: string | null;
+  pass_until?: string | null;
 };
 
 const TABLE_COLUMNS = "id,status,host_member,host_name,is_friendly,max_seats,view,hand_no,turn_deadline,next_hand_at,created_at";
 const SEAT_BASE = "id,table_id,member_id,name,status,buy_in,is_friendly,escrow_state,escrow_note,cash_out,hands,settle_state,payout,fee,created_at,left_at";
-const SEAT_COLUMNS = `${SEAT_BASE},rebuy_state,rebuy_note,rebuy_want,rebuy_total,renew_state`;
+const SEAT_COLUMNS = `${SEAT_BASE},rebuy_state,rebuy_note,rebuy_want,rebuy_total,renew_state,seated_at,pass_until`;
 const SEAT_REBUY = `${SEAT_BASE},rebuy_state,rebuy_note,rebuy_want,rebuy_total`;
 // 자리 기록 읽기 (충전 칸이 아직 DB에 없으면 그 칸 없이)
 async function readSeats(build: (columns: string) => PromiseLike<{ data: unknown; error: { code?: string } | null }>) {
@@ -71,6 +73,17 @@ async function readSeats(build: (columns: string) => PromiseLike<{ data: unknown
   return ((result.data ?? []) as SeatRow[]);
 }
 const WIN_FEE = 0.1; // 봇(holdem_bridge.py HOLDEM_FEE)과 같아야 한다
+// 🎫 이 자리에서 티켓을 썼는지. 티켓을 쓰면 봇이 앉는 순간 이용 시간을 '지금 + 1시간'으로 만든다.
+// 이미 남아 있던 이용 시간으로 앉은 자리는 끝 시각이 1시간보다 가깝다 (티켓을 쓰지 않았으니 환불할 티켓도 없다)
+function usedTicket(seat: SeatRow) {
+  if (!seat.pass_until || !seat.seated_at) return !seat.is_friendly;
+  return new Date(seat.pass_until).getTime() - new Date(seat.seated_at).getTime() >= 3600_000 - 15_000;
+}
+function noHandText(seat: SeatRow) {
+  const ticket = usedTicket(seat);
+  if (seat.is_friendly) return ticket ? "한 판도 안 해서 🎫 티켓 환불" : "한 판도 안 해서 변동 없음";
+  return ticket ? "한 판도 안 해서 💎 점수 · 🎫 티켓 모두 환불" : "한 판도 안 해서 💎 점수 환불 (남은 이용 시간으로 앉아 🎫 티켓은 쓰지 않았어요)";
+}
 
 // 🎫 내 이용권 끝 시각 (15초마다 확인) + 1초마다 남은 시간
 function usePass(memberId: string) {
@@ -303,7 +316,7 @@ function HoldemLobby({
               <small>
                 앉을 때 {fmt(BUY_IN)}점 · 티켓 1장을 내고 칩 {fmt(BUY_IN)}개로 시작해요. 아무 때나 일어나면 남은 칩을 점수로
                 돌려받습니다 (딴 금액의 10% 수수료). 🎫 티켓 1장으로 1시간 동안 플레이할 수 있어요 (시간이 끝나면 티켓 1장으로
-                자동 연장, 티켓이 없으면 그 판이 끝난 뒤 일어남). 한 판도 안 하고 일어나면 점수 · 티켓 모두 환불돼요.
+                자동 연장, 티켓이 없으면 그 판이 끝난 뒤 일어남). 한 판도 안 하고 일어나면 점수 · 티켓 모두 환불돼요 (남은 이용 시간으로 앉은 자리는 티켓을 쓰지 않아 점수만).
               </small>
             </div>
           )}
@@ -623,7 +636,7 @@ function HoldemRoom({
       {lastFailed && !mySeat && !me && <div className="omokMessage">자리 신청 실패: {lastFailed.escrow_note}</div>}
       {lastLeft && lastLeftResult && !me && (
         <div className="omokMessage info">
-          지난 자리 · {lastLeft.hands === 0 ? "한 판도 안 해서 💎 점수 · 🎫 티켓 모두 환불" : lastLeft.is_friendly ? `칩 ${fmt(lastLeftResult.out)} (친선)` : `💎 ${fmt(lastLeftResult.paid)} → ${fmt(lastLeftResult.out)} · ${signed(lastLeftResult.net)}점${lastLeftResult.fee ? ` (수수료 ${fmt(lastLeftResult.fee)})` : ""}`}
+          지난 자리 · {lastLeft.hands === 0 ? noHandText(lastLeft) :lastLeft.is_friendly ? `칩 ${fmt(lastLeftResult.out)} (친선)` : `💎 ${fmt(lastLeftResult.paid)} → ${fmt(lastLeftResult.out)} · ${signed(lastLeftResult.net)}점${lastLeftResult.fee ? ` (수수료 ${fmt(lastLeftResult.fee)})` : ""}`}
           {lastLeft.settle_state !== "done" && !lastLeft.is_friendly && " · 봇이 지급 중"}
         </div>
       )}
