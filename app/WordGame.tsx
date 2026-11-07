@@ -10,6 +10,7 @@ import {
   REWARDS,
   TICKET_PRICE,
   WORD_GAME_COLUMNS,
+  WORD_GAME_LIVE_COLUMNS,
   WORD_LEN,
   composeWords,
   type Mark,
@@ -77,6 +78,49 @@ function shortDate(value: string) {
   return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
+// ── 관전: 하는 사람이 지금 하고 있는지 · 쉬는 중인지 ──
+type PlayerPresence = { online: boolean; active: boolean };
+const TYPING_FRESH_MS = 8000; // 이 안에 글자를 쳤으면 '입력하는 중'
+const THINKING_MS = 3 * 60 * 1000; // 화면은 켜 두었는데 이만큼 입력이 없으면 '생각 중'
+
+export function agoText(ms: number) {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  if (s < 10) return "방금";
+  if (s < 60) return `${s}초 전`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}분 전`;
+  return `${Math.floor(m / 60)}시간 ${m % 60}분 전`;
+}
+
+// 시계는 이 줄만 다시 그린다 (게임 화면 전체를 다시 그리지 않게)
+function WordPlayerStatus({ game, presence, typingAt, fromKakao }: { game: WordGameRow; presence: PlayerPresence | null; typingAt: number; fromKakao: boolean }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 5000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const started = new Date(game.created_at).getTime();
+  const saved = game.updated_at ? new Date(game.updated_at).getTime() : started;
+  const lastInput = Math.max(saved, typingAt);
+  const quiet = now - lastInput;
+  const typing = typingAt > 0 && now - typingAt < TYPING_FRESH_MS;
+  let icon = "⏳";
+  let text = "접속 확인 중";
+  let tone = "wait";
+  if (typing) [icon, text, tone] = ["✍️", "입력하는 중", "live"];
+  else if (fromKakao) [icon, text, tone] = ["💬", "카톡에서 진행 중", quiet > THINKING_MS ? "off" : "live"];
+  else if (presence?.online && presence.active) [icon, text, tone] = ["🟢", quiet > THINKING_MS ? "화면은 켜 두고 생각 중" : "게임 화면 보는 중", "live"];
+  else if (presence?.online) [icon, text, tone] = ["🌙", "자리 비움 (다른 화면)", "away"];
+  else if (presence) [icon, text, tone] = ["💤", "게임 화면을 닫았어요", "off"];
+  const inputText = game.tries > 0 || typingAt > 0 ? `마지막 입력 ${agoText(quiet)}` : "아직 입력 없음";
+  return (
+    <div className={`wdPlayerState ${tone}`} role="status">
+      <b>{icon} {text}</b>
+      <span>{inputText} · 시작 {agoText(now - started)}</span>
+    </div>
+  );
+}
+
 export default function WordGame({ onClose, onBack, currentMemberId, myName, myPoints, myTickets, initialGameId, isAdmin }: Props) {
   const [games, setGames] = useState<WordGameRow[]>([]);
   const [game, setGame] = useState<WordGameRow | null>(null);
@@ -101,6 +145,9 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
   const blurTimer = useRef<number | undefined>(undefined);
   const pressedOutside = useRef(false);
   const [viewers, setViewers] = useState<string[]>([]);
+  // 관전: 하는 사람이 게임 화면을 띄워 두었는지 (null = 아직 확인 전) · 마지막으로 글자를 친 시각
+  const [playerPresence, setPlayerPresence] = useState<PlayerPresence | null>(null);
+  const [typingAt, setTypingAt] = useState(0);
   const [fromKakao, setFromKakao] = useState(false); // 카톡에서 시작한 판: 어느 쪽에서든 입력 · 채팅은 스레드로 전달
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const chatKey = useRef(0);
@@ -127,7 +174,7 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
   useEffect(() => {
     void load().then(async (rows) => {
       if (initialGameId) {
-        const { data } = await supabase.from("word_games").select(WORD_GAME_COLUMNS).eq("id", initialGameId).maybeSingle();
+        const { data } = await supabase.from("word_games").select(WORD_GAME_LIVE_COLUMNS).eq("id", initialGameId).maybeSingle();
         if (data) return setGame(data as unknown as WordGameRow);
       }
       const live = rows.find((r) => r.status === "escrow" || r.status === "playing");
@@ -180,7 +227,7 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
   const gameCreated = game?.created_at ?? "";
   const chatPlayer = useRef("");
   const refetch = useCallback(async (id: string) => {
-    const { data } = await supabase.from("word_games").select(WORD_GAME_COLUMNS).eq("id", id).maybeSingle();
+    const { data } = await supabase.from("word_games").select(WORD_GAME_LIVE_COLUMNS).eq("id", id).maybeSingle();
     if (data) setGame(data as unknown as WordGameRow);
   }, []);
   useEffect(() => {
@@ -194,6 +241,8 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
     if (!sameRun) setChat([]);
     else addChat({ name: "", text: "── 🔄 다음 판 ──", kind: "sys" });
     const watching = playerId !== currentMemberId;
+    setPlayerPresence(null);
+    setTypingAt(0);
     // 지난 채팅: 이 판 + 같은 사람이 1시간 안에 이어서 한 판들 (자리를 비운 사이 남긴 힌트도 보이게)
     void (async () => {
       const since = new Date(new Date(gameCreated).getTime() - 60 * 60 * 1000).toISOString();
@@ -220,8 +269,13 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
     const channel = supabase
       .channel(`word-${gameId}`, { config: { broadcast: { self: false }, presence: { key: currentMemberId } } })
       .on("presence", { event: "sync" }, () => {
-        const state = channel.presenceState() as Record<string, Array<{ name?: string }>>;
+        const state = channel.presenceState() as Record<string, Array<{ name?: string; active?: boolean }>>;
         setViewers(Object.entries(state).filter(([id]) => id !== playerId).map(([, metas]) => metas[0]?.name ?? "?"));
+        // 하는 사람이 이 판 화면에 들어와 있는가 · 다른 앱/탭으로 갔는가 (예전 화면은 active 를 안 보내므로 보는 중으로 친다)
+        if (watching) {
+          const metas = state[playerId] ?? [];
+          setPlayerPresence({ online: metas.length > 0, active: metas.some((m) => m.active !== false) });
+        }
       })
       .on("presence", { event: "join" }, ({ key, newPresences }) => {
         const name = (newPresences[0] as { name?: string } | undefined)?.name;
@@ -233,7 +287,10 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
       })
       .on("broadcast", { event: "typing" }, ({ payload }) => {
         const jamo = (payload as { jamo?: unknown }).jamo;
-        if (watching && Array.isArray(jamo)) setTyped(jamo.slice(0, WORD_LEN).map(String));
+        if (watching && Array.isArray(jamo)) {
+          setTyped(jamo.slice(0, WORD_LEN).map(String));
+          if (jamo.length > 0) setTypingAt(Date.now());
+        }
       })
       .on("broadcast", { event: "game" }, () => {
         if (watching) {
@@ -242,10 +299,16 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
         }
       })
       .subscribe((state) => {
-        if (state === "SUBSCRIBED") void channel.track({ name: myName });
+        if (state === "SUBSCRIBED") void channel.track({ name: myName, active: document.visibilityState !== "hidden" });
       });
     channelRef.current = channel;
+    // 다른 앱 · 탭으로 가면 관전자에게 '자리 비움'으로 보인다
+    const onVisibility = () => {
+      channel.track({ name: myName, active: document.visibilityState !== "hidden" }).catch(() => undefined);
+    };
+    document.addEventListener("visibilitychange", onVisibility);
     return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
       channelRef.current = null;
       void supabase.removeChannel(channel);
     };
@@ -307,7 +370,7 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
       if (!game.finished_at || Date.now() - new Date(game.finished_at).getTime() > 10 * 60 * 1000) return;
       const { data } = await supabase
         .from("word_games")
-        .select(WORD_GAME_COLUMNS)
+        .select(WORD_GAME_LIVE_COLUMNS)
         .eq("member_id", game.member_id)
         .in("status", ["escrow", "playing"])
         .gt("created_at", game.created_at)
@@ -648,6 +711,9 @@ export default function WordGame({ onClose, onBack, currentMemberId, myName, myP
                   <b>{spectating ? `👀 ${game.name}님 관전 중` : "👀 관전"} · {viewers.length}명</b>
                   {viewers.length > 0 && <span>{viewers.join(" · ")}</span>}
                 </div>
+              )}
+              {spectating && game.status === "playing" && (
+                <WordPlayerStatus game={game} presence={playerPresence} typingAt={typingAt} fromKakao={fromKakao} />
               )}
               <div className="wdHint">
                 {game.status === "escrow"

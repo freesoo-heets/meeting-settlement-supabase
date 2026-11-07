@@ -127,7 +127,10 @@ export type WordGameRow = {
   settle_state: string;
   created_at: string;
   finished_at: string | null;
+  updated_at?: string; // 마지막으로 바뀐 시각 (입력 · 시작). 관전 화면의 '마지막 입력'
 };
 
 export const WORD_GAME_COLUMNS =
   "id,member_id,name,status,reject_reason,auto_bought,hint_len,history,tries,max_tries,answer,reward,settle_state,created_at,finished_at";
+// 관전 화면용: 마지막 입력 시각까지
+export const WORD_GAME_LIVE_COLUMNS = `${WORD_GAME_COLUMNS},updated_at`;

@@ -9,7 +9,9 @@ import CatchMindGame from "./CatchMindGame";
 import HoldemOnline, { sweepHoldem } from "./HoldemOnline";
 import RatingBoard from "./RatingBoard";
 import TicketBuy from "./TicketBuy";
-import WordGame from "./WordGame";
+import WordGame, { agoText } from "./WordGame";
+
+const WORD_IDLE_MS = 60 * 1000; // 목록: 이만큼 입력이 없으면 💤
 
 export type GameKind = "omok" | "alkkagi" | "catch" | "holdem" | "word";
 type RoomKind = Exclude<GameKind, "holdem" | "word">;
@@ -87,7 +89,8 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
   const [alkkagi, setAlkkagi] = useState<StakeRow[]>([]);
   const [catchRooms, setCatchRooms] = useState<CatchRow[]>([]);
   const [holdemTables, setHoldemTables] = useState<Array<{ id: string; status: string; host_name: string; is_friendly: boolean; max_seats: number; hand_no: number; view: { players?: Array<{ name: string; empty?: boolean }> } }>>([]);
-  const [wordLive, setWordLive] = useState<Array<{ id: string; name: string; status: string; tries: number; max_tries: number; member_id: string }>>([]);
+  // quietMs: 마지막 입력(또는 시작) 뒤 지난 시간 — 읽은 시각 기준
+  const [wordLive, setWordLive] = useState<Array<{ id: string; name: string; status: string; tries: number; max_tries: number; member_id: string; quietMs: number }>>([]);
   const [ratingKind, setRatingKind] = useState<"omok" | "alkkagi" | null>(null);
   const [showPoints, setShowPoints] = useState(false);
 
@@ -146,9 +149,15 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
       supabase.from("alkkagi_games").select(STAKE_COLUMNS).in("status", ["open", "challenge", "escrow", "playing"]).order("created_at", { ascending: false }).limit(20),
       supabase.from("catch_rooms").select("id,status,host_name,players,max_players,turn_no,turn_total,is_test").in("status", ["waiting", "playing"]).order("created_at", { ascending: false }).limit(20),
       supabase.from("holdem_tables").select("id,status,host_name,is_friendly,max_seats,hand_no,view").in("status", ["waiting", "playing"]).order("created_at", { ascending: false }).limit(20),
-      supabase.from("word_games").select("id,name,status,tries,max_tries,member_id").eq("status", "playing").order("created_at", { ascending: false }).limit(30),
+      supabase.from("word_games").select("id,name,status,tries,max_tries,member_id,updated_at").eq("status", "playing").order("created_at", { ascending: false }).limit(30),
     ]);
-    setWordLive((w.data ?? []) as typeof wordLive);
+    const readAt = Date.now();
+    setWordLive(
+      ((w.data ?? []) as Array<Omit<(typeof wordLive)[number], "quietMs"> & { updated_at: string | null }>).map(({ updated_at, ...row }) => ({
+        ...row,
+        quietMs: updated_at ? readAt - new Date(updated_at).getTime() : 0,
+      })),
+    );
     setHoldemTables((h.data ?? []) as typeof holdemTables);
     if ((h.data ?? []).length > 0) sweepHoldem(); // 멈춘 홀덤 테이블 정리
     // 테스트 판은 만든 관리자에게만 보인다
@@ -408,14 +417,18 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
               <div className="wordLive">
                 {[...wordLive].sort((a, b) => Number(b.member_id === currentMemberId) - Number(a.member_id === currentMemberId)).map((row) => {
                   const mine = row.member_id === currentMemberId;
+                  // 1분 넘게 입력이 없으면 쉬는 중으로 흐리게 (관전 화면에서 자세히 보인다)
+                  const idle = !mine && row.quietMs > WORD_IDLE_MS;
+                  const quiet = `${row.tries > 0 ? "마지막 입력" : "시작"} ${agoText(row.quietMs)}`;
                   return (
                     <button
                       key={row.id}
-                      className={mine ? "mine" : ""}
-                      aria-label={`${row.name} ${row.tries}/${row.max_tries}번째 ${mine ? "이어하기" : "관전"}`}
+                      className={mine ? "mine" : idle ? "idle" : ""}
+                      title={quiet}
+                      aria-label={`${row.name} ${row.tries}/${row.max_tries}번째 · ${quiet} · ${mine ? "이어하기" : "관전"}`}
                       onClick={() => setActive({ kind: "word", id: mine ? "" : row.id })}
                     >
-                      <b>{row.name}</b>
+                      <b>{idle ? "💤 " : ""}{row.name}</b>
                       <em>{row.tries}/{row.max_tries}</em>
                     </button>
                   );
