@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { matchesHangul } from "../lib/hangulSearch";
-import PointRanking from "./PointRanking";
+import PointRanking, { PointHistoryBox, type PointRow } from "./PointRanking";
 import GameHub, { type GameKind } from "./GameHub";
 import BotAdmin from "./BotAdmin";
 import { ChatLogModal, chatAgo, useLastChats } from "./ChatLog";
@@ -23,6 +23,7 @@ type Member = {
 type BotPoint = {
   kakao_uid: string;
   name: string;
+  full_name?: string | null; // 카톡 전체 닉네임 (예: "카티 91 남 화곡") — 회원 현황에서만 보여준다
   exp: number;
   rank: number | null;
   trophies: string | null;
@@ -266,6 +267,7 @@ export default function Home() {
   const [editingMeetingDate, setEditingMeetingDate] = useState("");
   const [memberDetailId, setMemberDetailId] = useState("");
   const [chatLogName, setChatLogName] = useState(""); // 📜 채팅 내역 창
+  const [pointLogRow, setPointLogRow] = useState<PointRow | null>(null); // 💎 점수 내역 창 (회원 현황)
   const [expandedDays, setExpandedDays] = useState<string[]>([]); // 모임 달력: '+N개 더' 를 펼친 날짜
   const [noticePick, setNoticePick] = useState<string[]>([]); // 월별 참석 현황: 알림 보낼 회원 선택
   const [noticeBusy, setNoticeBusy] = useState(false);
@@ -449,7 +451,7 @@ export default function Home() {
     // 봇 점수는 부가 정보라 실패해도 화면 전체를 막지 않는다.
     const pointResult = await supabase
       .from("bot_points")
-      .select("kakao_uid,name,exp,rank,trophies,tickets,season,last_active,synced_at");
+      .select("kakao_uid,name,full_name,exp,rank,trophies,tickets,season,last_active,synced_at");
     setBotPoints(pointResult.error ? [] : ((pointResult.data ?? []) as BotPoint[]));
   }, []);
 
@@ -628,6 +630,41 @@ export default function Home() {
     }
     return map;
   }, [botPoints, members]);
+
+  // 👥 회원 현황 상단 통계: 카톡 전체 닉네임("카티 91 남 화곡")에서 나이 · 성별 · 지역을 읽는다.
+  // 기준은 '전체 N명'과 같다 (활동 중 · 게스트 제외). 형식이 다른 닉네임은 따로 센다.
+  const memberDemographics = useMemo(() => {
+    const NICK = /^\s*\S+\s+(\d{2})\s*([남여])\s*([가-힣A-Za-z]+)/;
+    const BANDS = ["~84", "85~89", "90~94", "95~99", "00~"];
+    let male = 0;
+    let female = 0;
+    let unknown = 0;
+    const ages = new Map<string, number>();
+    const regions = new Map<string, number>();
+    for (const member of members) {
+      if (!member.active || member.is_guest) continue;
+      const match = NICK.exec(pointsByMember[member.id]?.full_name ?? "");
+      if (!match) {
+        unknown += 1;
+        continue;
+      }
+      if (match[2] === "남") male += 1;
+      else female += 1;
+      const yy = Number(match[1]);
+      const year = yy >= 50 ? 1900 + yy : 2000 + yy;
+      const band = year < 1985 ? BANDS[0] : year < 1990 ? BANDS[1] : year < 1995 ? BANDS[2] : year < 2000 ? BANDS[3] : BANDS[4];
+      ages.set(band, (ages.get(band) ?? 0) + 1);
+      regions.set(match[3], (regions.get(match[3]) ?? 0) + 1);
+    }
+    return {
+      male,
+      female,
+      unknown,
+      counted: male + female,
+      ages: BANDS.filter((band) => ages.get(band)).map((band) => [band, ages.get(band) ?? 0] as const),
+      regions: [...regions].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ko")),
+    };
+  }, [members, pointsByMember]);
 
   const pointRanking = useMemo(() => {
     const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
@@ -1205,7 +1242,7 @@ export default function Home() {
       if (document.visibilityState === "hidden") return;
       const { data, error } = await supabase
         .from("bot_points")
-        .select("kakao_uid,name,exp,rank,trophies,tickets,season,last_active,synced_at")
+        .select("kakao_uid,name,full_name,exp,rank,trophies,tickets,season,last_active,synced_at")
         .eq("kakao_uid", myPointUid)
         .maybeSingle();
       if (stopped || error || !data) return;
@@ -4733,6 +4770,47 @@ async function setAttendanceMembers(memberIds: string[]) {
                 <h2>회원 현황</h2>
                 <p>회원 검색, 정렬과 상태별 인원을 한 곳에서 확인합니다.</p>
               </div>
+              {memberDemographics.counted > 0 && (() => {
+                const demo = memberDemographics;
+                const malePct = Math.round((demo.male / demo.counted) * 100);
+                const topRegions = demo.regions.slice(0, 8);
+                const otherRegions = demo.regions.slice(8).reduce((sum, [, n]) => sum + n, 0);
+                return (
+                  <div className="memberDemographics" aria-label="회원 구성">
+                    <div className="demoBlock">
+                      <span className="demoLabel">성비</span>
+                      <div className="demoGender">
+                        <b className="male">남 {demo.male}</b>
+                        <div className="demoBar" role="img" aria-label={`남 ${malePct}%, 여 ${100 - malePct}%`}>
+                          <i className="male" style={{ width: `${malePct}%` }} />
+                          <i className="female" style={{ width: `${100 - malePct}%` }} />
+                        </div>
+                        <b className="female">여 {demo.female}</b>
+                      </div>
+                    </div>
+                    <div className="demoBlock">
+                      <span className="demoLabel">나이대</span>
+                      <div className="demoChips">
+                        {demo.ages.map(([band, count]) => (
+                          <em key={band}>{band}년생 <b>{count}</b></em>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="demoBlock">
+                      <span className="demoLabel">지역</span>
+                      <div className="demoChips">
+                        {topRegions.map(([region, count]) => (
+                          <em key={region}>{region} <b>{count}</b></em>
+                        ))}
+                        {otherRegions > 0 && <em className="other">기타 <b>{otherRegions}</b></em>}
+                      </div>
+                    </div>
+                    {demo.unknown > 0 && (
+                      <small className="demoNote">닉네임 형식이 달라 {demo.unknown}명은 빠졌어요</small>
+                    )}
+                  </div>
+                );
+              })()}
               {isAdmin && (
                 <button
                   className={showAdminMemberAdd ? "smallButton ghost" : "smallButton memberAddToggleButton"}
@@ -4896,8 +4974,10 @@ async function setAttendanceMembers(memberIds: string[]) {
                         <button
                           className="memberNameButton"
                           onClick={() => setMemberDetailId(member.id)}
+                          title={point?.full_name ? `${member.name} (${point.full_name})` : member.name}
                         >
-                          {member.name}
+                          {/* 회원 현황에서만 카톡 전체 닉네임(닉네임 · 나이 · 성별 · 지역)을 보여준다 */}
+                          {point?.full_name || member.name}
                         </button>
                         {point ? (
                           <span className="botPointBadge" title="카톡 봇 점수판 기준">
@@ -4933,17 +5013,39 @@ async function setAttendanceMembers(memberIds: string[]) {
                               마지막 채팅 {chatAgo(chatAt)}
                             </span>
                           </span>
-                          {(isAdmin || currentMember?.id === member.id) && (
-                            <button
-                              type="button"
-                              className="chatLogButton"
-                              title="채팅 내역 보기"
-                              aria-label={`${member.name} 채팅 내역`}
-                              onClick={() => setChatLogName(member.name)}
-                            >
-                              📜
-                            </button>
-                          )}
+                          <span className="memberLogButtons">
+                            {(isAdmin || currentMember?.id === member.id) && (
+                              <button
+                                type="button"
+                                className="chatLogButton"
+                                title="채팅 내역 보기"
+                                aria-label={`${member.name} 채팅 내역`}
+                                onClick={() => setChatLogName(member.name)}
+                              >
+                                📜 채팅
+                              </button>
+                            )}
+                            {point && (
+                              <button
+                                type="button"
+                                className="chatLogButton"
+                                title="점수 내역 보기"
+                                aria-label={`${member.name} 점수 내역`}
+                                onClick={() =>
+                                  setPointLogRow({
+                                    kakao_uid: point.kakao_uid,
+                                    name: member.name,
+                                    exp: point.exp,
+                                    tickets: point.tickets,
+                                    trophies: point.trophies,
+                                    place: point.rank ?? 0,
+                                  })
+                                }
+                              >
+                                💎 점수내역
+                              </button>
+                            )}
+                          </span>
                         </div>
                       )}
                     </div>
@@ -5146,6 +5248,7 @@ async function setAttendanceMembers(memberIds: string[]) {
           </section>
 
           {chatLogName && <ChatLogModal name={chatLogName} onClose={() => setChatLogName("")} />}
+          {pointLogRow && <PointHistoryBox row={pointLogRow} onClose={() => setPointLogRow(null)} />}
 
           {guestMembers.length > 0 && (
             <section className="panel standalonePanel guestPanel">

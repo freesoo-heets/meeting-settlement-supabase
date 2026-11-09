@@ -5740,10 +5740,35 @@ button.meetingMetricCard {
 .hostPanelWarn { margin: 0 0 6px; font-size: 12px; color: #b45309; }
 
 /* 회원현황: 마지막 채팅 · 📜 채팅 내역 */
-.memberActivityLine { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+/* 버튼을 카드 오른쪽 끝이 아니라 '마지막 채팅' 문구 바로 옆에 둔다 (space-between 이면 멀리 떨어졌다) */
+.memberActivityLine { display: flex; align-items: center; justify-content: flex-start; flex-wrap: wrap; gap: 6px 8px; }
 .memberActivityLine > span { min-width: 0; }
-.chatLogButton { flex: none; border: 1px solid #e2e8f0; background: #fff; border-radius: 8px; padding: 2px 8px; font-size: 15px; cursor: pointer; }
+.memberLogButtons { display: inline-flex; gap: 4px; flex: none; }
+.chatLogButton { flex: none; border: 1px solid #e2e8f0; background: #fff; border-radius: 8px; padding: 2px 8px; font-size: 12px; line-height: 1.6; color: #334155; cursor: pointer; white-space: nowrap; }
 .chatLogButton:hover { background: #f1f5f9; }
+
+/* 👥 회원 현황 상단 통계 (성비 · 나이대 · 지역) */
+.memberManagementTitleRow { flex-wrap: wrap; }
+.memberDemographics { flex: 1 1 320px; min-width: 0; display: grid; gap: 7px; padding: 10px 12px; border: 1px solid #ece7e1; border-radius: 12px; background: #fcfaf8; }
+.demoBlock { display: grid; grid-template-columns: 44px 1fr; align-items: center; gap: 8px; }
+.demoLabel { font-size: 11px; font-weight: 700; color: #8d837b; }
+.demoGender { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.demoGender b { font-size: 12px; white-space: nowrap; }
+.demoGender b.male { color: #2563eb; }
+.demoGender b.female { color: #db2777; }
+.demoBar { flex: 1; display: flex; height: 8px; border-radius: 999px; overflow: hidden; background: #eee; min-width: 60px; }
+.demoBar i { display: block; height: 100%; }
+.demoBar i.male { background: #93c5fd; }
+.demoBar i.female { background: #f9a8d4; }
+.demoChips { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.demoChips em { font-style: normal; font-size: 11px; padding: 2px 7px; border-radius: 999px; background: #fff; border: 1px solid #ece7e1; color: #57534e; white-space: nowrap; }
+.demoChips em b { color: #6551a6; }
+.demoChips em.other { color: #a8a29e; }
+.demoNote { font-size: 10px; color: #a8a29e; }
+@media (max-width: 720px) {
+  /* 좁은 화면: 제목 · 버튼 줄 아래로 통계를 한 줄 전체로 */
+  .memberDemographics { order: 3; flex-basis: 100%; }
+}
 .chatLogModal { max-width: 560px; width: calc(100% - 32px); max-height: 88vh; display: flex; flex-direction: column; }
 .chatLogSearch { margin: 6px 0; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 10px; font: inherit; }
 .chatLogList { flex: 1; min-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding: 6px 2px; }

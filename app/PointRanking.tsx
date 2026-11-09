@@ -85,7 +85,7 @@ function AmountRow({ label, unit, up, down, sign, value, disabled, onSign, onVal
 const HISTORY_MAX = 100;
 const HISTORY_PAGE = 20;
 
-function PointHistoryBox({ row, onClose }: { row: PointRow; onClose: () => void }) {
+export function PointHistoryBox({ row, onClose }: { row: PointRow; onClose: () => void }) {
   const [logs, setLogs] = useState<PointLog[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [page, setPage] = useState(0);
