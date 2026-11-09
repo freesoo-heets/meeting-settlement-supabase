@@ -635,11 +635,10 @@ export default function Home() {
   // 기준은 '전체 N명'과 같다 (활동 중 · 게스트 제외). 형식이 다른 닉네임은 따로 센다.
   const memberDemographics = useMemo(() => {
     const NICK = /^\s*\S+\s+(\d{2})\s*([남여])\s*([가-힣A-Za-z]+)/;
-    const BANDS = ["~84", "85~89", "90~94", "95~99", "00~"];
     let male = 0;
     let female = 0;
     let unknown = 0;
-    const ages = new Map<string, number>();
+    const ages = new Map<number, number>(); // 출생연도(4자리) → 인원
     const regions = new Map<string, number>();
     for (const member of members) {
       if (!member.active || member.is_guest) continue;
@@ -652,8 +651,7 @@ export default function Home() {
       else female += 1;
       const yy = Number(match[1]);
       const year = yy >= 50 ? 1900 + yy : 2000 + yy;
-      const band = year < 1985 ? BANDS[0] : year < 1990 ? BANDS[1] : year < 1995 ? BANDS[2] : year < 2000 ? BANDS[3] : BANDS[4];
-      ages.set(band, (ages.get(band) ?? 0) + 1);
+      ages.set(year, (ages.get(year) ?? 0) + 1);
       regions.set(match[3], (regions.get(match[3]) ?? 0) + 1);
     }
     return {
@@ -661,7 +659,8 @@ export default function Home() {
       female,
       unknown,
       counted: male + female,
-      ages: BANDS.filter((band) => ages.get(band)).map((band) => [band, ages.get(band) ?? 0] as const),
+      // 1년 단위 (91년생, 92년생 …) · 나이 많은 순
+      ages: [...ages].sort((a, b) => a[0] - b[0]).map(([year, count]) => [String(year % 100).padStart(2, "0"), count] as const),
       regions: [...regions].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ko")),
     };
   }, [members, pointsByMember]);
@@ -4773,6 +4772,9 @@ async function setAttendanceMembers(memberIds: string[]) {
               {memberDemographics.counted > 0 && (() => {
                 const demo = memberDemographics;
                 const malePct = Math.round((demo.male / demo.counted) * 100);
+                // 성비 (봇 !유령 과 같은 표기: 남:여 를 10 기준으로, 예 6.2:3.8)
+                const maleRatio = Math.round((demo.male / demo.counted) * 100) / 10;
+                const ratioText = `${maleRatio.toFixed(1)}:${(10 - maleRatio).toFixed(1)}`;
                 const topRegions = demo.regions.slice(0, 8);
                 const otherRegions = demo.regions.slice(8).reduce((sum, [, n]) => sum + n, 0);
                 return (
@@ -4786,13 +4788,14 @@ async function setAttendanceMembers(memberIds: string[]) {
                           <i className="female" style={{ width: `${100 - malePct}%` }} />
                         </div>
                         <b className="female">여 {demo.female}</b>
+                        <span className="demoRatio">{ratioText}</span>
                       </div>
                     </div>
                     <div className="demoBlock">
-                      <span className="demoLabel">나이대</span>
+                      <span className="demoLabel">나이</span>
                       <div className="demoChips">
-                        {demo.ages.map(([band, count]) => (
-                          <em key={band}>{band}년생 <b>{count}</b></em>
+                        {demo.ages.map(([yy, count]) => (
+                          <em key={yy}>{yy}년생 <b>{count}</b></em>
                         ))}
                       </div>
                     </div>
