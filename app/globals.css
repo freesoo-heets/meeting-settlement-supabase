@@ -5753,18 +5753,25 @@ button.meetingMetricCard {
 .demoBlock { display: grid; grid-template-columns: 44px 1fr; align-items: center; gap: 8px; }
 .demoLabel { font-size: 11px; font-weight: 700; color: #8d837b; }
 .demoGender { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.demoGender b { font-size: 12px; white-space: nowrap; }
-.demoGender b.male { color: #2563eb; }
-.demoGender b.female { color: #db2777; }
 .demoRatio { font-size: 11px; font-weight: 700; color: #57534e; background: #fff; border: 1px solid #ece7e1; border-radius: 999px; padding: 1px 7px; white-space: nowrap; }
 .demoBar { flex: 1; display: flex; height: 8px; border-radius: 999px; overflow: hidden; background: #eee; min-width: 60px; }
 .demoBar i { display: block; height: 100%; }
 .demoBar i.male { background: #93c5fd; }
 .demoBar i.female { background: #f9a8d4; }
 .demoChips { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
-.demoChips em { font-style: normal; font-size: 11px; padding: 2px 7px; border-radius: 999px; background: #fff; border: 1px solid #ece7e1; color: #57534e; white-space: nowrap; }
-.demoChips em b { color: #6551a6; }
-.demoChips em.other { color: #a8a29e; }
+/* 통계 칩: 누르면 그 회원만 목록에 남는다 */
+.demoChip { font: inherit; font-size: 11px; line-height: 1.5; padding: 2px 8px; border-radius: 999px; background: #fff; border: 1px solid #ece7e1; color: #57534e; white-space: nowrap; cursor: pointer; }
+.demoChip b { color: #6551a6; }
+.demoChip:hover { border-color: #c4b5fd; background: #faf7ff; }
+.demoChip.other { color: #a8a29e; }
+.demoChip.male { color: #2563eb; font-weight: 700; }
+.demoChip.female { color: #db2777; font-weight: 700; }
+.demoChip.male b, .demoChip.female b { color: inherit; }
+.demoChip.on { background: #6551a6; border-color: #6551a6; color: #fff; }
+.demoChip.on b { color: #fff; }
+.demoActive { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11px; color: #57534e; background: #f3effd; border-radius: 8px; padding: 4px 8px; }
+.demoActive b { color: #6551a6; }
+.demoClear { font: inherit; font-size: 11px; border: 1px solid #d6cdf5; background: #fff; color: #6551a6; border-radius: 999px; padding: 1px 8px; cursor: pointer; white-space: nowrap; }
 .demoNote { font-size: 10px; color: #a8a29e; }
 @media (max-width: 720px) {
   /* 좁은 화면: 제목 · 버튼 줄 아래로 통계를 한 줄 전체로 */

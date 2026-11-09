@@ -268,6 +268,8 @@ export default function Home() {
   const [memberDetailId, setMemberDetailId] = useState("");
   const [chatLogName, setChatLogName] = useState(""); // 📜 채팅 내역 창
   const [pointLogRow, setPointLogRow] = useState<PointRow | null>(null); // 💎 점수 내역 창 (회원 현황)
+  // 👥 회원 현황 통계 칩으로 거르기 (성별 · 출생연도 · 지역, region "__other__" = 기타)
+  const [demoFilter, setDemoFilter] = useState<{ kind: "sex" | "year" | "region"; value: string } | null>(null);
   const [expandedDays, setExpandedDays] = useState<string[]>([]); // 모임 달력: '+N개 더' 를 펼친 날짜
   const [noticePick, setNoticePick] = useState<string[]>([]); // 월별 참석 현황: 알림 보낼 회원 선택
   const [noticeBusy, setNoticeBusy] = useState(false);
@@ -640,9 +642,13 @@ export default function Home() {
     let unknown = 0;
     const ages = new Map<number, number>(); // 출생연도(4자리) → 인원
     const regions = new Map<string, number>();
+    // 회원별 정보 (통계 칩을 눌러 목록을 거를 때 쓴다 · 탈퇴 회원도 포함)
+    const info: Record<string, { sex: string; yy: string; region: string }> = {};
     for (const member of members) {
-      if (!member.active || member.is_guest) continue;
+      if (member.is_guest) continue;
       const match = NICK.exec(pointsByMember[member.id]?.full_name ?? "");
+      if (match) info[member.id] = { sex: match[2], yy: match[1], region: match[3] };
+      if (!member.active) continue; // 통계 숫자는 활동 회원만
       if (!match) {
         unknown += 1;
         continue;
@@ -654,14 +660,17 @@ export default function Home() {
       ages.set(year, (ages.get(year) ?? 0) + 1);
       regions.set(match[3], (regions.get(match[3]) ?? 0) + 1);
     }
+    const sortedRegions = [...regions].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ko"));
     return {
       male,
       female,
       unknown,
       counted: male + female,
+      info,
       // 1년 단위 (91년생, 92년생 …) · 나이 많은 순
       ages: [...ages].sort((a, b) => a[0] - b[0]).map(([year, count]) => [String(year % 100).padStart(2, "0"), count] as const),
-      regions: [...regions].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ko")),
+      regions: sortedRegions,
+      topRegions: new Set(sortedRegions.slice(0, 8).map(([region]) => region)), // 나머지는 '기타'
     };
   }, [members, pointsByMember]);
 
@@ -885,6 +894,15 @@ export default function Home() {
     const rows = members.filter((member) => {
       if (member.is_guest) return false; // 게스트는 아래 '게스트 현황'에 따로
       if (q && !memberSearchMatches(member.name, q)) return false;
+      if (demoFilter) {
+        const info = memberDemographics.info[member.id];
+        if (!info) return false;
+        if (demoFilter.kind === "sex" && info.sex !== demoFilter.value) return false;
+        if (demoFilter.kind === "year" && info.yy !== demoFilter.value) return false;
+        if (demoFilter.kind === "region") {
+          if (demoFilter.value === "__other__" ? memberDemographics.topRegions.has(info.region) : info.region !== demoFilter.value) return false;
+        }
+      }
       if (memberFilter === "active") {
         return member.active && !warningByMember[member.id]?.warning;
       }
@@ -943,6 +961,8 @@ export default function Home() {
     lastAttendanceByMember,
     pointsByMember,
     lastChats,
+    demoFilter,
+    memberDemographics,
   ]);
 
   const adjustmentByKey = useMemo(() => {
@@ -4777,37 +4797,67 @@ async function setAttendanceMembers(memberIds: string[]) {
                 const ratioText = `${maleRatio.toFixed(1)}:${(10 - maleRatio).toFixed(1)}`;
                 const topRegions = demo.regions.slice(0, 8);
                 const otherRegions = demo.regions.slice(8).reduce((sum, [, n]) => sum + n, 0);
+                // 칩을 누르면 그 회원만 목록에 남는다. 같은 칩을 다시 누르면 해제.
+                const isOn = (kind: "sex" | "year" | "region", value: string) =>
+                  demoFilter?.kind === kind && demoFilter.value === value;
+                const toggle = (kind: "sex" | "year" | "region", value: string) =>
+                  setDemoFilter(isOn(kind, value) ? null : { kind, value });
+                const chip = (kind: "sex" | "year" | "region", value: string, label: string, count: number, extra = "") => (
+                  <button
+                    type="button"
+                    key={`${kind}-${value}`}
+                    className={`demoChip ${extra} ${isOn(kind, value) ? "on" : ""}`}
+                    aria-pressed={isOn(kind, value)}
+                    title={isOn(kind, value) ? "다시 누르면 전체 보기" : `${label} 회원만 보기`}
+                    onClick={() => toggle(kind, value)}
+                  >
+                    {label} <b>{count}</b>
+                  </button>
+                );
+                const filterLabel = !demoFilter
+                  ? ""
+                  : demoFilter.kind === "sex"
+                    ? demoFilter.value
+                    : demoFilter.kind === "year"
+                      ? `${demoFilter.value}년생`
+                      : demoFilter.value === "__other__"
+                        ? "기타 지역"
+                        : demoFilter.value;
                 return (
                   <div className="memberDemographics" aria-label="회원 구성">
                     <div className="demoBlock">
                       <span className="demoLabel">성비</span>
                       <div className="demoGender">
-                        <b className="male">남 {demo.male}</b>
+                        {chip("sex", "남", "남", demo.male, "male")}
                         <div className="demoBar" role="img" aria-label={`남 ${malePct}%, 여 ${100 - malePct}%`}>
                           <i className="male" style={{ width: `${malePct}%` }} />
                           <i className="female" style={{ width: `${100 - malePct}%` }} />
                         </div>
-                        <b className="female">여 {demo.female}</b>
+                        {chip("sex", "여", "여", demo.female, "female")}
                         <span className="demoRatio">{ratioText}</span>
                       </div>
                     </div>
                     <div className="demoBlock">
                       <span className="demoLabel">나이</span>
                       <div className="demoChips">
-                        {demo.ages.map(([yy, count]) => (
-                          <em key={yy}>{yy}년생 <b>{count}</b></em>
-                        ))}
+                        {demo.ages.map(([yy, count]) => chip("year", yy, `${yy}년생`, count))}
                       </div>
                     </div>
                     <div className="demoBlock">
                       <span className="demoLabel">지역</span>
                       <div className="demoChips">
-                        {topRegions.map(([region, count]) => (
-                          <em key={region}>{region} <b>{count}</b></em>
-                        ))}
-                        {otherRegions > 0 && <em className="other">기타 <b>{otherRegions}</b></em>}
+                        {topRegions.map(([region, count]) => chip("region", region, region, count))}
+                        {otherRegions > 0 && chip("region", "__other__", "기타", otherRegions, "other")}
                       </div>
                     </div>
+                    {demoFilter && (
+                      <div className="demoActive">
+                        <span>👀 <b>{filterLabel}</b> 회원만 보는 중 · {filteredMembers.length}명</span>
+                        <button type="button" className="demoClear" onClick={() => setDemoFilter(null)}>
+                          ✕ 해제
+                        </button>
+                      </div>
+                    )}
                     {demo.unknown > 0 && (
                       <small className="demoNote">닉네임 형식이 달라 {demo.unknown}명은 빠졌어요</small>
                     )}
@@ -4946,6 +4996,7 @@ async function setAttendanceMembers(memberIds: string[]) {
                   onClick={() => {
                     setMemberSearch("");
                     setMemberFilter("all");
+                    setDemoFilter(null);
                   }}
                 >
                   필터 초기화
