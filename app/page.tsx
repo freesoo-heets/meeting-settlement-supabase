@@ -269,7 +269,14 @@ export default function Home() {
   const [chatLogName, setChatLogName] = useState(""); // 📜 채팅 내역 창
   const [pointLogRow, setPointLogRow] = useState<PointRow | null>(null); // 💎 점수 내역 창 (회원 현황)
   // 👥 회원 현황 통계 칩으로 거르기 (성별 · 출생연도 · 지역, region "__other__" = 기타)
-  const [demoFilter, setDemoFilter] = useState<{ kind: "sex" | "year" | "region"; value: string } | null>(null);
+  // 통계 칩 필터: 종류끼리는 AND(91년생 + 남 + 화곡), 같은 종류 안에서는 OR(91년생 또는 92년생). 빈 배열이면 안 거름.
+  const [demoFilter, setDemoFilter] = useState<{ sex: string[]; year: string[]; region: string[] }>({
+    sex: [],
+    year: [],
+    region: [],
+  });
+  const demoFilterOn = demoFilter.sex.length + demoFilter.year.length + demoFilter.region.length > 0;
+  const clearDemoFilter = () => setDemoFilter({ sex: [], year: [], region: [] });
   const [expandedDays, setExpandedDays] = useState<string[]>([]); // 모임 달력: '+N개 더' 를 펼친 날짜
   const [noticePick, setNoticePick] = useState<string[]>([]); // 월별 참석 현황: 알림 보낼 회원 선택
   const [noticeBusy, setNoticeBusy] = useState(false);
@@ -894,14 +901,18 @@ export default function Home() {
     const rows = members.filter((member) => {
       if (member.is_guest) return false; // 게스트는 아래 '게스트 현황'에 따로
       if (q && !memberSearchMatches(member.name, q)) return false;
-      if (demoFilter) {
+      if (demoFilter.sex.length + demoFilter.year.length + demoFilter.region.length > 0) {
         const info = memberDemographics.info[member.id];
         if (!info) return false;
-        if (demoFilter.kind === "sex" && info.sex !== demoFilter.value) return false;
-        if (demoFilter.kind === "year" && info.yy !== demoFilter.value) return false;
-        if (demoFilter.kind === "region") {
-          if (demoFilter.value === "__other__" ? memberDemographics.topRegions.has(info.region) : info.region !== demoFilter.value) return false;
-        }
+        if (demoFilter.sex.length && !demoFilter.sex.includes(info.sex)) return false;
+        if (demoFilter.year.length && !demoFilter.year.includes(info.yy)) return false;
+        if (
+          demoFilter.region.length &&
+          !demoFilter.region.some((value) =>
+            value === "__other__" ? !memberDemographics.topRegions.has(info.region) : info.region === value,
+          )
+        )
+          return false;
       }
       if (memberFilter === "active") {
         return member.active && !warningByMember[member.id]?.warning;
@@ -4797,32 +4808,35 @@ async function setAttendanceMembers(memberIds: string[]) {
                 const ratioText = `${maleRatio.toFixed(1)}:${(10 - maleRatio).toFixed(1)}`;
                 const topRegions = demo.regions.slice(0, 8);
                 const otherRegions = demo.regions.slice(8).reduce((sum, [, n]) => sum + n, 0);
-                // 칩을 누르면 그 회원만 목록에 남는다. 같은 칩을 다시 누르면 해제.
-                const isOn = (kind: "sex" | "year" | "region", value: string) =>
-                  demoFilter?.kind === kind && demoFilter.value === value;
+                // 칩을 누르면 그 회원만 목록에 남는다. 여러 칩을 함께 누를 수 있고, 같은 칩을 다시 누르면 그 칩만 해제.
+                const isOn = (kind: "sex" | "year" | "region", value: string) => demoFilter[kind].includes(value);
                 const toggle = (kind: "sex" | "year" | "region", value: string) =>
-                  setDemoFilter(isOn(kind, value) ? null : { kind, value });
+                  setDemoFilter((prev) => ({
+                    ...prev,
+                    [kind]: prev[kind].includes(value) ? prev[kind].filter((v) => v !== value) : [...prev[kind], value],
+                  }));
                 const chip = (kind: "sex" | "year" | "region", value: string, label: string, count: number, extra = "") => (
                   <button
                     type="button"
                     key={`${kind}-${value}`}
                     className={`demoChip ${extra} ${isOn(kind, value) ? "on" : ""}`}
                     aria-pressed={isOn(kind, value)}
-                    title={isOn(kind, value) ? "다시 누르면 전체 보기" : `${label} 회원만 보기`}
+                    title={isOn(kind, value) ? "다시 누르면 이 조건 해제" : `${label} 조건 추가`}
                     onClick={() => toggle(kind, value)}
                   >
                     {label} <b>{count}</b>
                   </button>
                 );
-                const filterLabel = !demoFilter
-                  ? ""
-                  : demoFilter.kind === "sex"
-                    ? demoFilter.value
-                    : demoFilter.kind === "year"
-                      ? `${demoFilter.value}년생`
-                      : demoFilter.value === "__other__"
-                        ? "기타 지역"
-                        : demoFilter.value;
+                // 예: "91·92년생 · 남 · 화곡" (같은 종류는 · 로 묶어 OR, 종류 사이는 AND)
+                const filterLabel = [
+                  demoFilter.year.length
+                    ? `${[...demoFilter.year].sort().join("·")}년생`
+                    : "",
+                  demoFilter.sex.join("·"),
+                  demoFilter.region.map((r) => (r === "__other__" ? "기타 지역" : r)).join("·"),
+                ]
+                  .filter(Boolean)
+                  .join(" + ");
                 return (
                   <div className="memberDemographics" aria-label="회원 구성">
                     <div className="demoBlock">
@@ -4850,10 +4864,10 @@ async function setAttendanceMembers(memberIds: string[]) {
                         {otherRegions > 0 && chip("region", "__other__", "기타", otherRegions, "other")}
                       </div>
                     </div>
-                    {demoFilter && (
+                    {demoFilterOn && (
                       <div className="demoActive">
                         <span>👀 <b>{filterLabel}</b> 회원만 보는 중 · {filteredMembers.length}명</span>
-                        <button type="button" className="demoClear" onClick={() => setDemoFilter(null)}>
+                        <button type="button" className="demoClear" onClick={clearDemoFilter}>
                           ✕ 해제
                         </button>
                       </div>
@@ -4996,7 +5010,7 @@ async function setAttendanceMembers(memberIds: string[]) {
                   onClick={() => {
                     setMemberSearch("");
                     setMemberFilter("all");
-                    setDemoFilter(null);
+                    clearDemoFilter();
                   }}
                 >
                   필터 초기화
