@@ -33,6 +33,11 @@ type BotPoint = {
   synced_at: string;
 };
 
+// 모임 정렬: 날짜 최신순, 같은 날짜면 벙을 연 시각(created_at) 최신순
+function byMeetingNewest(a: { date: string; created_at?: string | null }, b: { date: string; created_at?: string | null }) {
+  return b.date.localeCompare(a.date) || (b.created_at ?? "").localeCompare(a.created_at ?? "");
+}
+
 type MeetingRow = {
   id: string;
   date: string;
@@ -357,7 +362,7 @@ export default function Home() {
       })(),
       (async () => {
         // 벙주 칸(host_member)이 DB 에 아직 없으면 빼고 다시 불러온다
-        const query = (columns: string) => supabase.from("meetings").select(columns).order("date", { ascending: false });
+        const query = (columns: string) => supabase.from("meetings").select(columns).order("date", { ascending: false }).order("created_at", { ascending: false });
         const withHost = await query("id,date,title,cost,created_at,host_member,created_by");
         return withHost.error?.code === "42703" ? await query("id,date,title,cost,created_at") : withHost;
       })(),
@@ -442,12 +447,14 @@ export default function Home() {
       guestsByMeeting.set(guest.meeting_id, current);
     }
 
-    const assembled: Meeting[] = meetingRows.map((meeting) => ({
-      ...meeting,
-      attendeeIds: attendanceByMeeting.get(meeting.id) ?? [],
-      onlineIds: onlineByMeeting.get(meeting.id) ?? [],
-      guests: guestsByMeeting.get(meeting.id) ?? [],
-    }));
+    const assembled: Meeting[] = meetingRows
+      .map((meeting) => ({
+        ...meeting,
+        attendeeIds: attendanceByMeeting.get(meeting.id) ?? [],
+        onlineIds: onlineByMeeting.get(meeting.id) ?? [],
+        guests: guestsByMeeting.get(meeting.id) ?? [],
+      }))
+      .sort(byMeetingNewest);
 
     setMembers(memberRows);
     setMeetings(assembled);
@@ -1327,12 +1334,12 @@ export default function Home() {
         meeting,
         share: meetingAllocation(meeting).shares[`m:${currentMember.id}`] ?? 0,
       }))
-      .sort((a, b) => b.meeting.date.localeCompare(a.meeting.date));
+      .sort((a, b) => byMeetingNewest(a.meeting, b.meeting));
   }, [currentMember, monthMeetings, meetingAllocation]);
 
   const myAllMeetings = useMemo(() => {
     if (!currentMember) return [];
-    return meetings.filter((meeting) => meeting.attendeeIds.includes(currentMember.id)).sort((a,b) => b.date.localeCompare(a.date));
+    return meetings.filter((meeting) => meeting.attendeeIds.includes(currentMember.id)).sort(byMeetingNewest);
   }, [currentMember, meetings]);
 
   const myUpcomingMeetings = useMemo(() =>
@@ -1357,7 +1364,7 @@ export default function Home() {
     if (!memberDetail) return [];
     return meetings
       .filter((meeting) => meeting.attendeeIds.includes(memberDetail.id))
-      .sort((a, b) => b.date.localeCompare(a.date));
+      .sort(byMeetingNewest);
   }, [meetings, memberDetail]);
 
 
