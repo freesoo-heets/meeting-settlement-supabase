@@ -33,9 +33,25 @@ type BotPoint = {
   synced_at: string;
 };
 
-// 모임 정렬: 날짜 최신순, 같은 날짜면 벙을 연 시각(created_at) 최신순
-function byMeetingNewest(a: { date: string; created_at?: string | null }, b: { date: string; created_at?: string | null }) {
-  return b.date.localeCompare(a.date) || (b.created_at ?? "").localeCompare(a.created_at ?? "");
+// 모임 정렬 기준: 날짜 → 벙 시작 시각(starts_at). 시작 시각이 없는 옛 모임은 날짜로만 정렬한다
+//   (같은 날짜면 시작 시각 있는 벙 뒤에, 그것끼리는 제목 순).
+type MeetingSortable = { date: string; title?: string; starts_at?: string | null };
+function meetingStartMs(meeting: MeetingSortable) {
+  const ms = meeting.starts_at ? Date.parse(meeting.starts_at) : NaN;
+  return Number.isNaN(ms) ? Number.POSITIVE_INFINITY : ms;
+}
+// 시작이 이른 벙이 먼저 (통합 정산 1번, 2번… 순서)
+function byMeetingOldest(a: MeetingSortable, b: MeetingSortable) {
+  const byDate = a.date.localeCompare(b.date);
+  if (byDate) return byDate;
+  const x = meetingStartMs(a);
+  const y = meetingStartMs(b);
+  if (x !== y) return x < y ? -1 : 1;
+  return (a.title ?? "").localeCompare(b.title ?? "", "ko");
+}
+// 목록용: 최신 벙이 위로 (같은 날이면 늦게 시작하는 벙이 위)
+function byMeetingNewest(a: MeetingSortable, b: MeetingSortable) {
+  return byMeetingOldest(b, a);
 }
 
 type MeetingRow = {
@@ -44,6 +60,7 @@ type MeetingRow = {
   title: string;
   cost: number | string | null;
   created_at: string;
+  starts_at?: string | null; // 벙 시작 시각 (카톡 일정 기준)
   host_member?: string | null; // 벙주 (모임 생성자, 벙포 지급 대상)
   created_by?: string | null; // 모임 생성자의 auth 사용자 ID
 };
@@ -362,7 +379,10 @@ export default function Home() {
       })(),
       (async () => {
         // 벙주 칸(host_member)이 DB 에 아직 없으면 빼고 다시 불러온다
-        const query = (columns: string) => supabase.from("meetings").select(columns).order("date", { ascending: false }).order("created_at", { ascending: false });
+        const query = (columns: string) => supabase.from("meetings").select(columns).order("date", { ascending: false });
+        // 벙 시작 시각(starts_at)도 같이 읽는다. 칸이 없으면 하나씩 빼고 다시 불러온다
+        const withStart = await query("id,date,title,cost,created_at,starts_at,host_member,created_by");
+        if (withStart.error?.code !== "42703") return withStart;
         const withHost = await query("id,date,title,cost,created_at,host_member,created_by");
         return withHost.error?.code === "42703" ? await query("id,date,title,cost,created_at") : withHost;
       })(),
@@ -2048,7 +2068,7 @@ async function setAttendanceMembers(memberIds: string[]) {
 
   // 여러 벙의 최종 부담금(개별 배분액 - 해당 벙 선입금)을 회원 ID 기준으로 합산합니다.
   const multiSettlementMeetings = useMemo(
-    () => meetings.filter((meeting) => multiSettlementIds.includes(meeting.id)).sort((a, b) => a.date.localeCompare(b.date) || a.title.localeCompare(b.title, "ko")),
+    () => meetings.filter((meeting) => multiSettlementIds.includes(meeting.id)).sort(byMeetingOldest),
     [meetings, multiSettlementIds]
   );
 
