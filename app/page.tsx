@@ -3661,6 +3661,7 @@ async function setAttendanceMembers(memberIds: string[]) {
             {label}
           </button>
         ))}
+        <a href="/tarot" className="tabButton" style={{textDecoration:"none",display:"inline-flex",alignItems:"center",justifyContent:"center",whiteSpace:"nowrap"}}>🔮 타로뱅크</a>
       </nav>
 
       <nav className="mobileBottomNav" aria-label="모바일 주요 메뉴">
@@ -3715,6 +3716,10 @@ async function setAttendanceMembers(memberIds: string[]) {
                 <em>›</em>
               </button>
             ))}
+            <a href="/tarot" className="mobileMoreItem" style={{textDecoration:"none",color:"inherit"}} onClick={() => setShowMobileMore(false)}>
+              <div><strong>🔮 타로뱅크</strong><span>타로 카드 · AI 리딩 · 상담 기록</span></div>
+              <em>›</em>
+            </a>
             <button
               className="mobileMoreItem"
               onClick={() => {
