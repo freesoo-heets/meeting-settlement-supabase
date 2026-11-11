@@ -6886,3 +6886,14 @@ button.meetingMetricCard {
 .extraFeaturesMenu { position: absolute; right: 0; bottom: calc(100% + 10px); min-width: 170px; padding: 7px; border-radius: 14px; border: 1px solid #e9e2f5; background: white; box-shadow: 0 12px 35px rgba(35,22,65,.2); }
 .extraFeaturesMenuItem { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 11px 13px; border-radius: 9px; color: #342663; font-size: 14px; font-weight: 700; text-decoration: none; white-space: nowrap; }
 .extraFeaturesMenuItem:hover, .extraFeaturesMenuItem:focus-visible { background: #f2edff; }
+
+/* 추가기능: 게임 허브처럼 독립 팝업에서 서비스 선택 */
+.extraFeaturesDialog { max-width: 480px; }
+.extraFeaturesDialogBody { padding: 16px 20px 22px; }
+.extraFeaturesDialogLink { display: flex; align-items: center; gap: 14px; padding: 17px; border: 1px solid #e6dff6; border-radius: 16px; background: #faf8ff; color: #29203f; text-decoration: none; transition: background .15s, transform .15s; }
+.extraFeaturesDialogLink:hover, .extraFeaturesDialogLink:focus-visible { background: #f0eaff; transform: translateY(-1px); }
+.extraFeaturesDialogIcon { display: grid; place-items: center; width: 46px; height: 46px; flex: none; border-radius: 13px; background: #ede4ff; font-size: 24px; }
+.extraFeaturesDialogLink > span:nth-child(2) { display: flex; flex: 1; flex-direction: column; gap: 5px; min-width: 0; }
+.extraFeaturesDialogLink strong { font-size: 16px; }
+.extraFeaturesDialogLink small { font-size: 12px; color: #736785; }
+.extraFeaturesDialogLink > span:last-child { font-size: 26px; color: #7c3aed; }
