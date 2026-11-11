@@ -19,7 +19,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
-      <body>{children}</body>
+      <body>{children}<a href="/tarot" aria-label="찐친 타로뱅크" style={{position:"fixed",right:16,bottom:16,zIndex:90,display:"inline-flex",alignItems:"center",gap:6,padding:"10px 14px",borderRadius:999,background:"#342663",color:"#fff",boxShadow:"0 5px 18px #0003",textDecoration:"none",fontSize:13,fontWeight:700}}>🔮 타로뱅크</a></body>
     </html>
   );
 }
