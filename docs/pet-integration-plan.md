@@ -1,146 +1,329 @@
-# JJINCHIN PET 통합 계획
+# JJINCHIN PET 완전 통합 계획
 
-## 목표
+## 최종 목표
 
-모임페이지를 메인 앱으로 유지하고, 기존 `jjinchin-pet`의 PET 기능을 단계적으로 내부 탭으로 흡수한다.
+`jjinchin-pet`를 별도 서비스로 유지하지 않고,
+`meeting-settlement-supabase` 안에 PET의 UI, API, 비즈니스 로직, DB 데이터를 모두 흡수한다.
 
-사용자는 모임페이지 로그인만 사용하며, PET 별도 로그인은 최종적으로 제거한다.
+최종 상태:
 
-## 통합 원칙
+```
+meeting-settlement-supabase
+├─ 모임 / 회원 / 정산 / 게임
+├─ 타로
+└─ PET
+   ├─ PET Hero / 상태 / 돌보기
+   ├─ Coin / 출석
+   ├─ 인벤토리 / 상점
+   ├─ 성장 / 업적
+   ├─ 친구 PET
+   └─ 모임 참석 보상
+```
 
-1. 기존 운영 모임/정산 기능을 깨지 않는다.
-2. 기존 PET 데이터와 PET Supabase는 1차 통합에서 이동하지 않는다.
-3. 브라우저가 PET 서버를 직접 호출하지 않는다.
-4. 로그인 사용자의 `profiles.member_id`를 PET 연동 외부키로 사용한다.
-5. PET 조작 대상 ID는 브라우저 입력을 신뢰하지 않고 서버가 연결정보에서 결정한다.
-6. 기존 참석 보상 Outbox와 중복지급 방지 구조는 유지한다.
-7. UI 통합이 안정된 후에만 DB 통합을 검토한다.
+`jjinchin-pet.vercel.app`은 충분한 검증 이후 종료하거나 통합 페이지로 리다이렉트한다.
+
+---
+
+## 현재 병행 작업과 충돌 방지
+
+현재 모임페이지에서는 타로 통합이 동시에 진행 중이다.
+
+PET 작업 중 다음 파일/영역은 타로 작업이 안정될 때까지 직접 수정하지 않는다.
+
+- `app/page.tsx`의 추가기능 FAB / 추가기능 모달
+- `app/tarot/**`
+- 타로 진입 URL / 타로 UI
+- 타로 통합용 환경변수 및 인증 흐름
+
+PET 작업은 우선 다음 경계 안에서 진행한다.
+
+- `app/api/pet/**`
+- `components/pet/**`
+- `lib/pet/**`
+- `docs/pet-*.md`
+- PET 전용 Supabase migration
+
+메인 네비게이션 연결은 PET 내부 기능이 준비된 뒤 최신 `app/page.tsx`를 다시 읽고 최소 변경으로 적용한다.
+
+---
+
+## 핵심 원칙
+
+1. 기존 모임 운영 기능과 타로 통합을 깨지 않는다.
+2. PET 기존 운영 데이터는 검증 완료 전까지 삭제하지 않는다.
+3. PET의 별도 `profiles` / `user_identities`는 최종 DB로 복사하지 않는다.
+4. 통합 계정 기준은 Meeting의 `profiles.id`와 `profiles.member_id`다.
+5. 기존 PET 계정과 Meeting 계정의 매핑 기준은 `meeting_member_links.external_member_id = meeting profiles.member_id`다.
+6. 데이터 이관은 복사 → 검증 → dual-read/bridge → local 전환 → 기존 서비스 종료 순서로 진행한다.
+7. PET UI와 API는 모임 프로젝트 내부 전용 모듈로 분리한다.
+8. 기존 참석 보상 Outbox의 중복 방지 의미는 유지한다.
+
+---
 
 ## 현재 연결 구조
 
 ```
-Meeting Supabase
-profiles.member_id
-      │
-      ▼
-meeting /api/pet/*
-      │ server-to-server
-      ▼
-PET /api/integration/meeting/*
-      │
-      ▼
+Meeting profiles.member_id
+        │
+        ▼
+Meeting /api/pet/*
+        │ server-to-server
+        ▼
+jjinchin-pet /api/integration/meeting/*
+        │
+        ▼
 meeting_member_links.external_member_id
-      │
-      ▼
-PET profiles.id → pets / wallet / inventory / missions
+        │
+        ▼
+PET profile_id
+        │
+        ├─ pets
+        ├─ wallet
+        ├─ inventory
+        ├─ missions
+        └─ achievements
 ```
 
-## STEP 32.0 — 통합 기반
+이 구조는 **이관 기간의 임시 Bridge**로만 사용한다.
 
-### PET 서버
+---
 
-`GET /api/integration/meeting/me?externalMemberId=...`
+# 단계별 통합
 
-반환:
+## STEP 32.0 — Bridge 및 이관 기반
 
-- 연동 여부
-- PET 존재 여부
-- PET 이름/종/레벨/EXP
-- 포만감/행복/에너지/친밀도
-- PET Coin
-- 공개 코드
-- 행동별 현재 쿨타임
-- 서버 시간
+현재 완료/진행:
 
-인증:
+- Meeting 로그인 사용자 기반 PET summary proxy
+- PET 서버의 Meeting summary endpoint
+- PET 데이터/계정 매핑 구조 조사
+- 타로 작업과 코드 경계 분리
+- 완전 통합 migration 설계
 
-`Authorization: Bearer MEETING_INTEGRATION_SECRET`
+이 단계에서는 운영 UI를 변경하지 않는다.
 
-### Meeting 서버
+---
 
-`GET /api/pet/me`
+## STEP 32.1 — Meeting 내부 PET 모듈 생성
 
-브라우저는 Meeting Supabase access token만 전달한다.
+Meeting 저장소에 아래 구조를 생성한다.
 
-Meeting 서버가:
+```
+components/pet/
+lib/pet/
+app/api/pet/
+```
 
-1. access token 검증
-2. 로그인 profile 조회
-3. `profile.member_id` 확보
-4. PET integration endpoint 호출
-5. 브라우저로 필요한 PET 요약만 반환
+PET 관련 타입, API client, 상태 모델을 이 경계 안에 둔다.
 
-브라우저는 PET profile ID나 external member ID를 요청값으로 지정하지 않는다.
+초기에는 기존 PET 서버 Bridge를 사용하지만
+UI는 이미 Meeting 코드베이스 안에서 렌더링되도록 만든다.
 
-## STEP 32.1 — PET 탭 Preview
+---
 
-모임페이지에 기능 플래그로 숨겨진 PET 탭을 추가한다.
+## STEP 32.2 — Target PET DB Schema 생성
 
-초기 화면:
+Meeting Supabase 안에 PET 테이블을 만든다.
+
+그대로 유지 가능한 주요 테이블:
+
+- pet_species
+- pets
+- pet_action_types
+- pet_actions
+- pet_action_cooldowns
+- items
+- inventories
+- pet_equipped_items
+- missions
+- mission_progress
+- wallets
+- wallet_transactions
+- pet_share_profiles
+- pet_visits
+- pet_friends
+- meeting_attendance_rewards
+- pet_action_milestone_rewards
+- pet_action_milestone_claims
+- meeting_box_drop_items
+- achievement_reward_claims
+- pet_daily_checkins
+
+### 복사하지 않는 테이블
+
+- PET `profiles`
+- PET `user_identities`
+- 최종적으로 필요 없게 되는 `meeting_member_links`
+
+PET의 모든 `profile_id / owner_id`는 Meeting `profiles.id`를 참조하도록 재설계한다.
+
+---
+
+## STEP 32.3 — 계정 ID Mapping
+
+기존 PET 데이터를 옮길 때 핵심 매핑:
+
+```
+PET meeting_member_links.external_member_id
+          =
+Meeting profiles.member_id
+```
+
+따라서:
+
+```
+old PET profile_id
+        ↓ meeting_member_links
+external_member_id
+        ↓ Meeting profiles.member_id
+new Meeting profiles.id
+```
+
+을 만들어 모든 PET 소유 데이터를 변환한다.
+
+매핑되지 않은 PET 계정은 자동 삭제하지 않고 migration exception 목록으로 남긴다.
+
+---
+
+## STEP 32.4 — 데이터 복사 및 검증
+
+이관 순서:
+
+1. 정적 master 데이터
+   - pet_species
+   - pet_action_types
+   - items
+   - missions
+
+2. 사용자 PET 데이터
+   - pets
+   - wallets
+
+3. 종속 데이터
+   - pet_actions
+   - cooldowns
+   - inventories
+   - equipped items
+   - mission progress
+   - share profiles
+   - friends
+   - achievements
+   - daily checkins
+   - meeting rewards
+
+검증 항목:
+
+- PET 수
+- 회원별 PET 1:1 매핑
+- Coin 총합
+- inventory 수량 총합
+- action count
+- meeting reward count
+- achievement claim count
+- friend relation count
+- orphan FK 0건
+
+---
+
+## STEP 32.5 — Local PET API 전환
+
+기존:
+
+```
+Meeting API → jjinchin-pet API → PET DB
+```
+
+에서:
+
+```
+Meeting API → Meeting Supabase
+```
+
+로 전환한다.
+
+Bridge와 Local 구현은 잠시 병존시켜 롤백 가능하게 유지한다.
+
+---
+
+## STEP 32.6 — PET UI 통합
+
+최신 모임페이지와 타로 UI 변경을 다시 읽은 뒤,
+그 시점의 구조에 맞춰 PET 진입점을 추가한다.
+
+초기 UI:
 
 - PET Hero
 - Lv / EXP / 친밀도
 - 포만감 / 행복 / 에너지
-- Coin
-- 행동 4종 상태
+- PET Coin
+- 출석
+- 밥주기 / 놀기 / 산책 / 재우기
 
-이 단계에서는 읽기 전용으로 먼저 검증한다.
-
-## STEP 32.2 — PET 행동 통합
-
-추가 프록시:
-
-- `POST /api/pet/action`
-- `GET /api/pet/action-status`
-- `POST /api/pet/checkin`
-- `POST /api/pet/coin-services`
-
-모든 PET 서버 endpoint는 연결된 `member_id`를 기준으로 대상 PET을 결정한다.
-
-## STEP 32.3 — Inventory / Growth
+후속:
 
 - 인벤토리
-- 아이템 사용/장착
+- 상점
 - 성장도감
-- 업적 및 보상
-- Coin Shop
-
-## STEP 32.4 — Friends
-
+- 업적
 - 친구 PET
-- 방문
-- 쓰다듬기
-- 공개 PET
 
-모임 회원과 PET 친구 모델을 연결할 수 있는지 별도 검토한다.
+---
 
-## STEP 32.5 — 모임 기능과 결합
+## STEP 32.7 — 모임 데이터와 직접 결합
 
-- 모임 상세에 PET 참석 보상 표시
-- 참석 완료 보상 toast
-- 회원 상세에 PET 요약
-- 관리자 PET 보상/연동 상태
-- PET 보상 Outbox 상태 모니터링
+DB가 하나가 되면 기존 서버간 참석보상 요청을 제거하고
+Meeting DB transaction/RPC 안에서 PET 보상을 처리한다.
 
-## STEP 33 — 단일 앱 전환
+목표:
 
-충분한 운영 검증 후:
+```
+attendance 등록
+   ↓
+PET reward RPC
+   ↓
+EXP / 친밀도 / Coin / 모임상자
+```
 
-1. 기존 PET 사이트를 fallback으로 유지
-2. 모임페이지 PET 탭을 기본 진입점으로 전환
-3. PET 별도 로그인 신규 사용 중단
-4. 기존 PET URL 안내/리다이렉트 검토
+기존 Outbox는 이관 기간 동안 유지하고,
+완전 로컬화 후 필요 여부를 다시 판단한다.
 
-## 최종 단계 — DB 통합
+---
 
-UI/인증 통합과 충분한 안정화 이후에만 진행한다.
+## STEP 33 — 기존 jjinchin-pet 종료
 
-PET 테이블을 Meeting Supabase로 옮기면 server-to-server 통신 일부를 제거할 수 있지만,
-운영 데이터 migration과 ID mapping 검증이 필요하므로 별도 프로젝트로 수행한다.
+종료 조건:
 
-## 롤백 전략
+- 모든 연결 회원 데이터 migration 완료
+- PET action 정상
+- Coin 정상
+- inventory 정상
+- attendance reward 정상
+- check-in 정상
+- achievements 정상
+- friends 정상
+- 카카오 공유 정상
+- 최소 1회 운영 백업 확보
+- rollback 검증 완료
 
-STEP 32~33 동안 PET 데이터 원본은 기존 PET Supabase에 유지한다.
+이후:
 
-모임페이지 통합 UI에서 문제가 발생하면 PET 탭/기능 플래그만 비활성화하고 기존
-`jjinchin-pet.vercel.app`을 즉시 fallback으로 사용할 수 있다.
+1. PET 신규 데이터 쓰기 중단
+2. `jjinchin-pet` read-only 또는 안내 페이지 전환
+3. 통합 Meeting PET을 기본 서비스로 전환
+4. 안정화 후 별도 Vercel 프로젝트/Supabase 제거 여부 결정
+
+---
+
+## Rollback
+
+완전 전환 전에는 기존 PET DB를 삭제하지 않는다.
+
+문제가 생기면:
+
+```
+local PET backend OFF
+→ Bridge backend ON
+→ 기존 jjinchin-pet 데이터 사용
+```
+
+으로 복구 가능해야 한다.
