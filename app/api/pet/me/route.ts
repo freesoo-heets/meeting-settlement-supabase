@@ -1,5 +1,12 @@
 import { NextResponse } from "next/server";
 import { getServerAdmin } from "../../../../lib/server-admin";
+import {
+  getPetBackendMode,
+  type MeetingPetIdentity,
+  type PetBackend,
+} from "../../../../lib/pet/backend";
+import { BridgePetBackend } from "../../../../lib/pet/bridge-backend";
+import { LocalPetBackend } from "../../../../lib/pet/local-backend";
 
 type MeetingProfile = {
   id: string;
@@ -54,16 +61,10 @@ async function requireUser(request: Request) {
   return { profile: profile as MeetingProfile } as const;
 }
 
-function getPetConfig() {
-  const secret = process.env.MEETING_INTEGRATION_SECRET;
-  const petBaseUrl = process.env.JJINCHIN_PET_URL;
-
-  if (!secret || !petBaseUrl) return null;
-
-  return {
-    secret,
-    baseUrl: petBaseUrl.replace(/\/+$/, ""),
-  };
+function createPetBackend(): PetBackend {
+  return getPetBackendMode() === "local"
+    ? new LocalPetBackend()
+    : new BridgePetBackend();
 }
 
 export async function GET(request: Request) {
@@ -77,9 +78,35 @@ export async function GET(request: Request) {
       );
     }
 
-    const config = getPetConfig();
+    const identity: MeetingPetIdentity = {
+      profileId: auth.profile.id,
+      memberId: auth.profile.member_id,
+      nickname: auth.profile.nickname,
+    };
 
-    if (!config) {
+    const backend = createPetBackend();
+    const result = await backend.getSummary(identity);
+
+    return NextResponse.json(result);
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "PET 상태 조회 실패";
+
+    if (message === "PET_LOCAL_BACKEND_NOT_READY") {
+      console.error("[PET_ME_PROXY] local backend requested before readiness");
+
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "통합 PET 데이터 이관이 아직 완료되지 않았습니다.",
+        },
+        { status: 503 }
+      );
+    }
+
+    if (message === "PET_BRIDGE_CONFIG_MISSING") {
+      console.error("[PET_ME_PROXY] PET bridge config is missing");
+
       return NextResponse.json(
         {
           ok: false,
@@ -89,43 +116,14 @@ export async function GET(request: Request) {
       );
     }
 
-    const endpoint =
-      `${config.baseUrl}/api/integration/meeting/me` +
-      `?externalMemberId=${encodeURIComponent(auth.profile.member_id)}`;
+    const status =
+      typeof error === "object" &&
+      error !== null &&
+      "status" in error &&
+      typeof (error as { status?: unknown }).status === "number"
+        ? Number((error as { status: number }).status)
+        : 502;
 
-    const petResponse = await fetch(endpoint, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${config.secret}`,
-      },
-      cache: "no-store",
-      signal: AbortSignal.timeout(10000),
-    });
-
-    const result = await petResponse.json().catch(() => null);
-
-    if (!petResponse.ok) {
-      console.error(
-        "[PET_ME_PROXY] PET server rejected request",
-        petResponse.status,
-        result
-      );
-
-      return NextResponse.json(
-        {
-          ok: false,
-          petStatus: petResponse.status,
-          error: result?.error ?? "PET 상태를 확인하지 못했습니다.",
-        },
-        { status: petResponse.status === 401 ? 502 : petResponse.status }
-      );
-    }
-
-    return NextResponse.json({
-      ...result,
-      meetingNickname: auth.profile.nickname,
-    });
-  } catch (error) {
     console.error("[PET_ME_PROXY]", error);
 
     return NextResponse.json(
@@ -133,7 +131,7 @@ export async function GET(request: Request) {
         ok: false,
         error: "PET 연동 서버와 통신하지 못했습니다.",
       },
-      { status: 502 }
+      { status: status === 401 ? 502 : status }
     );
   }
 }
