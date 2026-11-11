@@ -5946,7 +5946,7 @@ async function setAttendanceMembers(memberIds: string[]) {
               <button className="modalCloseButton" aria-label="닫기" onClick={() => setShowExtraFeatures(false)}>×</button>
             </div>
             <div className="extraFeaturesDialogBody">
-              <a href="/tarot" className="extraFeaturesDialogLink">
+              <a href="https://tarot-bank.vercel.app/" className="extraFeaturesDialogLink">
                 <span className="extraFeaturesDialogIcon" aria-hidden="true">🔮</span>
                 <span><strong>타로뱅크</strong><small>3카드 · 6개월 운세 · 켈틱 크로스</small></span>
                 <span aria-hidden="true">›</span>
