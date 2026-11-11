@@ -11,6 +11,7 @@ import { copyInviteLink } from "./copyInvite";
 import { useGameViewport } from "./useGameViewport";
 import { HoldemTableView, type HoldemEmote } from "./HoldemGame";
 import TicketBuy from "./TicketBuy";
+import { holdemTableLabel, holdemTableNumbers } from "../lib/holdemNo";
 import { EMOTE_COOLDOWN_MS, EMOTE_SHOW_MS, isEmoteKind, type EmoteKind } from "./OmokEmotes";
 
 // 안내 문구는 잠깐 보였다가 사라진다
@@ -192,6 +193,7 @@ function HoldemLobby({
 }) {
   useGameViewport();
   const [tables, setTables] = useState<TableRow[]>([]);
+  const [tableNos, setTableNos] = useState<Record<string, number>>({});
   const [records, setRecords] = useState<SeatRow[]>([]);
   const [mine, setMine] = useState<SeatRow[]>([]);
   const [myActive, setMyActive] = useState<SeatRow | null>(null);
@@ -211,6 +213,7 @@ function HoldemLobby({
       readSeats((c) => supabase.from("holdem_seats").select(c).eq("member_id", currentMemberId).in("status", ["escrow", "seated"]).limit(1)),
     ]);
     setTables((t.data ?? []) as TableRow[]);
+    if ((t.data ?? []).length > 0) void holdemTableNumbers(supabase, (t.data ?? []) as TableRow[]).then(setTableNos);
     setRecords(r);
     setMine(m);
     setMyActive(a[0] ?? null);
@@ -244,7 +247,7 @@ function HoldemLobby({
     return (
       <div className="omokCard" key={table.id}>
         <div>
-          <strong>{table.host_name}님의 테이블</strong>
+          <strong>{holdemTableLabel(tableNos[table.id])}</strong>
           <span>
             👥 {players.length}/{table.max_seats}명
             {table.status === "playing" ? ` · ${table.hand_no}번째 판` : ""}
@@ -382,6 +385,7 @@ function HoldemRoom({
   tableId, currentMemberId, myName, myPoints, myTickets, onClose, onBack,
 }: { tableId: string; currentMemberId: string; myName: string; myPoints: number | null; myTickets: number | null; onClose: () => void; onBack: () => void }) {
   const [row, setRow] = useState<TableRow | null>(null);
+  const [tableNo, setTableNo] = useState<number | null>(null);
   const [seats, setSeats] = useState<SeatRow[]>([]);
   const [hole, setHole] = useState<{ handNo: number; cards: Card[] } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -426,7 +430,10 @@ function HoldemRoom({
       supabase.from("holdem_tables").select(TABLE_COLUMNS).eq("id", tableId).maybeSingle(),
       readSeats((c) => supabase.from("holdem_seats").select(c).eq("table_id", tableId).order("created_at", { ascending: false }).limit(60)),
     ]);
-    if (t.data) setRow(t.data as TableRow);
+    if (t.data) {
+      setRow(t.data as TableRow);
+      void holdemTableNumbers(supabase, [t.data as TableRow]).then((nos) => setTableNo(nos[tableId] ?? null));
+    }
     setSeats(s);
   }, [tableId]);
 
@@ -655,7 +662,7 @@ function HoldemRoom({
       onAct={onAct}
       busy={busy}
       deadline={row.turn_deadline ? new Date(row.turn_deadline).getTime() : null}
-      title={`${row.is_friendly ? "🤝 " : ""}${row.host_name}님의 홀덤`}
+      title={`${row.is_friendly ? "🤝 " : ""}${holdemTableLabel(tableNo)}`}
       subtitle={`${money} · 블라인드 ${view.sb}/${view.bb}${handNo ? ` · ${handNo}번째 판` : ""} · ${seatedCount}/${row.max_seats}명${meIndex < 0 ? " · 관전 중" : ""}`}
       headerExtra={
         pass.text ? (

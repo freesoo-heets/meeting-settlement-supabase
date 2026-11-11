@@ -10,6 +10,7 @@ import HoldemOnline, { sweepHoldem } from "./HoldemOnline";
 import RatingBoard from "./RatingBoard";
 import TicketBuy from "./TicketBuy";
 import WordGame, { agoText } from "./WordGame";
+import { holdemTableLabel, holdemTableNumbers } from "../lib/holdemNo";
 
 const WORD_IDLE_MS = 60 * 1000; // 목록: 이만큼 입력이 없으면 💤
 
@@ -88,7 +89,8 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
   const [omok, setOmok] = useState<StakeRow[]>([]);
   const [alkkagi, setAlkkagi] = useState<StakeRow[]>([]);
   const [catchRooms, setCatchRooms] = useState<CatchRow[]>([]);
-  const [holdemTables, setHoldemTables] = useState<Array<{ id: string; status: string; host_name: string; is_friendly: boolean; max_seats: number; hand_no: number; view: { players?: Array<{ name: string; empty?: boolean }> } }>>([]);
+  const [holdemTables, setHoldemTables] = useState<Array<{ id: string; status: string; host_name: string; is_friendly: boolean; max_seats: number; hand_no: number; created_at: string; view: { players?: Array<{ name: string; empty?: boolean }> } }>>([]);
+  const [holdemNos, setHoldemNos] = useState<Record<string, number>>({});
   // quietMs: 마지막 입력(또는 시작) 뒤 지난 시간 — 읽은 시각 기준
   const [wordLive, setWordLive] = useState<Array<{ id: string; name: string; status: string; tries: number; max_tries: number; member_id: string; quietMs: number }>>([]);
   const [ratingKind, setRatingKind] = useState<"omok" | "alkkagi" | null>(null);
@@ -148,7 +150,7 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
       supabase.from("omok_games").select(STAKE_COLUMNS).in("status", ["open", "challenge", "escrow", "playing"]).order("created_at", { ascending: false }).limit(20),
       supabase.from("alkkagi_games").select(STAKE_COLUMNS).in("status", ["open", "challenge", "escrow", "playing"]).order("created_at", { ascending: false }).limit(20),
       supabase.from("catch_rooms").select("id,status,host_name,players,max_players,turn_no,turn_total,is_test").in("status", ["waiting", "playing"]).order("created_at", { ascending: false }).limit(20),
-      supabase.from("holdem_tables").select("id,status,host_name,is_friendly,max_seats,hand_no,view").in("status", ["waiting", "playing"]).order("created_at", { ascending: false }).limit(20),
+      supabase.from("holdem_tables").select("id,status,host_name,is_friendly,max_seats,hand_no,created_at,view").in("status", ["waiting", "playing"]).order("created_at", { ascending: false }).limit(20),
       supabase.from("word_games").select("id,name,status,tries,max_tries,member_id,updated_at").eq("status", "playing").order("created_at", { ascending: false }).limit(30),
     ]);
     const readAt = Date.now();
@@ -159,6 +161,7 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
       })),
     );
     setHoldemTables((h.data ?? []) as typeof holdemTables);
+    if ((h.data ?? []).length > 0) void holdemTableNumbers(supabase, (h.data ?? []) as typeof holdemTables).then(setHoldemNos);
     if ((h.data ?? []).length > 0) sweepHoldem(); // 멈춘 홀덤 테이블 정리
     // 테스트 판은 만든 관리자에게만 보인다
     const mineOrReal = (row: StakeRow) => !row.is_test || row.host_member === currentMemberId;
@@ -456,7 +459,7 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
                     onClick={() => setActive({ kind: "holdem", id: table.id })}
                   >
                     <span>
-                      <b>{table.host_name}님의 테이블 · {table.status === "playing" ? `진행 중 ${table.hand_no}판째` : "대기 중"}</b>
+                      <b>{holdemTableLabel(holdemNos[table.id])} · {table.status === "playing" ? `진행 중 ${table.hand_no}판째` : "대기 중"}</b>
                       <em>💎 바이인 1,000점 · 👥 {players.length}/{table.max_seats}</em>
                     </span>
                     <i>{players.length < table.max_seats ? "참가 →" : "관전 →"}</i>

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getServerAdmin } from "../../lib/server-admin";
+import { holdemTableLabel, holdemTableNumbers } from "../../lib/holdemNo";
 
 // 게임 초대 링크 전용 주소 (/game?omok=… · /game?alkkagi=… · /game?catch=…)
 // 카톡 미리보기에 '모임 참석 · 비용 정산' 대신 게임 제목이 나오게 하고, 들어오면 메인 화면의 그 방으로 보낸다.
@@ -22,11 +23,12 @@ async function describe(kind: Kind, id: string) {
   try {
     const admin = getServerAdmin();
     if (kind === "holdem") {
-      const { data } = await admin.from("holdem_tables").select("host_name,is_friendly,max_seats,view").eq("id", id).maybeSingle();
+      const { data } = await admin.from("holdem_tables").select("id,host_name,is_friendly,max_seats,view,created_at").eq("id", id).maybeSingle();
       if (!data) return null;
       const players = ((data.view as { players?: Array<{ empty?: boolean }> })?.players ?? []).filter((p) => !p.empty).length;
+      const nos = await holdemTableNumbers(admin, [data as { id: string; created_at: string }]);
       return {
-        title: `${LABEL.holdem} · ${data.host_name}님의 테이블`,
+        title: `🃏 ${holdemTableLabel(nos[id])}`,
         description: `${data.is_friendly ? "🤝 친선" : "💎 바이인 1,000점"} · ${players}/${data.max_seats}명 · 눌러서 참가하세요`,
       };
     }
