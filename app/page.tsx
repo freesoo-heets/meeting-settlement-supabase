@@ -210,6 +210,7 @@ export default function Home() {
   const [botPoints, setBotPoints] = useState<BotPoint[]>([]);
   const [showPointRanking, setShowPointRanking] = useState(false);
   const [showGames, setShowGames] = useState(false);
+  const [showExtraFeatures, setShowExtraFeatures] = useState(false);
   const [showBotAdmin, setShowBotAdmin] = useState(false);
   // 카톡 대국신청 링크(?omok= / ?alkkagi= / ?catch=)로 들어온 경우
   const [gameInvite, setGameInvite] = useState<{ kind: GameKind; id: string } | null>(null);
@@ -3661,7 +3662,6 @@ async function setAttendanceMembers(memberIds: string[]) {
             {label}
           </button>
         ))}
-        <a href="/tarot" className="tabButton" style={{textDecoration:"none",display:"inline-flex",alignItems:"center",justifyContent:"center",whiteSpace:"nowrap"}}>🔮 타로뱅크</a>
       </nav>
 
       <nav className="mobileBottomNav" aria-label="모바일 주요 메뉴">
@@ -3716,10 +3716,6 @@ async function setAttendanceMembers(memberIds: string[]) {
                 <em>›</em>
               </button>
             ))}
-            <a href="/tarot" className="mobileMoreItem" style={{textDecoration:"none",color:"inherit"}} onClick={() => setShowMobileMore(false)}>
-              <div><strong>🔮 타로뱅크</strong><span>타로 카드 · AI 리딩 · 상담 기록</span></div>
-              <em>›</em>
-            </a>
             <button
               className="mobileMoreItem"
               onClick={() => {
@@ -5888,10 +5884,9 @@ async function setAttendanceMembers(memberIds: string[]) {
 
       {botPoints.length > 0 && (
         <div className="floatingActions">
-          <details className="extraFeaturesFabGroup">
-            <summary className="pointRankingFab extraFeaturesFab" aria-label="추가기능 메뉴 열기"><span aria-hidden="true">✨</span><strong>추가기능</strong></summary>
-            <div className="extraFeaturesMenu"><a href="/tarot" className="extraFeaturesMenuItem">🔮 타로뱅크 <span aria-hidden="true">›</span></a></div>
-          </details>
+          <button className="pointRankingFab extraFeaturesFab" onClick={() => setShowExtraFeatures(true)} aria-label="추가기능 열기">
+            <span aria-hidden="true">✨</span><strong>추가기능</strong>
+          </button>
           <button
             className="pointRankingFab"
             onClick={() => setShowPointRanking(true)}
@@ -5941,6 +5936,24 @@ async function setAttendanceMembers(memberIds: string[]) {
             .map((member) => ({ id: member.id, name: member.name }))
             .sort((a, b) => a.name.localeCompare(b.name, "ko"))}
         />
+      )}
+
+      {showExtraFeatures && (
+        <div className="meetingModalBackdrop" role="presentation" onClick={() => setShowExtraFeatures(false)}>
+          <section className="meetingModal extraFeaturesDialog" role="dialog" aria-modal="true" aria-label="추가기능" onClick={(event) => event.stopPropagation()}>
+            <div className="meetingModalHeader">
+              <div><span>MORE FEATURES</span><h2>✨ 추가기능</h2></div>
+              <button className="modalCloseButton" aria-label="닫기" onClick={() => setShowExtraFeatures(false)}>×</button>
+            </div>
+            <div className="extraFeaturesDialogBody">
+              <a href="/tarot" className="extraFeaturesDialogLink">
+                <span className="extraFeaturesDialogIcon" aria-hidden="true">🔮</span>
+                <span><strong>타로뱅크</strong><small>3카드 · 6개월 운세 · 켈틱 크로스</small></span>
+                <span aria-hidden="true">›</span>
+              </a>
+            </div>
+          </section>
+        </div>
       )}
 
       {showPointRanking && pointBoard(() => setShowPointRanking(false))}
