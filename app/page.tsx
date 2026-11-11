@@ -5888,6 +5888,10 @@ async function setAttendanceMembers(memberIds: string[]) {
 
       {botPoints.length > 0 && (
         <div className="floatingActions">
+          <details className="extraFeaturesFabGroup">
+            <summary className="pointRankingFab extraFeaturesFab" aria-label="추가기능 메뉴 열기"><span aria-hidden="true">✨</span><strong>추가기능</strong></summary>
+            <div className="extraFeaturesMenu"><a href="/tarot" className="extraFeaturesMenuItem">🔮 타로뱅크 <span aria-hidden="true">›</span></a></div>
+          </details>
           <button
             className="pointRankingFab"
             onClick={() => setShowPointRanking(true)}
