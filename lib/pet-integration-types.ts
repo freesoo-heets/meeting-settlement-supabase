@@ -10,6 +10,7 @@ export type PetIntegrationAction = {
 export type PetIntegrationSummary = {
   ok: boolean;
   linked: boolean;
+  backendSource?: "bridge" | "local";
   externalMemberId?: string;
   externalNickname?: string;
   linkedAt?: string;
