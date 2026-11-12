@@ -10,6 +10,7 @@ export function useVisiblePolling(load: () => Promise<void>, intervalMs: number,
     let timer: number | undefined;
     let running = false;
     let stopped = false;
+    const isVisible = () => document.visibilityState !== "hidden";
 
     function clearTimer() {
       window.clearTimeout(timer);
@@ -18,7 +19,7 @@ export function useVisiblePolling(load: () => Promise<void>, intervalMs: number,
 
     async function poll() {
       clearTimer();
-      if (stopped || running || document.visibilityState === "hidden") return;
+      if (stopped || running || !isVisible()) return;
 
       running = true;
       try {
@@ -27,14 +28,14 @@ export function useVisiblePolling(load: () => Promise<void>, intervalMs: number,
         console.warn("Game refresh failed", error);
       } finally {
         running = false;
-        if (!stopped && document.visibilityState !== "hidden") {
+        if (!stopped && isVisible()) {
           timer = window.setTimeout(() => void poll(), intervalMs);
         }
       }
     }
 
     function onVisibilityChange() {
-      if (document.visibilityState === "hidden") clearTimer();
+      if (!isVisible()) clearTimer();
       else void poll();
     }
 
