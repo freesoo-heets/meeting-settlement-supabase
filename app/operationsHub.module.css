@@ -1,0 +1,61 @@
+.hub {
+  --hub-ink: #28233b;
+  --hub-accent: #57418d;
+  --hub-line: #e6dff0;
+  color: var(--hub-ink);
+  display: grid;
+  gap: 18px;
+  margin: 0 auto 36px;
+  max-width: 1180px;
+  min-width: 0;
+}
+
+.hero, .section, .card, .metric {
+  border: 1px solid var(--hub-line);
+  border-radius: 18px;
+  padding: 18px;
+  background: #fff;
+  min-width: 0;
+}
+
+.hero, .heading, .actions, .checkInputs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.hero, .heading { justify-content: space-between; }
+.hero { background: #f2ecfb; padding: 24px; }
+.hero h2, .section h3, .card h4, .hero p, .card p { margin: 0; }
+.hero h2 { margin-top: 6px; font-size: clamp(1.6rem, 5vw, 2.35rem); }
+.section { display: grid; gap: 12px; }
+.grid, .services { display: grid; gap: 10px; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.services { grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); }
+.metric { display: grid; gap: 5px; color: inherit; text-align: left; }
+.metric strong { font-size: 1.25rem; overflow-wrap: anywhere; }
+.metric small, .card small { color: #605873; }
+.card { display: grid; gap: 7px; background: #fcfaff; }
+.card summary { cursor: pointer; min-height: 32px; align-content: center; }
+.card a, .tarotFrame a { color: var(--hub-accent, #57418d); font-weight: 700; min-height: 44px; align-content: center; }
+.card button, .heading button, .actions button, .check button {
+  border: 1px solid var(--hub-line, #e6dff0);
+  border-radius: 10px;
+  min-height: 44px;
+  padding: 8px 12px;
+  color: var(--hub-accent, #57418d);
+  background: #fff;
+  font-weight: 700;
+}
+.actions button[aria-pressed="true"] { background: #eee6fa; }
+.check { display: grid; gap: 6px; border-top: 1px solid var(--hub-line); padding-top: 12px; margin-top: 12px; }
+.checkInputs input { flex: 1 1 180px; min-width: 0; }
+.checkInputs input, .checkInputs select { min-height: 44px; padding: 6px 8px; border-radius: 8px; border: 1px solid #b9accd; }
+.check button:disabled { opacity: .55; }
+.tarotFrame iframe { width: 100%; height: 75dvh; min-height: 480px; border: 1px solid #e6dff0; border-radius: 14px; display: block; margin-top: 12px; }
+
+@media (max-width: 780px) {
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .hero, .section { padding: 14px; }
+  .metric { padding: 12px; }
+}
