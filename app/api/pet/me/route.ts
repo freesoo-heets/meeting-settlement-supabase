@@ -7,6 +7,7 @@ import {
 } from "../../../../lib/pet/backend";
 import { BridgePetBackend } from "../../../../lib/pet/bridge-backend";
 import { LocalPetBackend } from "../../../../lib/pet/local-backend";
+import { HybridPetBackend } from "../../../../lib/pet/hybrid-backend";
 
 type MeetingProfile = {
   id: string;
@@ -62,9 +63,10 @@ async function requireUser(request: Request) {
 }
 
 function createPetBackend(): PetBackend {
-  return getPetBackendMode() === "local"
-    ? new LocalPetBackend()
-    : new BridgePetBackend();
+  const mode = getPetBackendMode();
+  if (mode === "local") return new LocalPetBackend();
+  if (mode === "bridge") return new BridgePetBackend();
+  return new HybridPetBackend();
 }
 
 export async function GET(request: Request) {
@@ -92,7 +94,7 @@ export async function GET(request: Request) {
     const message =
       error instanceof Error ? error.message : "PET 상태 조회 실패";
 
-    if (message === "PET_LOCAL_BACKEND_NOT_READY") {
+    if (message === "PET_LOCAL_PROFILE_NOT_MIGRATED") {
       console.error("[PET_ME_PROXY] local backend requested before readiness");
 
       return NextResponse.json(
