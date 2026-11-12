@@ -1,6 +1,6 @@
 import type { PetIntegrationSummary } from "../pet-integration-types";
 
-export type PetBackendMode = "bridge" | "local";
+export type PetBackendMode = "bridge" | "local" | "hybrid";
 
 export type MeetingPetIdentity = {
   profileId: string;
@@ -13,9 +13,14 @@ export type PetBackend = {
 };
 
 /**
- * During migration, Bridge remains the safe default.
- * Local mode will only be enabled after target schema + data verification.
+ * Hybrid is the safe migration default:
+ * - migrated profiles use Meeting-local PET data first
+ * - non-migrated profiles continue through the legacy bridge
+ *
+ * PET_BACKEND_MODE can still force bridge/local during rollback or verification.
  */
 export function getPetBackendMode(): PetBackendMode {
-  return process.env.PET_BACKEND_MODE === "local" ? "local" : "bridge";
+  if (process.env.PET_BACKEND_MODE === "bridge") return "bridge";
+  if (process.env.PET_BACKEND_MODE === "local") return "local";
+  return "hybrid";
 }
