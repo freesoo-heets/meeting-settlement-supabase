@@ -1,7 +1,6 @@
 "use client";
 
 import { useGameViewport } from "./useGameViewport";
-import { useVisiblePolling } from "./useVisiblePolling";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { supabase } from "../lib/supabase";
 import OmokGame, { type Opponent } from "./OmokGame";
@@ -175,16 +174,21 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
     );
   }, [currentMemberId]);
 
-  // 정리할 방이 있었을 때만 목록을 다시 읽는다.
+  // 로비를 열 때 유령 방 정리 (한 번)
   useEffect(() => {
-    let active = true;
+    let mounted = true;
     void callCatchCleanup(false).then((result) => {
-      if (active && result.closed && document.visibilityState !== "hidden") void load();
+      if (mounted && result.closed) void load();
     }).catch(() => undefined);
-    return () => { active = false; };
+    return () => { mounted = false; };
   }, [load]);
 
-  useVisiblePolling(load, 12000, !active);
+  useEffect(() => {
+    if (active) return;
+    void load();
+    const timer = window.setInterval(() => void load(), 4000);
+    return () => window.clearInterval(timer);
+  }, [load, active]);
 
   const back = () => setActive(null);
 

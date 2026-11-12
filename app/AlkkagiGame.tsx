@@ -1,7 +1,6 @@
 "use client";
 
 import { useGameViewport } from "./useGameViewport";
-import { useVisiblePolling } from "./useVisiblePolling";
 import { playAlkLose, playAlkTick, playAlkWin, playClack, playFall, playFlick, playPull, resetPull, useGameSound } from "./gameSound";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
@@ -307,7 +306,11 @@ export default function AlkkagiGame({
 
   const live = viewing && (viewing.status === "playing" || viewing.status === "escrow");
 
-  useVisiblePolling(load, live ? 1500 : 10000);
+  useEffect(() => {
+    void load();
+    const timer = window.setInterval(() => void load(), live ? 1500 : 3000);
+    return () => window.clearInterval(timer);
+  }, [load, live]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 250);

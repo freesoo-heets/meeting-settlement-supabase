@@ -8,6 +8,36 @@ const KST_MS = 9 * 3600_000;
 const DAY_MS = 86_400_000;
 const cache = new Map<string, number>();
 
+type TableNumberRow = { id: string; created_at: string };
+const pendingRanges = new WeakMap<SupabaseClient, Map<string, Promise<TableNumberRow[] | null>>>();
+
+function readTableNumberRange(client: SupabaseClient, from: string, to: string) {
+  let pending = pendingRanges.get(client);
+  if (!pending) {
+    pending = new Map();
+    pendingRanges.set(client, pending);
+  }
+
+  const key = `${from}/${to}`;
+  const existing = pending.get(key);
+  if (existing) return existing;
+
+  const requests = pending;
+  const request = (async () => {
+      const { data, error } = await client
+        .from("holdem_tables")
+        .select("id,created_at")
+        .gte("created_at", from)
+        .lte("created_at", to)
+        .order("created_at", { ascending: true })
+        .limit(1000);
+    return error ? null : data as TableNumberRow[] | null;
+  })().finally(() => requests.delete(key));
+
+  requests.set(key, request);
+  return request;
+}
+
 /** 그 시각이 든 한국 날짜의 0시 (밀리초) */
 function kstDayStartMs(iso: string): number {
   const t = Date.parse(iso) + KST_MS;
@@ -29,17 +59,10 @@ export async function holdemTableNumbers(
   const starts = need.map((row) => kstDayStartMs(row.created_at as string));
   const from = new Date(Math.min(...starts)).toISOString();
   const to = new Date(Math.max(...need.map((row) => Date.parse(row.created_at as string))) + 1000).toISOString();
-  const { data, error } = await client
-    .from("holdem_tables")
-    .select("id,created_at")
-    .gte("created_at", from)
-    .lte("created_at", to)
-    .order("created_at", { ascending: true })
-    .limit(1000);
-  if (error || !data) return out;
-  const list = (data as Array<{ id: string; created_at: string }>).map((row) => ({
+  const data = await readTableNumberRange(client, from, to);
+  if (!data) return out;
+  const list = data.map((row) => ({
     id: row.id,
-    at: Date.parse(row.created_at),
     day: kstDayStartMs(row.created_at),
   }));
   for (const row of need) {
