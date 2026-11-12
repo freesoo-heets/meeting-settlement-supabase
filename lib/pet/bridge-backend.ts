@@ -51,6 +51,7 @@ export class BridgePetBackend implements PetBackend {
 
     return {
       ...result,
+      backendSource: "bridge",
       meetingNickname: identity.nickname,
     };
   }
