@@ -53,6 +53,8 @@ export default function PetPage() {
   const [summary, setSummary] = useState<PetIntegrationSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [linking, setLinking] = useState(false);
+  const [actingCode, setActingCode] = useState("");
+  const [actionMessage, setActionMessage] = useState("");
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
@@ -91,6 +93,49 @@ export default function PetPage() {
     document.title = "찐친 PET | 강서구 찐친만들기";
     void load();
   }, [load]);
+
+  const runAction = async (actionCode: string) => {
+    if (actingCode || summary?.backendSource !== "local") return;
+
+    setActingCode(actionCode);
+    setActionMessage("");
+    setError("");
+
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) throw new Error("로그인이 필요합니다.");
+
+      const response = await fetch("/api/pet/action", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ actionCode }),
+      });
+      const result = await response.json();
+
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || "PET 돌보기에 실패했습니다.");
+      }
+
+      const actionName = result.result?.actionName || "돌보기";
+      const coin = Number(result.result?.coinEarned || 0);
+      const exp = Number(result.result?.expEarned || 0);
+      setActionMessage(
+        `${actionName} 완료 · EXP +${exp}${coin > 0 ? ` · Coin +${coin}` : ""}`
+      );
+      await load();
+    } catch (err) {
+      setActionMessage(
+        err instanceof Error ? err.message : "PET 돌보기에 실패했습니다."
+      );
+      await load();
+    } finally {
+      setActingCode("");
+    }
+  };
 
   const linkPet = async () => {
     if (linking) return;
@@ -205,18 +250,55 @@ export default function PetPage() {
                   {(summary.actions || []).map((action) => (
                     <button
                       key={action.code}
-                      disabled
-                      title="돌보기 쓰기 기능은 다음 통합 단계에서 활성화됩니다."
-                      style={{ textAlign: "left", border: "1px solid #e4e4ec", borderRadius: 14, padding: 13, background: action.available ? "#fbfbfd" : "#f4f4f7", color: "#343442" }}
+                      onClick={() => void runAction(action.code)}
+                      disabled={
+                        summary.backendSource !== "local" ||
+                        !action.available ||
+                        Boolean(actingCode)
+                      }
+                      title={
+                        summary.backendSource !== "local"
+                          ? "데이터 이관 완료 후 돌보기를 사용할 수 있습니다."
+                          : action.available
+                            ? "PET 돌보기"
+                            : formatRemaining(action.remainingSeconds)
+                      }
+                      style={{
+                        textAlign: "left",
+                        border: "1px solid #e4e4ec",
+                        borderRadius: 14,
+                        padding: 13,
+                        background: action.available ? "#fbfbfd" : "#f4f4f7",
+                        color: "#343442",
+                        cursor:
+                          summary.backendSource === "local" &&
+                          action.available &&
+                          !actingCode
+                            ? "pointer"
+                            : "default",
+                        opacity:
+                          summary.backendSource === "local" ? 1 : 0.72,
+                      }}
                     >
                       <span style={{ fontSize: 22, marginRight: 8 }}>{actionIcon[action.code] || "🐾"}</span>
                       <strong>{action.name}</strong>
-                      <small style={{ display: "block", marginTop: 6, color: "#77778b" }}>{formatRemaining(action.remainingSeconds)}</small>
+                      <small style={{ display: "block", marginTop: 6, color: "#77778b" }}>
+                        {actingCode === action.code
+                          ? "처리 중…"
+                          : formatRemaining(action.remainingSeconds)}
+                      </small>
                     </button>
                   ))}
                 </div>
-                <p style={{ margin: "10px 0 0", fontSize: 12, color: "#858598", lineHeight: 1.6 }}>
-                  {summary.backendSource === "local" ? "Meeting 내부 PET 데이터로 전환되었습니다. 돌보기 쓰기 기능은 다음 단계에서 활성화합니다." : "아직 이관되지 않은 계정은 기존 PET 서버를 안전하게 조회합니다. 데이터 확인 후 Meeting 내부로 순차 전환합니다."}
+                {actionMessage && (
+                  <p style={{ margin: "10px 0 0", fontSize: 13, color: "#56516d", fontWeight: 700 }}>
+                    {actionMessage}
+                  </p>
+                )}
+                <p style={{ margin: "8px 0 0", fontSize: 12, color: "#858598", lineHeight: 1.6 }}>
+                  {summary.backendSource === "local"
+                    ? "Meeting 내부 PET 데이터로 돌보기까지 처리합니다. 상태·EXP·Coin·쿨타임은 서버에서 원자적으로 반영됩니다."
+                    : "아직 이관되지 않은 계정은 기존 PET 서버를 안전하게 조회합니다. 쓰기 기능은 Meeting 이관 완료 후 활성화됩니다."}
                 </p>
               </section>
             </>
@@ -224,7 +306,7 @@ export default function PetPage() {
         </section>
 
         <aside style={{ marginTop: 12, padding: "13px 16px", borderRadius: 16, background: "#ecebf4", color: "#5d5d70", fontSize: 12, lineHeight: 1.6 }}>
-          PET 통합 STEP 32.5 · 이관 완료 계정은 Meeting 내부 DB를 우선 사용하고, 미이관 계정은 Bridge를 유지합니다. 기존 jjinchin-pet 데이터는 최종 검증 전까지 삭제하지 않습니다.
+          PET 통합 STEP 32.6 · 이관 완료 계정은 Meeting 내부 DB에서 조회·돌보기를 처리하고, 미이관 계정은 Bridge 읽기 전용을 유지합니다. 기존 jjinchin-pet 데이터는 최종 검증 전까지 삭제하지 않습니다.
         </aside>
       </div>
     </main>
