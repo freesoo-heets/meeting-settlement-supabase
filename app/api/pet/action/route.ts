@@ -1,13 +1,13 @@
 import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
-import { getServerAdmin } from "../../../../../lib/server-admin";
+import { getServerAdmin } from "../../../../lib/server-admin";
 import {
   calculateCurrentStatus,
   clamp,
   growthMultiplier,
   round2,
-} from "../../../../../lib/pet/status-engine";
-import { applyExperience } from "../../../../../lib/pet/level-engine";
+} from "../../../../lib/pet/status-engine";
+import { applyExperience } from "../../../../lib/pet/level-engine";
 
 const ALLOWED_ACTIONS = new Set(["FEED", "PLAY", "WALK", "SLEEP"]);
 
