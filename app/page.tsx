@@ -63,6 +63,8 @@ type MeetingRow = {
   starts_at?: string | null; // 벙 시작 시각 (카톡 일정 기준)
   host_member?: string | null; // 벙주 (모임 생성자, 벙포 지급 대상)
   created_by?: string | null; // 모임 생성자의 auth 사용자 ID
+  pay_to?: string | null; // 정산 입금받는 사람 (비어 있으면 벙주)
+  pay_account?: string | null; // 입금 계좌 (선택: 카카오페이로 받는 사람은 비워 둔다)
 };
 
 type AttendanceRow = {
@@ -304,6 +306,7 @@ export default function Home() {
   const [noticePick, setNoticePick] = useState<string[]>([]); // 월별 참석 현황: 알림 보낼 회원 선택
   const [noticeBusy, setNoticeBusy] = useState(false);
   const [botSendBusy, setBotSendBusy] = useState(false);
+  const [payAccountDraft, setPayAccountDraft] = useState<{ id: string; value: string } | null>(null);
   const [showMyActivity, setShowMyActivity] = useState(false);
   const [showAccountPanel, setShowAccountPanel] = useState(false);
 
@@ -383,6 +386,9 @@ export default function Home() {
         // 벙주 칸(host_member)이 DB 에 아직 없으면 빼고 다시 불러온다
         const query = (columns: string) => supabase.from("meetings").select(columns).order("date", { ascending: false });
         // 벙 시작 시각(starts_at)도 같이 읽는다. 칸이 없으면 하나씩 빼고 다시 불러온다
+        // 정산 입금받는 사람 · 계좌(pay_to · pay_account)도 같이. 칸이 없으면 빼고 다시 불러온다 (2026-11-12)
+        const withPay = await query("id,date,title,cost,created_at,starts_at,host_member,created_by,pay_to,pay_account");
+        if (withPay.error?.code !== "42703") return withPay;
         const withStart = await query("id,date,title,cost,created_at,starts_at,host_member,created_by");
         if (withStart.error?.code !== "42703") return withStart;
         const withHost = await query("id,date,title,cost,created_at,host_member,created_by");
@@ -2014,6 +2020,65 @@ async function setAttendanceMembers(memberIds: string[]) {
     }
   }
 
+  // 💸 정산 입금받는 사람: 따로 고르지 않았으면 벙주 (2026-11-12)
+  function payeeOf(meeting: Meeting) {
+    const id = meeting.pay_to || meeting.host_member || "";
+    const member = id ? members.find((item) => item.id === id) : undefined;
+    return member ? { id: member.id, name: member.name, account: (meeting.pay_account ?? "").trim() } : null;
+  }
+
+  // 정산 글 위쪽(총 비용 아래)과 맨 아래에 넣는 입금 안내. 계좌가 없으면 계좌 줄은 빼고 '○○님께 입금'만
+  function payHeadLines(meeting: Meeting | undefined) {
+    const payee = meeting ? payeeOf(meeting) : null;
+    if (!payee) return [];
+    return [`💸 입금받는 사람: ${payee.name}`, ...(payee.account ? [`🏦 계좌: ${payee.account}`] : [])];
+  }
+
+  function payFootLines(meeting: Meeting | undefined) {
+    const payee = meeting ? payeeOf(meeting) : null;
+    if (!payee) return ["벙비 확인 부탁드립니다 🙌"];
+    return [`👉 ${payee.name}님께 입금 부탁드립니다 🙌`, ...(payee.account ? [`🏦 ${payee.account}`] : [])];
+  }
+
+  // 그 사람이 예전 모임에서 쓴 계좌 (입금받는 사람을 바꾸면 자동으로 채운다)
+  function lastAccountOf(memberId: string, exceptMeetingId: string) {
+    const found = meetings.find(
+      (item) => item.id !== exceptMeetingId && (item.pay_to || item.host_member) === memberId && (item.pay_account ?? "").trim(),
+    );
+    return (found?.pay_account ?? "").trim();
+  }
+
+  async function savePayee(meeting: Meeting, memberId: string) {
+    // 벙주를 고르면 비워 둔다 → 나중에 벙주가 바뀌어도 따라간다
+    const payTo = memberId && memberId !== meeting.host_member ? memberId : null;
+    const account = lastAccountOf(memberId, meeting.id) || (memberId === (meeting.pay_to || meeting.host_member) ? (meeting.pay_account ?? "") : "");
+    setSaving(true);
+    const { error } = await supabase.from("meetings").update({ pay_to: payTo, pay_account: account || null }).eq("id", meeting.id);
+    setSaving(false);
+    if (error) {
+      setNotice(/pay_to|pay_account/.test(error.message) ? "입금받는 사람 설정이 아직 안 됐어요. (운영진: SQL 실행 필요)" : `저장 실패: ${error.message}`);
+      return;
+    }
+    setPayAccountDraft(null);
+    const name = members.find((item) => item.id === memberId)?.name ?? "";
+    setNotice(`💸 입금받는 사람을 ${name}님으로 정했어요.${account ? ` (예전 계좌 ${account} 를 불러왔어요)` : ""}`);
+    await loadAll();
+  }
+
+  async function savePayAccount(meeting: Meeting, value: string) {
+    const account = value.replace(/\s+/g, " ").trim().slice(0, 80);
+    setSaving(true);
+    const { error } = await supabase.from("meetings").update({ pay_account: account || null }).eq("id", meeting.id);
+    setSaving(false);
+    if (error) {
+      setNotice(/pay_account/.test(error.message) ? "계좌 설정이 아직 안 됐어요. (운영진: SQL 실행 필요)" : `저장 실패: ${error.message}`);
+      return;
+    }
+    setPayAccountDraft(null);
+    setNotice(account ? "🏦 계좌를 저장했어요. 정산 글에 같이 나갑니다." : "계좌를 비웠어요. 정산 글에는 입금받는 사람만 나갑니다.");
+    await loadAll();
+  }
+
   function buildSettlementShareText(meeting: Meeting) {
     if (meeting.cost == null) return "";
 
@@ -2054,6 +2119,7 @@ async function setAttendanceMembers(memberIds: string[]) {
       `🍻 ${meeting.title}`,
       `💰 총 비용 ${won(Number(meeting.cost))}`,
       `👥 ${allRows.length}명`,
+      ...payHeadLines(meeting),
       "",
       ...allRows.map((row) => {
         if (row.guest) return `• ${row.name}(게스트) : ${won(row.remaining)}`;
@@ -2064,7 +2130,7 @@ async function setAttendanceMembers(memberIds: string[]) {
       }),
       "",
       `━━━━━━━━━━━━━━`,
-      `벙비 확인 부탁드립니다 🙌`,
+      ...payFootLines(meeting),
     ].join("\n");
   }
 
@@ -2111,11 +2177,15 @@ async function setAttendanceMembers(memberIds: string[]) {
     }));
   }, [multiSettlementMeetings, members, prepaymentByKey, adjustmentByKey]);
 
+  // 통합 정산 입금받는 사람: 입금받는 사람이 정해진 첫 모임(1번부터) 기준 (봇 meeting_settlement.py 와 같게)
+  const multiPayMeeting = multiSettlementMeetings.find((meeting) => meeting.pay_to || meeting.host_member);
+
   const multiSettlementText = useMemo(() => {
     if (multiSettlementMeetings.length < 2) return '';
     const lines = [
       '📌 강서구 찐친만들기 통합 벙비 정산', '━━━━━━━━━━━━━━',
       ...multiSettlementMeetings.map((meeting, i) => `${i + 1}번) ${meeting.date} · ${meeting.title}${meeting.cost == null ? '' : ` · ${won(Number(meeting.cost))}`}`),
+      ...payHeadLines(multiPayMeeting),
       '',
     ];
     for (const section of multiSettlementResult) {
@@ -2127,9 +2197,10 @@ async function setAttendanceMembers(memberIds: string[]) {
       }
       lines.push('');
     }
-    lines.push('━━━━━━━━━━━━━━', '※ 선입금 차감 후 남은 부담금 기준', '벙비 확인 부탁드립니다 🙌');
+    lines.push('━━━━━━━━━━━━━━', '※ 선입금 차감 후 남은 부담금 기준', ...payFootLines(multiPayMeeting));
     return lines.join('\n');
-  }, [multiSettlementMeetings, multiSettlementResult]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [multiSettlementMeetings, multiSettlementResult, multiPayMeeting, members]);
 
   async function copyMultiSettlement() {
     try {
@@ -4284,7 +4355,7 @@ async function setAttendanceMembers(memberIds: string[]) {
             {multiSettlementMeetings.length >= 2 ? (
               <div className="multiSettlementPreview step49MultiResult">
                 <div className="step49MultiHeading"><strong>② 통합 정산 결과</strong><small>참석 조합별 자동 합산</small></div>
-                <div className="multiSettlementPreviewHead"><strong>통합 정산 미리보기</strong><div className="shareControl two"><button className="kakaoShareButton" disabled={botSendBusy || multiSettlementMeetings.some((meeting) => meeting.cost == null)} title="봇이 단톡방에 바로 올립니다" onClick={() => void sendSettlementByBot(multiSettlementMeetings.map((meeting) => meeting.id), multiSettlementMeetings.map((meeting, index) => `${index + 1}번) ${meeting.date} · ${meeting.title}`).join("\n"))}>{botSendBusy ? "🤖 보내는 중…" : "🤖 카카오톡 공유하기"}</button><button className="copyShareButton" onClick={() => void copyMultiSettlement()}>📋 복사하기</button></div></div>
+                <div className="multiSettlementPreviewHead"><strong>통합 정산 미리보기</strong><div className="shareControl two"><button className="kakaoShareButton" disabled={botSendBusy || multiSettlementMeetings.some((meeting) => meeting.cost == null)} title="봇이 단톡방에 바로 올립니다" onClick={() => void sendSettlementByBot(multiSettlementMeetings.map((meeting) => meeting.id), multiSettlementMeetings.map((meeting, index) => `${index + 1}번) ${meeting.date} · ${meeting.title}`).join("\n"))}>{botSendBusy ? "🤖 보내는 중…" : "🤖 카카오톡 공유하기"}</button><button className="copyShareButton" onClick={() => void copyMultiSettlement()}>📋 복사하기</button></div></div><p className="payeeHint">💸 입금받는 사람: <strong>{multiPayMeeting ? payeeOf(multiPayMeeting)?.name ?? "없음" : "없음"}</strong>{multiPayMeeting && payeeOf(multiPayMeeting)?.account ? ` · 🏦 ${payeeOf(multiPayMeeting)?.account}` : ""} — {multiPayMeeting ? `${multiSettlementMeetings.indexOf(multiPayMeeting) + 1}번 모임 설정 기준 (바꾸려면 그 모임의 비용 정산 화면에서)` : "모임 비용 정산 화면에서 정해 주세요"}</p>
                 {multiSettlementResult.map((section) => (
                   <div className="multiSettlementGroup" key={section.ids.join('|')}>
                     <h3>{section.label} <small>{section.rows.length}명</small></h3>
@@ -4566,6 +4637,61 @@ async function setAttendanceMembers(memberIds: string[]) {
                       <button type="button" className="smallButton" disabled={!canManageMeeting(selectedMeeting)} onClick={() => {setEditingCostId(selectedMeeting.id);setEditingCost(selectedMeeting.cost == null ? "" : String(selectedMeeting.cost));}}>{selectedMeeting.cost == null ? "＋ 총비용 입력" : "✎ 총비용 수정"}</button>
                     </div>
                   )}
+                  {/* 💸 정산 입금받는 사람 · 계좌 (2026-11-12) */}
+                  {(() => {
+                    const payee = payeeOf(selectedMeeting);
+                    const candidates = Array.from(new Set([selectedMeeting.host_member, selectedMeeting.pay_to, ...selectedMeeting.attendeeIds].filter(Boolean) as string[]))
+                      .map((id) => members.find((item) => item.id === id))
+                      .filter((item): item is NonNullable<typeof item> => !!item);
+                    const canEdit = canManageMeeting(selectedMeeting) && !saving;
+                    const editing = payAccountDraft?.id === selectedMeeting.id;
+                    return (
+                      <div className="payeeEditor">
+                        <div className="step51CostHead"><strong>💸 입금받는 사람</strong><span>{payee ? (payee.account ? "계좌 있음" : "계좌 없음 (카카오페이 등)") : "선택 필요"}</span></div>
+                        <div className="payeeRow">
+                          <select
+                            aria-label="입금받는 사람"
+                            value={payee?.id ?? ""}
+                            disabled={!canEdit}
+                            onChange={(event) => event.target.value && void savePayee(selectedMeeting, event.target.value)}
+                          >
+                            {!payee && <option value="">입금받는 사람 고르기</option>}
+                            {candidates.map((item) => (
+                              <option key={item.id} value={item.id}>
+                                {item.id === selectedMeeting.host_member ? `👑 ${item.name} (벙주)` : item.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        {payee && (
+                          <div className="payeeRow">
+                            {editing ? (
+                              <>
+                                <input
+                                  type="text"
+                                  maxLength={80}
+                                  aria-label="입금 계좌"
+                                  placeholder="예) 카카오뱅크 3333-01-1234567 홍길동"
+                                  value={payAccountDraft.value}
+                                  onChange={(event) => setPayAccountDraft({ id: selectedMeeting.id, value: event.target.value })}
+                                />
+                                <button type="button" className="smallButton" disabled={!canEdit} onClick={() => void savePayAccount(selectedMeeting, payAccountDraft.value)}>저장</button>
+                                <button type="button" className="smallButton ghost" onClick={() => setPayAccountDraft(null)}>취소</button>
+                              </>
+                            ) : (
+                              <>
+                                <span className="payeeAccount">{payee.account ? `🏦 ${payee.account}` : "계좌 없이 보냄 (선택사항)"}</span>
+                                <button type="button" className="smallButton" disabled={!canEdit} onClick={() => setPayAccountDraft({ id: selectedMeeting.id, value: payee.account })}>
+                                  {payee.account ? "✎ 계좌 수정" : "＋ 계좌번호 입력"}
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        )}
+                        <p className="payeeHint">정산 글에 “{payee?.name ?? "○○"}님께 입금 부탁드립니다”{payee?.account ? "와 계좌" : ""}가 같이 나갑니다. 계좌를 비우면 이름만 나가요.</p>
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
               {!selectedMeeting ? (
