@@ -303,6 +303,7 @@ export default function Home() {
   const [expandedDays, setExpandedDays] = useState<string[]>([]); // 모임 달력: '+N개 더' 를 펼친 날짜
   const [noticePick, setNoticePick] = useState<string[]>([]); // 월별 참석 현황: 알림 보낼 회원 선택
   const [noticeBusy, setNoticeBusy] = useState(false);
+  const [botSendBusy, setBotSendBusy] = useState(false);
   const [showMyActivity, setShowMyActivity] = useState(false);
   const [showAccountPanel, setShowAccountPanel] = useState(false);
 
@@ -2139,40 +2140,50 @@ async function setAttendanceMembers(memberIds: string[]) {
     }
   }
 
-  async function shareSettlement(meeting: Meeting) {
+  // 📋 복사하기: 정산 문구만 복사 (카톡에 직접 붙여넣기)
+  async function copySettlement(meeting: Meeting) {
     const text = buildSettlementShareText(meeting);
     if (!text) {
       setNotice("먼저 모임 비용을 입력해주세요.");
       return;
     }
-
-    // 휴대폰·태블릿에서만 공유 창(카톡 선택)을 띄운다.
-    // PC 크롬·엣지도 navigator.share 가 있어서 윈도우 공유 창이 떴다 → PC 는 바로 복사 (2026-11-12)
-    const ua = navigator.userAgent;
-    const isPhone =
-      /Android|iPhone|iPad|iPod|Mobile/i.test(ua) ||
-      (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
-
     try {
-      if (isPhone && navigator.share) {
-        await navigator.share({
-          title: `${meeting.title} 벙비 정산`,
-          text,
-        });
-        return;
-      }
-
       await navigator.clipboard.writeText(text);
       setNotice("정산 내용을 복사했습니다. 카카오톡 채팅방에 붙여넣어주세요.");
-    } catch (error) {
-      if ((error as Error)?.name === "AbortError") return;
+    } catch {
+      setNotice("복사에 실패했습니다. 다시 시도해주세요.");
+    }
+  }
 
-      try {
-        await navigator.clipboard.writeText(text);
-        setNotice("정산 내용을 복사했습니다. 카카오톡 채팅방에 붙여넣어주세요.");
-      } catch {
-        setNotice("공유에 실패했습니다. 다시 시도해주세요.");
+  // 🤖 카카오톡 공유하기: 봇이 본방(강서2026)에 정산 글을 바로 올린다 (회원 이름은 카톡 태그로, 15명씩 나눠서)
+  //   요청을 넣고 봇이 보낼 때까지 몇 초 기다려 결과를 알려 준다 (2026-11-12)
+  async function sendSettlementByBot(meetingIds: string[], label: string) {
+    if (botSendBusy) return;
+    if (!window.confirm(`봇이 단톡방(강서2026)에 정산 글을 바로 올립니다.\n\n${label}\n\n보낼까요?`)) return;
+    setBotSendBusy(true);
+    try {
+      const { data } = await supabase.auth.getSession();
+      const headers = { "Content-Type": "application/json", Authorization: `Bearer ${data.session?.access_token ?? ""}` };
+      const response = await fetch("/api/settlement-send", { method: "POST", headers, body: JSON.stringify({ action: "send", meetingIds }) });
+      const json = await response.json().catch(() => ({ ok: false, error: "응답 오류" }));
+      if (!json.ok) {
+        setNotice(`봇 전송 실패: ${json.error}`);
+        return;
       }
+      setNotice("🤖 봇에게 보냈어요. 몇 초 안에 단톡방에 올라갑니다…");
+      for (let i = 0; i < 20; i += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+        const check = await fetch("/api/settlement-send", { method: "POST", headers, body: JSON.stringify({ action: "status", id: json.id }) })
+          .then((r) => r.json())
+          .catch(() => null);
+        if (check?.ok && check.result) {
+          setNotice(String(check.result));
+          return;
+        }
+      }
+      setNotice("봇이 아직 보내지 못했어요. 봇이 꺼져 있을 수 있으니 잠시 뒤 단톡방을 확인해 주세요.");
+    } finally {
+      setBotSendBusy(false);
     }
   }
 
@@ -4273,7 +4284,7 @@ async function setAttendanceMembers(memberIds: string[]) {
             {multiSettlementMeetings.length >= 2 ? (
               <div className="multiSettlementPreview step49MultiResult">
                 <div className="step49MultiHeading"><strong>② 통합 정산 결과</strong><small>참석 조합별 자동 합산</small></div>
-                <div className="multiSettlementPreviewHead"><strong>통합 정산 미리보기</strong><button className="smallButton" onClick={() => void copyMultiSettlement()}>📋 카카오톡 정산 복사</button></div>
+                <div className="multiSettlementPreviewHead"><strong>통합 정산 미리보기</strong><div className="shareControl two"><button className="kakaoShareButton" disabled={botSendBusy || multiSettlementMeetings.some((meeting) => meeting.cost == null)} title="봇이 단톡방에 바로 올립니다" onClick={() => void sendSettlementByBot(multiSettlementMeetings.map((meeting) => meeting.id), multiSettlementMeetings.map((meeting, index) => `${index + 1}번) ${meeting.date} · ${meeting.title}`).join("\n"))}>{botSendBusy ? "🤖 보내는 중…" : "🤖 카카오톡 공유하기"}</button><button className="copyShareButton" onClick={() => void copyMultiSettlement()}>📋 복사하기</button></div></div>
                 {multiSettlementResult.map((section) => (
                   <div className="multiSettlementGroup" key={section.ids.join('|')}>
                     <h3>{section.label} <small>{section.rows.length}명</small></h3>
@@ -4523,12 +4534,17 @@ async function setAttendanceMembers(memberIds: string[]) {
                   <p>선입금과 특정값을 해당 모임 기준으로 함께 관리합니다.</p>
                 </div>
                 {selectedMeeting && selectedMeeting.cost != null && (
-                  <div className="shareControl">
+                  <div className="shareControl two">
                     <button
                       className="kakaoShareButton"
-                      onClick={() => void shareSettlement(selectedMeeting)}
+                      disabled={botSendBusy}
+                      title="봇이 단톡방에 바로 올립니다"
+                      onClick={() => void sendSettlementByBot([selectedMeeting.id], `${selectedMeeting.date} · ${selectedMeeting.title}`)}
                     >
-                      카카오톡 정산 공유
+                      {botSendBusy ? "🤖 보내는 중…" : "🤖 카카오톡 공유하기"}
+                    </button>
+                    <button className="copyShareButton" onClick={() => void copySettlement(selectedMeeting)}>
+                      📋 복사하기
                     </button>
                   </div>
                 )}
@@ -5716,7 +5732,7 @@ async function setAttendanceMembers(memberIds: string[]) {
               <div className="helpStepNumber">04</div>
               <h3>개별 · 통합 정산 공유</h3>
               <p>
-                개별 모임은 비용 배분 화면에서 <strong>카카오톡 정산 공유</strong>를 사용합니다.
+                개별 모임은 비용 배분 화면에서 <strong>🤖 카카오톡 공유하기</strong>(봇이 단톡방에 바로 올림) 또는 <strong>📋 복사하기</strong>를 사용합니다.
                 여러 모임을 함께 정산할 때는 <strong>통합 정산</strong> 탭에서 비용이 입력된 모임을
                 2개 이상 선택하세요. 중복 참석 회원의 부담금이 합산되고 참석 조합별로 나뉩니다.
                 <strong>카카오톡 문구 복사</strong>를 누르면 줄바꿈이 포함된 정산 문구가 복사됩니다.
@@ -5760,7 +5776,7 @@ async function setAttendanceMembers(memberIds: string[]) {
                   <p>모임 생성 · 수정 · 삭제 · 복사</p>
                   <p>참석자 · 게스트 관리</p>
                   <p>비용 배분 · 특정값 · 선입금 입력</p>
-                  <p>카카오톡 정산 공유 · 여러 모임 통합 정산</p>
+                  <p>카카오톡 공유하기(봇 전송) · 복사하기 · 여러 모임 통합 정산</p>
                   <p>회원 및 월별 참석 현황 조회</p>
                   <p>월별 CSV 내보내기</p>
                 </div>

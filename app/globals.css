@@ -1663,6 +1663,23 @@ th { color: #6b7280; font-size: 11px; }
   cursor: pointer;
 }
 
+.kakaoShareButton:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+/* 정산: 🤖 카카오톡 공유하기(봇이 바로 전송) 옆 📋 복사하기 (2026-11-12) */
+.copyShareButton {
+  border: 1px solid #e5ddd5;
+  border-radius: 10px;
+  padding: 8px 11px;
+  background: #fff;
+  color: #5e554e;
+  font-size: 10px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
 .memberNameButton {
   border: 0;
   padding: 0;
@@ -2032,8 +2049,13 @@ select {
   }
 
   .shareControl select,
-  .shareControl .kakaoShareButton {
+  .shareControl .kakaoShareButton,
+  .shareControl .copyShareButton {
     width: 100%;
+  }
+
+  .shareControl.two {
+    grid-template-columns: 1fr 1fr;
   }
 
   .headerControls .installButton {
@@ -2050,7 +2072,8 @@ select {
   .tabButton,
   .stripActionButton,
   .logoutButton,
-  .kakaoShareButton {
+  .kakaoShareButton,
+  .copyShareButton {
     font-size: 12px;
   }
 }
