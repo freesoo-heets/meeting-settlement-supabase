@@ -9,6 +9,7 @@ import { supabase } from "../lib/supabase";
 import { BUY_IN, type Action, type Card, type Table } from "../lib/holdem";
 import { copyInviteLink } from "./copyInvite";
 import { useGameViewport } from "./useGameViewport";
+import { useVisiblePolling } from "./useVisiblePolling";
 import { HoldemTableView, type HoldemEmote } from "./HoldemGame";
 import TicketBuy from "./TicketBuy";
 import { holdemTableLabel, holdemTableNumbers } from "../lib/holdemNo";
@@ -218,11 +219,7 @@ function HoldemLobby({
     setMine(m);
     setMyActive(a[0] ?? null);
   }, [currentMemberId]);
-  useEffect(() => {
-    void load();
-    const timer = window.setInterval(() => void load(), 4000);
-    return () => window.clearInterval(timer);
-  }, [load]);
+  useVisiblePolling(load, 12000);
 
   async function run(payload: Record<string, unknown>, done?: (id?: string) => void) {
     setBusy(true);
@@ -454,17 +451,20 @@ function HoldemRoom({
     setSeats(s);
   }, [tableId]);
 
-  // 실시간 반영 (+ 끊겨도 5초마다)
+  // 실시간 갱신과 연결이 끊겼을 때의 보조 조회.
+  const [realtimeReady, setRealtimeReady] = useState(false);
+  useVisiblePolling(load, realtimeReady ? 15000 : 5000);
   useEffect(() => {
-    void load();
+    setRealtimeReady(false);
+    const refresh = () => {
+      if (document.visibilityState !== "hidden") void load();
+    };
     const channel = supabase
       .channel(`holdem-${tableId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "holdem_tables", filter: `id=eq.${tableId}` }, () => void load())
-      .on("postgres_changes", { event: "*", schema: "public", table: "holdem_seats", filter: `table_id=eq.${tableId}` }, () => void load())
-      .subscribe();
-    const timer = window.setInterval(() => void load(), 5000);
+      .on("postgres_changes", { event: "*", schema: "public", table: "holdem_tables", filter: `id=eq.${tableId}` }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "holdem_seats", filter: `table_id=eq.${tableId}` }, refresh)
+      .subscribe((status) => setRealtimeReady(status === "SUBSCRIBED"));
     return () => {
-      window.clearInterval(timer);
       void supabase.removeChannel(channel);
     };
   }, [load, tableId]);

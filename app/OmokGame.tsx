@@ -1,6 +1,7 @@
 "use client";
 
 import { useGameViewport } from "./useGameViewport";
+import { useVisiblePolling } from "./useVisiblePolling";
 import { playLose, playStone, playTick, playWin, useGameSound } from "./gameSound";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
@@ -366,11 +367,7 @@ export default function OmokGame({ onClose, onBack, initialGameId, currentMember
 
   const live = viewing && (viewing.status === "playing" || viewing.status === "escrow");
 
-  useEffect(() => {
-    void load();
-    const timer = window.setInterval(() => void load(), live ? 1200 : 3000);
-    return () => window.clearInterval(timer);
-  }, [load, live]);
+  useVisiblePolling(load, live ? 1200 : 10000);
 
   // 감정표현: 서버를 거치지 않고 실시간 채널로 주고받는다
   function showEmote(next: { kind: EmoteKind; spot: number; name: string; watcher: boolean }) {
