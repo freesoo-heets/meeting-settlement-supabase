@@ -403,6 +403,10 @@ function HoldemRoom({
   const [, setTickNow] = useState(0);
   const emoteKey = useRef(0);
   const emoteChannel = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  // 👀 지금 이 테이블 화면을 보고 있는 사람 (실시간 · presence). 자리에 앉지 않은 사람 = 관전
+  const [viewers, setViewers] = useState<Array<{ member: string; name: string }>>([]);
+  const [showWatch, setShowWatch] = useState(false);
+  const viewerKey = useRef(currentMemberId || `guest-${Math.random().toString(36).slice(2, 10)}`);
   const showEmote = useCallback((e: Omit<HoldemEmote, "key">) => {
     emoteKey.current += 1;
     const key = emoteKey.current;
@@ -411,19 +415,32 @@ function HoldemRoom({
   }, []);
   useEffect(() => {
     const channel = supabase
-      .channel(`holdem-emote-${tableId}`, { config: { broadcast: { self: false } } })
+      .channel(`holdem-emote-${tableId}`, { config: { broadcast: { self: false }, presence: { key: viewerKey.current } } })
       .on("broadcast", { event: "emote" }, ({ payload }) => {
         const data = payload as { kind?: unknown; member?: unknown; name?: unknown };
         if (!isEmoteKind(data.kind) || typeof data.member !== "string") return;
         showEmote({ kind: data.kind, member: data.member, name: String(data.name ?? "").slice(0, 10) });
       })
-      .subscribe();
+      .on("presence", { event: "sync" }, () => {
+        const state = channel.presenceState<{ member?: string; name?: string }>();
+        const seen = new Map<string, { member: string; name: string }>();
+        for (const [key, metas] of Object.entries(state)) {
+          const meta = metas[0];
+          if (!meta) continue;
+          const member = String(meta.member || key);
+          if (!seen.has(member)) seen.set(member, { member, name: String(meta.name || "손님").slice(0, 12) });
+        }
+        setViewers([...seen.values()]);
+      })
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") void channel.track({ member: currentMemberId || viewerKey.current, name: myName || "손님" });
+      });
     emoteChannel.current = channel;
     return () => {
       emoteChannel.current = null;
       void supabase.removeChannel(channel);
     };
-  }, [tableId, showEmote]);
+  }, [tableId, showEmote, currentMemberId, myName]);
 
   const load = useCallback(async () => {
     const [t, s] = await Promise.all([
@@ -531,6 +548,22 @@ function HoldemRoom({
   const pendingCount = seats.filter((seat) => seat.status === "escrow").length;
   const full = seatedCount + pendingCount >= row.max_seats;
   const money = row.is_friendly ? "🤝 친선 (점수 없음)" : `💎 바이인 ${fmt(BUY_IN)}점`;
+  // 👀 관전자: 화면을 보고 있는데 자리에 없는 사람
+  const seatedMembers = new Set(view.players.filter((p) => !p.empty).map((p) => p.member));
+  const watchers = viewers.filter((v) => !seatedMembers.has(v.member));
+  const watchChip = watchers.length > 0 ? (
+    <span className="hdWatchWrap">
+      <button className="hdWatch" onClick={() => setShowWatch((v) => !v)} title="관전 중인 사람" aria-expanded={showWatch}>
+        👀 {watchers[0].name}{watchers.length > 1 ? ` 외 ${watchers.length - 1}` : ""}
+      </button>
+      {showWatch && (
+        <span className="hdWatchList" role="list">
+          <strong>관전 중 {watchers.length}명</strong>
+          {watchers.map((w) => <span key={w.member} role="listitem">{w.member === currentMemberId ? `${w.name} (나)` : w.name}</span>)}
+        </span>
+      )}
+    </span>
+  ) : null;
   const closed = row.status === "closed";
 
   const inviteButtons = (
@@ -665,11 +698,14 @@ function HoldemRoom({
       title={`${row.is_friendly ? "🤝 " : ""}${holdemTableLabel(tableNo)}`}
       subtitle={`${money} · 블라인드 ${view.sb}/${view.bb}${handNo ? ` · ${handNo}번째 판` : ""} · ${seatedCount}/${row.max_seats}명${meIndex < 0 ? " · 관전 중" : ""}`}
       headerExtra={
-        pass.text ? (
-          <span className={`hdPass ${pass.left < 300 ? "low" : ""}`} title="티켓 이용 시간 (끝나면 티켓 1장으로 자동 연장)">
-            {mySeat?.renew_state === "requested" || mySeat?.renew_state === "locking" ? "🎫 연장 중" : `🎫${pass.text}`}
-          </span>
-        ) : null
+        <>
+          {watchChip}
+          {pass.text ? (
+            <span className={`hdPass ${pass.left < 300 ? "low" : ""}`} title="티켓 이용 시간 (끝나면 티켓 1장으로 자동 연장)">
+              {mySeat?.renew_state === "requested" || mySeat?.renew_state === "locking" ? "🎫 연장 중" : `🎫${pass.text}`}
+            </span>
+          ) : null}
+        </>
       }
       idleBar={idleBar}
       notice={notice}

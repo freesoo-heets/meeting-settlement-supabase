@@ -467,7 +467,8 @@ export function HoldemTableView({
                       <b>{fmt(chipsShown(p.id))}</b>
                     </span>
                     {role && <span className={`hdRole ${role.toLowerCase()}`}>{role}</span>}
-                    {status && <span className={`hdStatus ${status === "올인" ? "allin" : ""}`}>{status}</span>}
+                    {/* '대기' 는 다음 판을 기다리는 사람이라 이름 · 칩이 보이게 덮지 않고 작은 표만 붙인다 */}
+                    {status && <span className={`hdStatus ${status === "올인" ? "allin" : status === "대기" ? "wait" : ""}`}>{status}</span>}
                     {turn && secondsLeft !== null && <span className={`hdClock ${secondsLeft <= 5 ? "hurry" : ""}`}>{secondsLeft}</span>}
                   </div>
                   {p.bet > 0 && (

@@ -2146,8 +2146,15 @@ async function setAttendanceMembers(memberIds: string[]) {
       return;
     }
 
+    // 휴대폰·태블릿에서만 공유 창(카톡 선택)을 띄운다.
+    // PC 크롬·엣지도 navigator.share 가 있어서 윈도우 공유 창이 떴다 → PC 는 바로 복사 (2026-11-12)
+    const ua = navigator.userAgent;
+    const isPhone =
+      /Android|iPhone|iPad|iPod|Mobile/i.test(ua) ||
+      (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
+
     try {
-      if (navigator.share) {
+      if (isPhone && navigator.share) {
         await navigator.share({
           title: `${meeting.title} 벙비 정산`,
           text,
