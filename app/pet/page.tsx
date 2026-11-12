@@ -199,7 +199,7 @@ export default function PetPage() {
               <section style={{ marginTop: 20 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 10 }}>
                   <strong>🐾 PET 돌보기</strong>
-                  <span style={{ fontSize: 12, color: "#77778b" }}>Bridge 조회 모드</span>
+                  <span style={{ fontSize: 12, color: "#77778b" }}>{summary.backendSource === "local" ? "Meeting 통합 조회" : "Bridge 조회 모드"}</span>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
                   {(summary.actions || []).map((action) => (
@@ -216,7 +216,7 @@ export default function PetPage() {
                   ))}
                 </div>
                 <p style={{ margin: "10px 0 0", fontSize: 12, color: "#858598", lineHeight: 1.6 }}>
-                  현재는 기존 PET 서버 데이터를 안전하게 조회합니다. 돌보기·상점·인벤토리 쓰기는 데이터 이관 검증 후 순차 활성화합니다.
+                  {summary.backendSource === "local" ? "Meeting 내부 PET 데이터로 전환되었습니다. 돌보기 쓰기 기능은 다음 단계에서 활성화합니다." : "아직 이관되지 않은 계정은 기존 PET 서버를 안전하게 조회합니다. 데이터 확인 후 Meeting 내부로 순차 전환합니다."}
                 </p>
               </section>
             </>
@@ -224,7 +224,7 @@ export default function PetPage() {
         </section>
 
         <aside style={{ marginTop: 12, padding: "13px 16px", borderRadius: 16, background: "#ecebf4", color: "#5d5d70", fontSize: 12, lineHeight: 1.6 }}>
-          PET 통합 STEP 32.1 · 모임/타로 코드와 분리된 PET 전용 경로입니다. 기존 jjinchin-pet 데이터는 아직 삭제하지 않습니다.
+          PET 통합 STEP 32.5 · 이관 완료 계정은 Meeting 내부 DB를 우선 사용하고, 미이관 계정은 Bridge를 유지합니다. 기존 jjinchin-pet 데이터는 최종 검증 전까지 삭제하지 않습니다.
         </aside>
       </div>
     </main>
