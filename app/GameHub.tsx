@@ -176,7 +176,11 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
 
   // 로비를 열 때 유령 방 정리 (한 번)
   useEffect(() => {
-    void callCatchCleanup(false).then(() => load());
+    let mounted = true;
+    void callCatchCleanup(false).then((result) => {
+      if (mounted && result.closed) void load();
+    }).catch(() => undefined);
+    return () => { mounted = false; };
   }, [load]);
 
   useEffect(() => {
