@@ -834,7 +834,7 @@ th { color: #6b7280; font-size: 11px; }
 @media (max-width: 760px) {
   .attendeeBulkBar {
     display: grid;
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .attendeeBulkBar button,
@@ -6991,7 +6991,7 @@ button.meetingMetricCard {
 .extraFeaturesDialogLink > span:last-child { font-size: 26px; color: #7c3aed; }
 
 @media (max-width: 760px) {
-  .attendeeBulkBar { grid-template-columns: 1fr; }
+  .attendeeBulkBar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .attendeeBulkBar button:last-child { grid-column: auto; }
   .chip { min-height: 44px; }
 }
