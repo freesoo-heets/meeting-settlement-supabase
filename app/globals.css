@@ -5947,44 +5947,121 @@ button.meetingMetricCard {
 .mobileTableHint { display: none; }
 
 html[data-theme="christmas"] body {
-  background-color: #f1f6f1;
-  background-image: radial-gradient(circle at 12% 8%, rgba(255,255,255,.88) 0 2px, transparent 3px), radial-gradient(circle at 85% 18%, rgba(255,255,255,.76) 0 2px, transparent 3px), linear-gradient(145deg, #f5f8f2, #f8f2ee 58%, #f1f6f1);
+  background-color: #edf4ed;
+  background-image: radial-gradient(circle at 12% 8%, rgba(255,255,255,.96) 0 2px, transparent 3px), radial-gradient(circle at 85% 18%, rgba(255,255,255,.92) 0 2px, transparent 3px), radial-gradient(circle at 72% 72%, rgba(255,255,255,.76) 0 2px, transparent 3px), linear-gradient(145deg, #edf5ed, #fbf3ed 54%, #e8f2e8);
   color: #24342b;
 }
 html[data-theme="christmas"] .topHeader {
   padding: 16px 18px;
-  border: 1px solid #dce8dc;
+  border: 1px solid #d3e2d4;
   border-radius: 18px;
-  background: linear-gradient(110deg, rgba(255,255,255,.96), rgba(255,248,244,.94));
-  box-shadow: 0 8px 24px rgba(44, 77, 54, .07);
+  background: linear-gradient(110deg, rgba(255,255,255,.97), rgba(255,247,240,.96));
+  box-shadow: 0 10px 28px rgba(29, 77, 48, .11);
 }
-html[data-theme="christmas"] .kicker { color: #2f7048; }
-html[data-theme="christmas"] .topHeader h1 { color: #963e3e; }
+html[data-theme="christmas"] .topHeader > div:first-child {
+  position: relative;
+  min-width: min(100%, 370px);
+  overflow: hidden;
+  padding: 17px 20px;
+  border: 1px solid rgba(232, 207, 142, .72);
+  border-radius: 16px;
+  background: linear-gradient(120deg, #174f35 0%, #1d6841 62%, #8c2733 100%);
+  box-shadow: inset 0 1px rgba(255,255,255,.14), 0 8px 18px rgba(33, 78, 49, .18);
+}
+html[data-theme="christmas"] .topHeader > div:first-child::after {
+  position: absolute;
+  top: 12px;
+  right: 13px;
+  content: "❄  ✦  🔔";
+  color: #ffdf8a;
+  font-size: 17px;
+  letter-spacing: 3px;
+}
+html[data-theme="christmas"] .kicker { color: #ffe39a; }
+html[data-theme="christmas"] .topHeader h1 { max-width: 520px; color: #fffdf5; text-shadow: 0 2px 8px rgba(0,0,0,.2); }
+html[data-theme="christmas"] .christmasBanner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 82px;
+  margin: 12px 0 14px;
+  overflow: hidden;
+  padding: 12px 18px;
+  border: 2px solid #d7b65f;
+  border-radius: 17px;
+  background: linear-gradient(105deg, #a92f38 0%, #bd3940 42%, #1d6841 42%, #164d34 100%);
+  color: #fffdf5;
+  box-shadow: 0 8px 22px rgba(102, 38, 40, .17);
+}
+html[data-theme="christmas"] .christmasBanner::before,
+html[data-theme="christmas"] .christmasBanner::after {
+  position: absolute;
+  top: -14px;
+  width: 42px;
+  height: 42px;
+  border: 2px solid rgba(255, 229, 155, .82);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff1c5, #ce9f3d 55%, #8d6827);
+  content: "";
+  opacity: .8;
+}
+html[data-theme="christmas"] .christmasBanner::before { left: 34%; }
+html[data-theme="christmas"] .christmasBanner::after { right: 35%; }
+html[data-theme="christmas"] .christmasBannerOrnaments,
+html[data-theme="christmas"] .christmasBannerGifts,
+html[data-theme="christmas"] .christmasBannerMessage { position: relative; z-index: 1; }
+html[data-theme="christmas"] .christmasBannerOrnaments { color: #ffe8ad; font-size: 15px; letter-spacing: 3px; white-space: nowrap; }
+html[data-theme="christmas"] .christmasBannerMessage { display: grid; gap: 3px; text-align: center; }
+html[data-theme="christmas"] .christmasBannerMessage strong { font-size: 16px; font-weight: 900; letter-spacing: -.02em; }
+html[data-theme="christmas"] .christmasBannerMessage span { color: #ffdfa0; font-size: 9px; font-weight: 900; letter-spacing: .19em; }
+html[data-theme="christmas"] .christmasBannerGifts { font-size: 24px; white-space: nowrap; }
 html[data-theme="christmas"] .panel,
 html[data-theme="christmas"] .summaryCard,
 html[data-theme="christmas"] .loginUserBox,
 html[data-theme="christmas"] .mobileBottomNav,
 html[data-theme="christmas"] .mobileMoreSheet {
-  border-color: #e3e9df;
-  background-color: #fffefa;
+  border-color: #dce7d9;
+  background-color: #fffdf7;
 }
-html[data-theme="christmas"] .mainTabs { background: rgba(224, 235, 224, .96); }
+html[data-theme="christmas"] .mainTabs { background: rgba(207, 225, 207, .98); box-shadow: inset 0 0 0 1px rgba(28, 91, 54, .08); }
 html[data-theme="christmas"] .tabButton.active,
 html[data-theme="christmas"] .mobileBottomNav > button.active {
-  background: #fff;
-  color: #9b3e3e;
+  background: #a92f38;
+  color: #fff;
 }
 html[data-theme="christmas"] .smallButton:not(.ghost):not(.danger),
 html[data-theme="christmas"] .tinyButton:not(.ghost):not(.danger),
-html[data-theme="christmas"] .tabButton.active {
-  background-color: #2f7048;
+html[data-theme="christmas"] .tabButton.active,
+html[data-theme="christmas"] .dashboardManageButton {
+  border-color: #1d6841;
+  background-color: #1d6841;
   color: #fff;
 }
-html[data-theme="christmas"] .tabButton.active { background-color: #963e3e; }
+html[data-theme="christmas"] .tabButton.active { border-color: #a92f38; background-color: #a92f38; }
+html[data-theme="christmas"] .meetingDashboardTitle {
+  padding: 17px 18px;
+  border: 1px solid #dfbf73;
+  border-radius: 16px;
+  background: linear-gradient(110deg, #fffaf0 0 54%, #e8f3e8 54% 100%);
+  box-shadow: 0 5px 16px rgba(37, 75, 45, .08);
+}
+html[data-theme="christmas"] .meetingDashboardTitle h2 { color: #7d2832; }
+html[data-theme="christmas"] .meetingDashboardTitle p { color: #465c4c; }
+html[data-theme="christmas"] .dashboardEyebrow { color: #1d6841; }
+html[data-theme="christmas"] .meetingMetricCard { border-color: #d8e4d6; background: #fffdf8; }
+html[data-theme="christmas"] .meetingMetricCard:nth-child(odd) { border-top: 3px solid #a92f38; }
+html[data-theme="christmas"] .meetingMetricCard:nth-child(even) { border-top: 3px solid #1d6841; }
+html[data-theme="christmas"] .pointRankingFab.extraFeaturesFab { background: linear-gradient(135deg, #c13d43, #8e202e); box-shadow: 0 10px 28px rgba(142, 32, 46, .32); }
+html[data-theme="christmas"] .pointRankingFab:not(.extraFeaturesFab):not(.omokFab) { background: linear-gradient(135deg, #efc45d, #bf8621); box-shadow: 0 10px 28px rgba(173, 119, 24, .32); }
+html[data-theme="christmas"] .omokFab { background: linear-gradient(135deg, #2b8752, #155837); box-shadow: 0 10px 28px rgba(21, 88, 55, .34); }
+html[data-theme="christmas"] .mobileBottomNav { box-shadow: 0 12px 34px rgba(30, 67, 43, .18); }
+html[data-theme="christmas"] .mobileBottomNav > button.active { background: #a92f38; color: #fff; }
+html[data-theme="christmas"] .themeToggle { border-color: #dfbf73; background: #fff1d1; color: #71343a; box-shadow: 0 3px 10px rgba(121, 75, 34, .1); }
 html[data-theme="christmas"] .input:focus,
 html[data-theme="christmas"] input:focus,
 html[data-theme="christmas"] select:focus { border-color: #4d8b5e; }
-html[data-theme="christmas"] .themeToggle { border-color: #b8d0bc; background: #f4faf3; }
 
 @media (max-width: 760px) {
   input, select, textarea { font-size: 16px; }
@@ -6014,6 +6091,14 @@ html[data-theme="christmas"] .themeToggle { border-color: #b8d0bc; background: #
   .attendanceOnlyTable thead th:not(:first-child) { background: #f8fafc; }
   .topHeader { flex-wrap: wrap; }
   .themeToggle { min-height: 44px; }
+  html[data-theme="christmas"] .topHeader > div:first-child { min-width: 0; }
+  html[data-theme="christmas"] .topHeader > div:first-child::after { top: 10px; right: 10px; font-size: 14px; }
+  html[data-theme="christmas"] .christmasBanner { min-height: 76px; padding: 10px 11px; gap: 4px; }
+  html[data-theme="christmas"] .christmasBannerOrnaments { font-size: 11px; letter-spacing: 0; }
+  html[data-theme="christmas"] .christmasBannerMessage strong { font-size: 13px; }
+  html[data-theme="christmas"] .christmasBannerMessage span { font-size: 8px; }
+  html[data-theme="christmas"] .christmasBannerGifts { font-size: 20px; }
+  html[data-theme="christmas"] .meetingDashboardTitle { background: linear-gradient(135deg, #fffaf0, #e8f3e8); }
   html[data-theme="christmas"] .attendanceOnlyTable:not(.isAdmin) th:first-child,
   html[data-theme="christmas"] .attendanceOnlyTable:not(.isAdmin) td:first-child,
   html[data-theme="christmas"] .attendanceOnlyTable.isAdmin th:first-child,
