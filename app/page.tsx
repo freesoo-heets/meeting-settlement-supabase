@@ -3804,7 +3804,7 @@ async function setAttendanceMembers(memberIds: string[]) {
     <main className="pageShell">
       <header className="topHeader">
         <div>
-          <div className="kicker">MEETING MANAGER</div>
+          <div className="kicker">{themeMode === "christmas" ? "🎄 SEASON'S GREETINGS · 2026" : "MEETING MANAGER"}</div>
           <h1>강서구 찐친만들기 현황관리</h1>
           <button
             type="button"
@@ -3863,6 +3863,17 @@ async function setAttendanceMembers(memberIds: string[]) {
           </div>
         </div>
       </header>
+
+      {themeMode === "christmas" && (
+        <section className="christmasBanner" aria-label="크리스마스 테마 장식">
+          <span className="christmasBannerOrnaments" aria-hidden="true">🔔 ✦ ❄ ✦ 🔔</span>
+          <div className="christmasBannerMessage">
+            <strong>따뜻한 연말, 찐친들과 함께</strong>
+            <span>HAPPY HOLIDAYS · 2026</span>
+          </div>
+          <span className="christmasBannerGifts" aria-hidden="true">🎄 🎁 ❄️</span>
+        </section>
+      )}
 
       <nav className="mainTabs desktopMainTabs">
         {[
