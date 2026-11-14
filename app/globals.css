@@ -6106,6 +6106,165 @@ html[data-theme="christmas"] select:focus { border-color: #4d8b5e; }
   html[data-theme="christmas"] .attendanceOnlyTable.isAdmin th:nth-child(2),
   html[data-theme="christmas"] .attendanceOnlyTable.isAdmin td:nth-child(2) { background: #fffefa; }
 }
+
+/* Mobile layout: keep header controls readable and prevent fixed actions from
+   covering the content. Scoped to narrow viewports; desktop layout is unchanged. */
+@media (max-width: 760px) {
+  .pageShell {
+    width: min(100% - 20px, 1240px);
+    min-width: 0;
+    padding-bottom: calc(148px + env(safe-area-inset-bottom)) !important;
+  }
+
+  .pageShell img { max-width: 100%; }
+
+  .topHeader {
+    width: 100%;
+    min-width: 0;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .topHeader > div:first-child {
+    width: 100%;
+    min-width: 0;
+  }
+
+  html[data-theme="christmas"] .topHeader > div:first-child {
+    width: 100%;
+    min-width: 0;
+    padding: 16px;
+  }
+
+  .topHeader h1 {
+    max-width: 100%;
+    font-size: clamp(21px, 6vw, 28px);
+    line-height: 1.25;
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+  }
+
+  .themeToggle {
+    max-width: 100%;
+    white-space: normal;
+    line-height: 1.35;
+  }
+
+  .headerControls {
+    display: grid;
+    width: 100%;
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .headerControls > *,
+  .monthControl,
+  .loginUserBox { width: 100%; min-width: 0; }
+
+  .loginUserBox {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px;
+    padding: 9px;
+  }
+
+  .loginUserBox > div {
+    grid-column: 1 / -1;
+    min-width: 0;
+    padding: 2px 3px 5px;
+  }
+
+  .loginUserBox > div > strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .loginUserBox .logoutButton {
+    display: inline-flex;
+    min-width: 0;
+    min-height: 42px;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 6px;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  html[data-theme="christmas"] .christmasBanner {
+    display: grid;
+    width: 100%;
+    min-width: 0;
+    grid-template-columns: minmax(34px, .7fr) minmax(0, 2fr) minmax(34px, .7fr);
+    gap: 6px;
+    min-height: 74px;
+    padding: 10px 9px;
+  }
+
+  html[data-theme="christmas"] .christmasBannerOrnaments,
+  html[data-theme="christmas"] .christmasBannerGifts {
+    min-width: 0;
+    font-size: clamp(12px, 3.8vw, 18px);
+    letter-spacing: 0;
+    text-align: center;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  html[data-theme="christmas"] .christmasBannerMessage { min-width: 0; }
+  html[data-theme="christmas"] .christmasBannerMessage strong {
+    font-size: clamp(12px, 3.6vw, 15px);
+    line-height: 1.35;
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+  }
+  html[data-theme="christmas"] .christmasBannerMessage span {
+    font-size: clamp(7px, 2.3vw, 9px);
+    letter-spacing: .12em;
+    overflow-wrap: anywhere;
+  }
+
+  .floatingActions {
+    right: 12px;
+    bottom: calc(82px + env(safe-area-inset-bottom));
+    left: 12px;
+    flex-direction: row;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+
+  .floatingActions > .extraFeaturesFabGroup,
+  .floatingActions > .pointRankingFab {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+
+  .floatingActions .pointRankingFab {
+    min-height: 40px;
+    gap: 4px;
+    padding: 8px clamp(7px, 2.5vw, 11px);
+    font-size: clamp(10px, 2.8vw, 12px);
+    white-space: nowrap;
+  }
+
+  .floatingActions .pointRankingFab span { font-size: 15px; }
+  .floatingActions .pointRankingFab strong { font-size: inherit; }
+
+  .meetingDashboardTitle,
+  .summaryCard,
+  .panel,
+  .meetingMetricCard { min-width: 0; }
+}
+
+@media (max-width: 360px) {
+  html[data-theme="christmas"] .christmasBanner { grid-template-columns: 28px minmax(0, 1fr) 28px; gap: 3px; padding-inline: 6px; }
+  html[data-theme="christmas"] .christmasBannerOrnaments,
+  html[data-theme="christmas"] .christmasBannerGifts { font-size: 11px; }
+  .floatingActions { right: 8px; left: 8px; gap: 4px; }
+  .floatingActions .pointRankingFab { gap: 3px; padding-inline: 5px; }
+}
 .chatLogLine time { flex: none; color: #94a3b8; font-variant-numeric: tabular-nums; }
 .chatLogLine span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .chatLogLine:hover span { white-space: normal; word-break: break-word; }
