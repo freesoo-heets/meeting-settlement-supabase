@@ -7384,3 +7384,26 @@ html[data-theme="christmas"] select:focus { border-color: #4d8b5e; }
   .attendeeBulkBar button:last-child { grid-column: auto; }
   .chip { min-height: 44px; }
 }
+
+/* The default theme keeps the same mobile header structure with neutral styling. */
+@media (max-width: 760px) {
+  html[data-theme="default"] .topHeader {
+    padding: 14px;
+    border: 1px solid #e2e8e3;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, .96);
+    box-shadow: 0 8px 24px rgba(31, 41, 55, .07);
+  }
+
+  html[data-theme="default"] .topHeader > div:first-child {
+    padding: 16px;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    background: linear-gradient(135deg, #ffffff, #f7f8fa);
+    box-shadow: 0 4px 14px rgba(31, 41, 55, .05);
+  }
+
+  html[data-theme="default"] .topHeader h1 {
+    color: #1f2937;
+  }
+}
