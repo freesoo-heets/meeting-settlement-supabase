@@ -711,6 +711,29 @@ th { color: #6b7280; font-size: 11px; }
   font-weight: 800;
 }
 
+.allocationField label {
+  color: #475569;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.allocationField input {
+  min-height: 44px;
+  font-variant-numeric: tabular-nums;
+}
+
+.allocationDraftStatus {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 10px;
+  font-weight: 800;
+}
+
 .allocationAmount strong {
   font-size: 12px;
 }
@@ -789,7 +812,7 @@ th { color: #6b7280; font-size: 11px; }
 
 .allocationSaveButton {
   align-self: end;
-  min-height: 34px;
+  min-height: 44px;
 }
 
 .finalBurden {
@@ -809,6 +832,17 @@ th { color: #6b7280; font-size: 11px; }
 }
 
 @media (max-width: 760px) {
+  .attendeeBulkBar {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .attendeeBulkBar button,
+  .attendeeBulkBar button:last-child {
+    grid-column: auto;
+    min-height: 44px;
+  }
+
   .allocationCompactRow.memberAllocationRow {
     grid-template-columns: 1fr 1fr;
   }
@@ -823,6 +857,23 @@ th { color: #6b7280; font-size: 11px; }
 
   .allocationCompactRow.memberAllocationRow .finalBurden {
     grid-column: 2;
+  }
+
+  .allocationScroll {
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
+  }
+
+  .allocationField label {
+    min-height: 28px;
+    display: flex;
+    align-items: flex-end;
+  }
+
+  .allocationField input,
+  .allocationCompactRow.memberAllocationRow .allocationSaveButton {
+    min-height: 48px;
   }
 }
 
@@ -1650,6 +1701,13 @@ th { color: #6b7280; font-size: 11px; }
   flex-wrap: wrap;
   gap: 6px;
   margin-bottom: 8px;
+}
+
+.attendeeBulkHint {
+  margin: -2px 0 10px;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .kakaoShareButton {
@@ -6931,3 +6989,9 @@ button.meetingMetricCard {
 .extraFeaturesDialogLink strong { font-size: 16px; }
 .extraFeaturesDialogLink small { font-size: 12px; color: #736785; }
 .extraFeaturesDialogLink > span:last-child { font-size: 26px; color: #7c3aed; }
+
+@media (max-width: 760px) {
+  .attendeeBulkBar { grid-template-columns: 1fr; }
+  .attendeeBulkBar button:last-child { grid-column: auto; }
+  .chip { min-height: 44px; }
+}
