@@ -102,6 +102,7 @@ type Meeting = MeetingRow & {
 };
 
 type MainTab = "dashboard" | "meetings" | "members" | "monthly" | "history" | "help";
+type ThemeMode = "christmas" | "default";
 type MemberFilter = "all" | "active" | "warning" | "withdrawn";
 type MemberSort = "nickname_asc" | "nickname_desc" | "join_desc" | "join_asc" | "last_desc" | "last_asc" | "points_desc" | "chat_desc" | "chat_asc";
 type MonthlySortKey = "member" | "status" | "join" | "attendance" | "last" | "burden" | "warning";
@@ -195,9 +196,32 @@ function isBotName(name: string) {
 }
 
 export default function Home() {
+  const [themeMode, setThemeMode] = useState<ThemeMode>("christmas");
+  const mobileMoreTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const mobileMoreSheetRef = useRef<HTMLElement | null>(null);
+  const mobileMoreWasOpenRef = useRef(false);
+
   useEffect(() => {
     document.title = "[86~02] 강서구 찐친만들기❤️";
   }, []);
+
+  useEffect(() => {
+    try {
+      const savedTheme = window.localStorage.getItem("meeting-page-theme");
+      if (savedTheme === "default" || savedTheme === "christmas") setThemeMode(savedTheme);
+    } catch {
+      // 테마 저장이 차단된 환경에서도 화면 테마 전환은 동작한다.
+    }
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = themeMode;
+    try {
+      window.localStorage.setItem("meeting-page-theme", themeMode);
+    } catch {
+      // 저장소 사용이 불가능하면 현재 탭에서만 테마를 적용한다.
+    }
+  }, [themeMode]);
 
   const today = todayString();
   const currentMonth = today.slice(0, 7);
@@ -272,7 +296,6 @@ export default function Home() {
 
   // STEP53_55_UX: operational convenience controls
   const [historySearch, setHistorySearch] = useState("");
-  const [historyPage, setHistoryPage] = useState(1);
   const [showOnlyUnsettled, setShowOnlyUnsettled] = useState(false);
   const [memberSearch, setMemberSearch] = useState("");
   const [memberFilter, setMemberFilter] = useState<MemberFilter>("all");
@@ -335,6 +358,7 @@ export default function Home() {
   const [showAdminPasswordReset, setShowAdminPasswordReset] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [showMobileMore, setShowMobileMore] = useState(false);
+  const [showMemberDemographics, setShowMemberDemographics] = useState(false);
   const [openMemberMenuId, setOpenMemberMenuId] = useState("");
 
   const [newMemberName, setNewMemberName] = useState("");
@@ -349,6 +373,46 @@ export default function Home() {
   const [editingBirthday, setEditingBirthday] = useState("");
   const [editingCostId, setEditingCostId] = useState("");
   const [editingCost, setEditingCost] = useState("");
+
+  const filteredActivityLogs = useMemo(() => {
+    const query = historySearch.trim().toLocaleLowerCase("ko-KR");
+    return activityLogs.filter((log) =>
+      `${log.action} ${log.description} ${log.actor_nickname}`.toLocaleLowerCase("ko-KR").includes(query),
+    );
+  }, [activityLogs, historySearch]);
+  const visibleActivityLogs = filteredActivityLogs;
+
+  useEffect(() => {
+    if (showMobileMore) {
+      mobileMoreWasOpenRef.current = true;
+      mobileMoreSheetRef.current?.querySelector<HTMLElement>("button")?.focus();
+      const handleKeyDown = (event: KeyboardEvent) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          setShowMobileMore(false);
+          return;
+        }
+        if (event.key !== "Tab" || !mobileMoreSheetRef.current) return;
+        const focusable = Array.from(mobileMoreSheetRef.current.querySelectorAll<HTMLElement>("button, a[href], [tabindex]:not([tabindex='-1'])"));
+        if (!focusable.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      };
+      document.addEventListener("keydown", handleKeyDown);
+      return () => document.removeEventListener("keydown", handleKeyDown);
+    }
+    if (mobileMoreWasOpenRef.current) {
+      mobileMoreWasOpenRef.current = false;
+      mobileMoreTriggerRef.current?.focus();
+    }
+  }, [showMobileMore]);
 
   const [memberFixedDrafts, setMemberFixedDrafts] = useState<Record<string, string>>({});
   const [guestFixedDrafts, setGuestFixedDrafts] = useState<Record<string, string>>({});
@@ -2718,7 +2782,7 @@ async function setAttendanceMembers(memberIds: string[]) {
 
     if (
       !window.confirm(
-        `${member.name} 회원을 완전히 삭제할까요?\n\n참석 기록, 특정값, 선입금 등 이 회원과 연결된 데이터도 함께 삭제됩니다. 이 작업은 되돌릴 수 없습니다.`
+        `${member.name} 회원을 완전히 삭제할까요?\n\n참석 기록, 개별 부담금, 선입금 등 이 회원과 연결된 데이터도 함께 삭제됩니다. 이 작업은 되돌릴 수 없습니다.`
       )
     ) {
       return;
@@ -3223,7 +3287,7 @@ async function setAttendanceMembers(memberIds: string[]) {
 
       if (value < memberFixed + guestFixed) {
         setNotice(
-          `총 비용은 현재 특정값 합계 ${won(memberFixed + guestFixed)}보다 작을 수 없습니다.`
+          `총 비용은 현재 개별 부담금 합계 ${won(memberFixed + guestFixed)}보다 작을 수 없습니다.`
         );
         return;
       }
@@ -3442,7 +3506,7 @@ async function setAttendanceMembers(memberIds: string[]) {
     const prepaymentAmount = Number(prepaymentRaw);
 
     if (hasFixed && (!Number.isFinite(fixedAmount) || fixedAmount < 0)) {
-      setNotice("특정값은 0 이상의 숫자로 입력해주세요.");
+      setNotice("개별 부담금은 0 이상의 숫자로 입력해주세요.");
       return;
     }
 
@@ -3468,7 +3532,7 @@ async function setAttendanceMembers(memberIds: string[]) {
         otherMemberFixed + guestFixed + fixedAmount >
         Number(selectedMeeting.cost)
       ) {
-        setNotice("특정값 합계가 모임 총비용을 초과할 수 없습니다.");
+        setNotice("개별 부담금 합계가 모임 총비용을 초과할 수 없습니다.");
         return;
       }
     }
@@ -3742,6 +3806,14 @@ async function setAttendanceMembers(memberIds: string[]) {
         <div>
           <div className="kicker">MEETING MANAGER</div>
           <h1>강서구 찐친만들기 현황관리</h1>
+          <button
+            type="button"
+            className="themeToggle"
+            aria-pressed={themeMode === "christmas"}
+            onClick={() => setThemeMode((current) => current === "christmas" ? "default" : "christmas")}
+          >
+            {themeMode === "christmas" ? "🎄 기본 테마로 전환" : "🎄 크리스마스 테마 적용"}
+          </button>
         </div>
 
         <div className="headerControls">
@@ -3805,6 +3877,7 @@ async function setAttendanceMembers(memberIds: string[]) {
             key={value}
             className={mainTab === value ? "tabButton active" : "tabButton"}
             data-tab={value}
+            aria-current={mainTab === value ? "page" : undefined}
             onClick={() => setMainTab(value as MainTab)}
           >
             {label}
@@ -3821,6 +3894,7 @@ async function setAttendanceMembers(memberIds: string[]) {
           <button
             key={value}
             className={mainTab === value ? "active" : ""}
+            aria-current={mainTab === value ? "page" : undefined}
             onClick={() => {
               setMainTab(value as MainTab);
               setShowMobileMore(false);
@@ -3831,8 +3905,11 @@ async function setAttendanceMembers(memberIds: string[]) {
           </button>
         ))}
         <button
+          ref={mobileMoreTriggerRef}
           className={["monthly", "history", "help"].includes(mainTab) || showMobileMore ? "active" : ""}
           onClick={() => setShowMobileMore((current) => !current)}
+          aria-expanded={showMobileMore}
+          aria-haspopup="dialog"
         >
           <span>•••</span>
           <strong>더보기</strong>
@@ -3841,11 +3918,11 @@ async function setAttendanceMembers(memberIds: string[]) {
 
       {showMobileMore && (
         <div className="mobileMoreBackdrop" onClick={() => setShowMobileMore(false)}>
-          <section className="mobileMoreSheet" onClick={(event) => event.stopPropagation()}>
+          <section ref={mobileMoreSheetRef} className="mobileMoreSheet" role="dialog" aria-modal="true" aria-labelledby="mobileMoreTitle" onClick={(event) => event.stopPropagation()}>
             <div className="mobileMoreHandle" />
             <div className="mobileMoreHead">
-              <strong>더보기</strong>
-              <button onClick={() => setShowMobileMore(false)}>×</button>
+              <strong id="mobileMoreTitle">더보기</strong>
+              <button aria-label="더보기 메뉴 닫기" onClick={() => setShowMobileMore(false)}>×</button>
             </div>
             {[
               ["monthly", "월별 참석 현황", "월별 참석·부담금 확인"],
@@ -4783,7 +4860,7 @@ async function setAttendanceMembers(memberIds: string[]) {
                       <strong>{won(selectedAllocation?.totalCost ?? 0)}</strong>
                     </div>
                     <div className="miniSummary">
-                      <span>특정값</span>
+                      <span>개별 부담금</span>
                       <strong>{won(selectedAllocation?.fixedTotal ?? 0)}</strong>
                     </div>
                     <div className="miniSummary">
@@ -4947,7 +5024,7 @@ async function setAttendanceMembers(memberIds: string[]) {
                               className="tinyButton"
                               onClick={() => void saveGuestFixed(guest)}
                             >
-                              특정값 저장
+                              개별 부담금 저장
                             </button>
                             {guest.fixed_amount != null && (
                               <button
@@ -5107,7 +5184,17 @@ async function setAttendanceMembers(memberIds: string[]) {
                   .filter(Boolean)
                   .join(" + ");
                 return (
-                  <div className="memberDemographics" aria-label="회원 구성">
+                  <div className="memberDemographicsDisclosure">
+                    <button
+                      type="button"
+                      className="demoDisclosureButton"
+                      aria-expanded={showMemberDemographics}
+                      onClick={() => setShowMemberDemographics((current) => !current)}
+                    >
+                      {showMemberDemographics ? "회원 구성 닫기" : `회원 구성 보기 · ${demo.counted}명`}
+                      {demoFilterOn && <span>필터 적용 중</span>}
+                    </button>
+                    {showMemberDemographics && <div className="memberDemographics" aria-label="회원 구성">
                     <div className="demoBlock">
                       <span className="demoLabel">성비</span>
                       <div className="demoGender">
@@ -5144,6 +5231,7 @@ async function setAttendanceMembers(memberIds: string[]) {
                     {demo.unknown > 0 && (
                       <small className="demoNote">닉네임 형식이 달라 {demo.unknown}명은 빠졌어요</small>
                     )}
+                    </div>}
                   </div>
                 );
               })()}
@@ -5735,8 +5823,9 @@ async function setAttendanceMembers(memberIds: string[]) {
               </div>
             )}
 
-            <div className="tableWrap">
-              <table className="monthlyTable attendanceOnlyTable">
+            <div className="tableWrap attendanceTableWrap">
+              <p className="mobileTableHint">표를 좌우로 밀어 회원별 현황과 정렬 항목을 확인하세요.</p>
+              <table className={`monthlyTable attendanceOnlyTable ${isAdmin ? "isAdmin" : ""}`}>
                 <thead>
                   <tr>
                     {isAdmin && (
@@ -5844,7 +5933,7 @@ async function setAttendanceMembers(memberIds: string[]) {
               <h2>최근 변경 이력</h2>
               <p>회원·모임·정산 관련 최근 변경 내용을 시간순으로 확인합니다.</p>
             </div>
-            <strong>{activityLogs.length}건</strong>
+            <strong>{filteredActivityLogs.length}건</strong>
           </section>
 
           <section className="panel activityPanel historyActivityPanel">
@@ -5854,9 +5943,9 @@ async function setAttendanceMembers(memberIds: string[]) {
                 <p>최근 20건 · 모든 역할에서 동일하게 확인</p>
               </div>
             </div>
-            <div className="step55HistorySearch"><input type="search" placeholder="변경 내용·담당자 검색" aria-label="변경 이력 검색" value={historySearch} onChange={(e) => {setHistorySearch(e.target.value);setHistoryPage(1);}} /></div>
+            <div className="step55HistorySearch"><input type="search" placeholder="최근 20건에서 변경 내용·담당자 검색" aria-label="최근 20건 변경 이력 검색" value={historySearch} onChange={(e) => setHistorySearch(e.target.value)} />{historySearch && <button type="button" className="tinyButton ghost" onClick={() => setHistorySearch("")}>검색 초기화</button>}</div>
             <div className="activityList">
-              {activityLogs.filter((log) => `${log.action} ${log.description} ${log.actor_nickname}`.toLowerCase().includes(historySearch.toLowerCase())).slice((historyPage - 1) * 20, historyPage * 20).map((log) => (
+              {visibleActivityLogs.map((log) => (
                 <div className="activityRow" key={log.id}>
                   <div>
                     <strong>{log.action}</strong>
@@ -5876,8 +5965,8 @@ async function setAttendanceMembers(memberIds: string[]) {
                   </div>
                 </div>
               ))}
-              {activityLogs.length === 0 && (
-                <div className="empty">아직 기록된 변경 이력이 없습니다.</div>
+              {filteredActivityLogs.length === 0 && (
+                <div className="empty" role="status">{activityLogs.length === 0 ? "아직 기록된 변경 이력이 없습니다." : "검색 결과가 없습니다. 다른 검색어를 입력하거나 검색을 초기화해 주세요."}</div>
               )}
             </div>
           </section>
@@ -5938,7 +6027,7 @@ async function setAttendanceMembers(memberIds: string[]) {
                 모임 관리에서 모임을 선택하고 <strong>참석자 · 게스트</strong>, <strong>비용 배분</strong>,
                 <strong>통합 정산</strong> 작업 탭을 전환해 사용합니다. 참석자 기본 정렬은
                 닉네임 가나다순이며 정렬 메뉴에서 다른 기준으로 변경할 수 있습니다.
-                비용은 참석 인원 기준 1/N으로 계산되고 회원별 특정값도 입력할 수 있습니다.
+                비용은 참석 인원 기준 1/N으로 계산하고, 회원별 개별 부담금을 입력하면 나머지 금액을 참석자에게 나눕니다.
               </p>
               <p>
                 <strong>선입금</strong>은 해당 모임의 비용 배분 영역에서 관리하며,
@@ -5974,7 +6063,7 @@ async function setAttendanceMembers(memberIds: string[]) {
             <div className="helpExampleGrid">
               <div><span>01 · 모임 선택</span><strong>날짜와 모임 선택</strong><p>모임을 추가하거나 기존 모임을 선택합니다.</p></div>
               <div><span>02 · 참석자</span><strong>회원 · 게스트 확인</strong><p>닉네임 가나다순으로 확인하고 참석자를 설정합니다.</p></div>
-              <div><span>03 · 비용 배분</span><strong>총비용 · 선입금 · 특정값</strong><p>비용을 입력하고 모임별 부담금을 확인합니다.</p></div>
+              <div><span>03 · 비용 배분</span><strong>총비용 · 선입금 · 개별 부담금</strong><p>비용을 입력하고 모임별 부담금을 확인합니다.</p></div>
               <div><span>04 · 정산 공유</span><strong>개별 또는 통합 정산</strong><p>여러 모임은 통합 정산 탭에서 선택 후 복사합니다.</p></div>
             </div>
           </section>
@@ -5993,7 +6082,7 @@ async function setAttendanceMembers(memberIds: string[]) {
                   <p>대시보드 및 내 현황 조회</p>
                   <p>모임 생성 · 수정 · 삭제 · 복사</p>
                   <p>참석자 · 게스트 관리</p>
-                  <p>비용 배분 · 특정값 · 선입금 입력</p>
+                  <p>비용 배분 · 개별 부담금 · 선입금 입력</p>
                   <p>카카오톡 공유하기(봇 전송) · 복사하기 · 여러 모임 통합 정산</p>
                   <p>회원 및 월별 참석 현황 조회</p>
                   <p>월별 CSV 내보내기</p>
@@ -6103,7 +6192,7 @@ async function setAttendanceMembers(memberIds: string[]) {
                 <p>각 25,000원</p>
               </div>
               <div>
-                <span>특정값 적용</span>
+                <span>개별 부담금 적용</span>
                 <strong>A 회원 10,000원 고정</strong>
                 <p>남은 90,000원을 나머지 인원이 1/N</p>
               </div>
@@ -6115,7 +6204,7 @@ async function setAttendanceMembers(memberIds: string[]) {
             </div>
           </section>
 
-          <div className="helpVersion">사용방법 · Step 48 기준</div>
+          <div className="helpVersion">사용방법 및 운영 기준</div>
         </section>
       )}
 

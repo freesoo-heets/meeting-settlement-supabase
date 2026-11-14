@@ -5918,6 +5918,109 @@ button.meetingMetricCard {
 .chatLogDay { display: flex; flex-direction: column; gap: 1px; }
 .chatLogDay h4 { position: sticky; top: 0; margin: 6px 0 2px; padding: 4px 8px; font-size: 12px; color: #475569; background: #eef2f7; border-radius: 6px; }
 .chatLogLine { display: flex; gap: 8px; padding: 3px 8px; font-size: 13px; line-height: 1.45; border-bottom: 1px solid #f1f5f9; }
+
+/* 테마 전환: 기본 디자인은 기존 스타일 그대로 두고 크리스마스 팔레트만 별도 적용 */
+.themeToggle {
+  margin-top: 8px;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid #d8e5da;
+  border-radius: 999px;
+  background: #fff;
+  color: #275c3d;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.memberDemographicsDisclosure { flex: 1 1 320px; min-width: 0; }
+.demoDisclosureButton {
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid #e8e0d7;
+  border-radius: 10px;
+  background: #fff;
+  color: #51483f;
+  font-weight: 800;
+}
+.demoDisclosureButton span { margin-left: 8px; color: #9a3412; font-size: 11px; }
+.memberDemographicsDisclosure .memberDemographics { margin-top: 7px; }
+.mobileTableHint { display: none; }
+
+html[data-theme="christmas"] body {
+  background-color: #f1f6f1;
+  background-image: radial-gradient(circle at 12% 8%, rgba(255,255,255,.88) 0 2px, transparent 3px), radial-gradient(circle at 85% 18%, rgba(255,255,255,.76) 0 2px, transparent 3px), linear-gradient(145deg, #f5f8f2, #f8f2ee 58%, #f1f6f1);
+  color: #24342b;
+}
+html[data-theme="christmas"] .topHeader {
+  padding: 16px 18px;
+  border: 1px solid #dce8dc;
+  border-radius: 18px;
+  background: linear-gradient(110deg, rgba(255,255,255,.96), rgba(255,248,244,.94));
+  box-shadow: 0 8px 24px rgba(44, 77, 54, .07);
+}
+html[data-theme="christmas"] .kicker { color: #2f7048; }
+html[data-theme="christmas"] .topHeader h1 { color: #963e3e; }
+html[data-theme="christmas"] .panel,
+html[data-theme="christmas"] .summaryCard,
+html[data-theme="christmas"] .loginUserBox,
+html[data-theme="christmas"] .mobileBottomNav,
+html[data-theme="christmas"] .mobileMoreSheet {
+  border-color: #e3e9df;
+  background-color: #fffefa;
+}
+html[data-theme="christmas"] .mainTabs { background: rgba(224, 235, 224, .96); }
+html[data-theme="christmas"] .tabButton.active,
+html[data-theme="christmas"] .mobileBottomNav > button.active {
+  background: #fff;
+  color: #9b3e3e;
+}
+html[data-theme="christmas"] .smallButton:not(.ghost):not(.danger),
+html[data-theme="christmas"] .tinyButton:not(.ghost):not(.danger),
+html[data-theme="christmas"] .tabButton.active {
+  background-color: #2f7048;
+  color: #fff;
+}
+html[data-theme="christmas"] .tabButton.active { background-color: #963e3e; }
+html[data-theme="christmas"] .input:focus,
+html[data-theme="christmas"] input:focus,
+html[data-theme="christmas"] select:focus { border-color: #4d8b5e; }
+html[data-theme="christmas"] .themeToggle { border-color: #b8d0bc; background: #f4faf3; }
+
+@media (max-width: 760px) {
+  input, select, textarea { font-size: 16px; }
+  .mobileTableHint {
+    display: block;
+    margin: 0 0 8px;
+    color: #6b7280;
+    font-size: 12px;
+  }
+  .attendanceTableWrap { scroll-padding-inline: 12px; }
+  .attendanceOnlyTable:not(.isAdmin) th:first-child,
+  .attendanceOnlyTable:not(.isAdmin) td:first-child,
+  .attendanceOnlyTable.isAdmin th:first-child,
+  .attendanceOnlyTable.isAdmin td:first-child,
+  .attendanceOnlyTable.isAdmin th:nth-child(2),
+  .attendanceOnlyTable.isAdmin td:nth-child(2) {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: #fff;
+    box-shadow: 4px 0 8px rgba(15, 23, 42, .08);
+  }
+  .attendanceOnlyTable.isAdmin th:first-child,
+  .attendanceOnlyTable.isAdmin td:first-child { z-index: 3; }
+  .attendanceOnlyTable.isAdmin th:nth-child(2),
+  .attendanceOnlyTable.isAdmin td:nth-child(2) { left: 64px; }
+  .attendanceOnlyTable thead th:not(:first-child) { background: #f8fafc; }
+  .topHeader { flex-wrap: wrap; }
+  .themeToggle { min-height: 44px; }
+  html[data-theme="christmas"] .attendanceOnlyTable:not(.isAdmin) th:first-child,
+  html[data-theme="christmas"] .attendanceOnlyTable:not(.isAdmin) td:first-child,
+  html[data-theme="christmas"] .attendanceOnlyTable.isAdmin th:first-child,
+  html[data-theme="christmas"] .attendanceOnlyTable.isAdmin td:first-child,
+  html[data-theme="christmas"] .attendanceOnlyTable.isAdmin th:nth-child(2),
+  html[data-theme="christmas"] .attendanceOnlyTable.isAdmin td:nth-child(2) { background: #fffefa; }
+}
 .chatLogLine time { flex: none; color: #94a3b8; font-variant-numeric: tabular-nums; }
 .chatLogLine span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .chatLogLine:hover span { white-space: normal; word-break: break-word; }
