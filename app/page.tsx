@@ -2061,8 +2061,11 @@ async function setAttendanceMembers(memberIds: string[]) {
     }
     setPayAccountDraft(null);
     const name = members.find((item) => item.id === memberId)?.name ?? "";
+    setMeetings((current) => current.map((item) => item.id === meeting.id
+      ? { ...item, pay_to: payTo, pay_account: account || null }
+      : item
+    ));
     setNotice(`💸 입금받는 사람을 ${name}님으로 정했어요.${account ? ` (예전 계좌 ${account} 를 불러왔어요)` : ""}`);
-    await loadAll();
   }
 
   async function savePayAccount(meeting: Meeting, value: string) {
@@ -2075,8 +2078,11 @@ async function setAttendanceMembers(memberIds: string[]) {
       return;
     }
     setPayAccountDraft(null);
+    setMeetings((current) => current.map((item) => item.id === meeting.id
+      ? { ...item, pay_account: account || null }
+      : item
+    ));
     setNotice(account ? "🏦 계좌를 저장했어요. 정산 글에 같이 나갑니다." : "계좌를 비웠어요. 정산 글에는 입금받는 사람만 나갑니다.");
-    await loadAll();
   }
 
   function buildSettlementShareText(meeting: Meeting) {
@@ -3187,8 +3193,11 @@ async function setAttendanceMembers(memberIds: string[]) {
       );
       setEditingCostId("");
       setEditingCost("");
-      await Promise.all([...attendanceJobs.current]); // 참석 체크 저장이 끝난 뒤에 새로 불러온다
-      await loadAll();
+      await Promise.all([...attendanceJobs.current]); // 참석 변경 저장과 비용 표시 순서를 맞춘다
+      setMeetings((current) => current.map((item) => item.id === meetingId
+        ? { ...item, cost: Math.round(value) }
+        : item
+      ));
     }
     setSaving(false);
   }
