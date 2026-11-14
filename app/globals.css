@@ -52,10 +52,37 @@ input, select {
   border: 1px solid #e5e7eb;
   border-radius: 10px;
   background: #fff;
-  outline: none;
 }
 
 input:focus, select:focus { border-color: #8b5cf6; }
+
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid #7c3aed;
+  outline-offset: 2px;
+}
+
+.skipLink {
+  position: absolute;
+  z-index: 100;
+  top: 12px;
+  left: 12px;
+  transform: translateY(-160%);
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #fff;
+  color: #4c1d95;
+  font-weight: 800;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, .18);
+}
+
+.skipLink:focus-visible {
+  transform: translateY(0);
+}
+
+#main-content {
+  scroll-margin-top: 80px;
+}
+
 
 .mainTabs {
   position: sticky;
@@ -954,6 +981,13 @@ th { color: #6b7280; font-size: 11px; }
   border-radius: inherit;
   background: #26211d;
   animation: authLoading 1.1s ease-in-out infinite alternate;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .authLoadingBar::after,
+  .appToast {
+    animation: none;
+  }
 }
 
 @keyframes authLoading {
@@ -4501,6 +4535,23 @@ button.meetingMetricCard {
   background: #fff;
 }
 
+.calendarDaySelect {
+  display: block;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+}
+
+.calendarDaySelect:focus-visible {
+  position: relative;
+  z-index: 1;
+}
+
 .calendarDay:nth-child(7n + 1) {
   border-left: 1px solid #f0ebe7;
 }
@@ -5655,7 +5706,7 @@ button.meetingMetricCard {
 
 /* STEP 35-41: activity, calendar 2.0, profile, ops, admin center, backup */
 .dashboardInsightsGrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}.dashboardInsightPanel{padding:16px}.insightMetricGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.insightMetricGrid>div,.memberProfileSnapshot>div,.myActivityQuickGrid>div{border:1px solid var(--line,#e8e2dc);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:3px}.insightMetricGrid span,.memberProfileSnapshot span,.myActivityQuickGrid span{font-size:11px;color:#80756d}.insightMetricGrid strong,.memberProfileSnapshot strong,.myActivityQuickGrid strong{font-size:15px}.adminWorkCenter>button{width:100%;display:flex;justify-content:space-between;align-items:center;border:0;border-bottom:1px solid #eee7e1;background:transparent;padding:11px 4px;text-align:left}.backupActionRow{display:flex;gap:8px;margin-top:12px}.backupHint{display:block;margin-top:8px;color:#8a7f77}.memberProfileSnapshot,.myActivityQuickGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:10px 0 14px}.myActivityQuickGrid{grid-template-columns:repeat(3,minmax(0,1fr))}.calendarDay.selectedDate{outline:2px solid rgba(97,73,57,.35);outline-offset:-2px}.mobileCalendarDayList{display:none;margin-top:10px}.mobileCalendarDayList>button{width:100%;display:flex;justify-content:space-between;align-items:center;padding:10px;border:1px solid #ece5df;border-radius:12px;background:#fff;margin-top:6px;text-align:left}.mobileCalendarDayList>button div{display:flex;flex-direction:column;gap:2px}.mobileCalendarDayList>button span{font-size:11px;color:#857970}
-@media(max-width:720px){.dashboardInsightsGrid{grid-template-columns:1fr}.memberProfileSnapshot{grid-template-columns:repeat(2,minmax(0,1fr))}.myActivityQuickGrid{grid-template-columns:1fr 1fr 1fr}.meetingCalendarPanel .calendarGrid{min-width:0!important}.meetingCalendarPanel .calendarDay{min-height:52px!important;height:52px!important;padding:3px!important;cursor:pointer}.meetingCalendarPanel .calendarEvents{display:none}.meetingCalendarPanel .calendarDayNumber{justify-content:center!important}.meetingCalendarPanel .calendarDayNumber em{font-size:9px}.mobileCalendarDayList{display:block}.meetingCalendarPanel{overflow:visible!important}.meetingCalendarPanel .calendarWeekdays{min-width:0!important}.insightMetricGrid{grid-template-columns:1fr 1fr}}
+@media(max-width:720px){.dashboardInsightsGrid{grid-template-columns:1fr}.memberProfileSnapshot{grid-template-columns:repeat(2,minmax(0,1fr))}.myActivityQuickGrid{grid-template-columns:1fr 1fr 1fr}.meetingCalendarPanel .calendarGrid{min-width:0!important}.meetingCalendarPanel .calendarDay{min-height:52px!important;height:52px!important;padding:3px!important}.meetingCalendarPanel .calendarDaySelect{cursor:pointer}.meetingCalendarPanel .calendarEvents{display:none}.meetingCalendarPanel .calendarDayNumber{justify-content:center!important}.meetingCalendarPanel .calendarDayNumber em{font-size:9px}.mobileCalendarDayList{display:block}.meetingCalendarPanel{overflow:visible!important}.meetingCalendarPanel .calendarWeekdays{min-width:0!important}.insightMetricGrid{grid-template-columns:1fr 1fr}}
 
 /* STEP 42: TOP5 카드 항목 크기 통일 */
 .popularMeetingCard,
