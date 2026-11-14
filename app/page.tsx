@@ -6,6 +6,7 @@ import { matchesHangul } from "../lib/hangulSearch";
 import PointRanking, { PointHistoryBox, type PointRow } from "./PointRanking";
 import GameHub, { type GameKind } from "./GameHub";
 import BotAdmin from "./BotAdmin";
+import OperationsHub from "./OperationsHub";
 import { ChatLogModal, chatAgo, useLastChats } from "./ChatLog";
 
 type Member = {
@@ -101,7 +102,7 @@ type Meeting = MeetingRow & {
   guests: MeetingGuest[];
 };
 
-type MainTab = "dashboard" | "meetings" | "members" | "monthly" | "history" | "help";
+type MainTab = "dashboard" | "operations" | "meetings" | "members" | "monthly" | "history" | "help";
 type MemberFilter = "all" | "active" | "warning" | "withdrawn";
 type MemberSort = "nickname_asc" | "nickname_desc" | "join_desc" | "join_asc" | "last_desc" | "last_asc" | "points_desc" | "chat_desc" | "chat_asc";
 type MonthlySortKey = "member" | "status" | "join" | "attendance" | "last" | "burden" | "warning";
@@ -353,6 +354,7 @@ export default function Home() {
   const [prepaymentDrafts, setPrepaymentDrafts] = useState<Record<string, string>>({});
 
   const [loading, setLoading] = useState(true);
+  const [operationsDataReady, setOperationsDataReady] = useState(false);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
 
@@ -447,6 +449,7 @@ export default function Home() {
 
     if (error) {
       setNotice(`데이터 불러오기 실패: ${error.message}`);
+      setOperationsDataReady(false);
       setLoading(false);
       return;
     }
@@ -490,6 +493,7 @@ export default function Home() {
     setPrepayments((prepaymentResult.data ?? []) as MeetingPrepayment[]);
     setProfiles((profileResult.data ?? []) as Profile[]);
     setActivityLogs((activityLogResult.data ?? []) as ActivityLog[]);
+    setOperationsDataReady(true);
     setLoading(false);
 
     // 봇 점수는 부가 정보라 실패해도 화면 전체를 막지 않는다.
@@ -604,6 +608,7 @@ export default function Home() {
             setMembers([]);
             setMeetings([]);
             setProfiles([]);
+            setOperationsDataReady(false);
             return;
           }
 
@@ -3733,9 +3738,10 @@ async function setAttendanceMembers(memberIds: string[]) {
         </div>
       </header>
 
-      <nav className="mainTabs desktopMainTabs">
+      <nav className="mainTabs desktopMainTabs" style={{ gridTemplateColumns: "repeat(7, minmax(0, 1fr))" }}>
         {[
           ["dashboard", "대시보드"],
+          ["operations", "운영 허브"],
           ["meetings", "모임 관리"],
           ["members", "회원 현황"],
           ["monthly", "월별 참석 현황"],
@@ -3772,7 +3778,7 @@ async function setAttendanceMembers(memberIds: string[]) {
           </button>
         ))}
         <button
-          className={["monthly", "history", "help"].includes(mainTab) || showMobileMore ? "active" : ""}
+          className={["operations", "monthly", "history", "help"].includes(mainTab) || showMobileMore ? "active" : ""}
           onClick={() => setShowMobileMore((current) => !current)}
         >
           <span>•••</span>
@@ -3789,6 +3795,7 @@ async function setAttendanceMembers(memberIds: string[]) {
               <button onClick={() => setShowMobileMore(false)}>×</button>
             </div>
             {[
+              ["operations", "운영 허브", "모임·펫·타로 연계 상태 확인"],
               ["monthly", "월별 참석 현황", "월별 참석·부담금 확인"],
               ["history", "변경 이력", "최근 운영 변경 기록"],
               ["help", "사용방법", "기능과 권한 안내"],
@@ -3824,6 +3831,29 @@ async function setAttendanceMembers(memberIds: string[]) {
           <span>{notice}</span>
           <button onClick={() => setNotice("")} aria-label="알림 닫기">×</button>
         </div>
+      )}
+
+      {mainTab === "operations" && currentRole && (
+        <OperationsHub
+          key={currentUserId}
+          userId={currentUserId}
+          role={currentRole}
+          month={selectedMonth}
+          onMonthChange={setSelectedMonth}
+          dataReady={operationsDataReady}
+          dataLoading={loading}
+          metrics={[
+            { title: "모임", value: `${monthMeetings.length}건`, detail: "모임 관리", open: () => setMainTab("meetings") },
+            { title: "회원", value: `${activeMembers.length}명`, detail: "활동 회원", open: () => setMainTab("members") },
+            { title: "출석", value: `${monthAttendanceTotal}회`, detail: "월별 참석", open: () => setMainTab("monthly") },
+            { title: "정산", value: `${completedCostMeetings}/${monthMeetings.length}건`, detail: "비용 입력 완료", open: () => setMainTab("meetings") },
+            { title: "생일", value: `${monthBirthdays.length}명`, detail: "대시보드 생일자", open: () => setMainTab("dashboard") },
+          ]}
+          botSyncedAt={botPointsSyncedAt}
+          onOpenBot={() => setShowBotAdmin(true)}
+          onOpenHistory={() => setMainTab("history")}
+          onOpenHelp={() => setMainTab("help")}
+        />
       )}
 
       <section className="myStatusStrip">
@@ -6095,14 +6125,14 @@ async function setAttendanceMembers(memberIds: string[]) {
               <button className="modalCloseButton" aria-label="닫기" onClick={() => setShowExtraFeatures(false)}>×</button>
             </div>
             <div className="extraFeaturesDialogBody">
-              <a href="https://tarot-bank.vercel.app/" className="extraFeaturesDialogLink">
+              <a href="/tarot" className="extraFeaturesDialogLink">
                 <span className="extraFeaturesDialogIcon" aria-hidden="true">🔮</span>
                 <span><strong>타로뱅크</strong><small>3카드 · 6개월 운세 · 켈틱 크로스</small></span>
                 <span aria-hidden="true">›</span>
               </a>
               <a href="/pet" className="extraFeaturesDialogLink">
                 <span className="extraFeaturesDialogIcon" aria-hidden="true">🐾</span>
-                <span><strong>찐친 PET</strong><small>PET 상태 · Coin · 돌보기 통합 준비</small></span>
+                <span><strong>찐친 PET</strong><small>PET 상태 · Coin · 돌보기</small></span>
                 <span aria-hidden="true">›</span>
               </a>
             </div>
