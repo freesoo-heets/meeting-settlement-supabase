@@ -285,6 +285,8 @@ export default function Home() {
   const [newGuestName, setNewGuestName] = useState("");
   const [attendeeSearch, setAttendeeSearch] = useState("");
   const [attendeeSort, setAttendeeSort] = useState<AttendeeSort>("nickname_asc");
+  const [showPreviousMeetingPicker, setShowPreviousMeetingPicker] = useState(false);
+  const [previousMeetingSourceId, setPreviousMeetingSourceId] = useState("");
   const [guestSort, setGuestSort] = useState<GuestSort>("nickname_asc");
   const [detailMeetingId, setDetailMeetingId] = useState("");
   const [editingMeetingId, setEditingMeetingId] = useState("");
@@ -641,6 +643,20 @@ export default function Home() {
   const selectedMeeting = useMemo(
     () => meetings.find((meeting) => meeting.id === selectedMeetingId) ?? null,
     [meetings, selectedMeetingId]
+  );
+
+  const previousAttendanceMeetings = useMemo(
+    () =>
+      selectedMeeting
+        ? meetings
+            .filter(
+              (meeting) =>
+                meeting.id !== selectedMeeting.id &&
+                byMeetingOldest(meeting, selectedMeeting) < 0
+            )
+            .sort(byMeetingNewest)
+        : [],
+    [meetings, selectedMeeting]
   );
 
   const detailMeeting = useMemo(
@@ -1916,29 +1932,31 @@ async function setAttendanceMembers(memberIds: string[]) {
   setSaving(false);
 }
 
-  async function loadPreviousMeetingAttendees() {
+  function openPreviousMeetingPicker() {
     if (!selectedMeeting) return;
-
-    const previous = meetings
-      .filter((meeting) => meeting.date < selectedMeeting.date && meeting.id !== selectedMeeting.id)
-      .sort((a, b) => b.date.localeCompare(a.date))[0];
-
-    if (!previous) {
+    if (previousAttendanceMeetings.length === 0) {
       setNotice("불러올 이전 모임이 없습니다.");
       return;
     }
+    setPreviousMeetingSourceId(previousAttendanceMeetings[0].id);
+    setShowPreviousMeetingPicker(true);
+  }
 
-    if (
-      !window.confirm(
-        `${previous.date} · ${previous.title} 참석자 ${previous.attendeeIds.length}명을 불러올까요?`
-      )
-    ) {
+  async function loadPreviousMeetingAttendees() {
+    if (!selectedMeeting) return;
+    const source = previousAttendanceMeetings.find(
+      (meeting) => meeting.id === previousMeetingSourceId
+    );
+    if (!source) {
+      setNotice("참석자를 불러올 모임을 선택해주세요.");
       return;
     }
 
-    await setAttendanceMembers(previous.attendeeIds.filter((id) =>
+    const attendeeIds = source.attendeeIds.filter((id) =>
       activeMembers.some((member) => member.id === id)
-    ));
+    );
+    setShowPreviousMeetingPicker(false);
+    await setAttendanceMembers(attendeeIds);
   }
 
   function csvEscape(value: string | number) {
@@ -4503,7 +4521,7 @@ async function setAttendanceMembers(memberIds: string[]) {
                     </button>
                     <button
                       className="tinyButton ghost"
-                      onClick={() => void loadPreviousMeetingAttendees()}
+                      onClick={openPreviousMeetingPicker}
                       disabled={saving}
                     >
                       이전 모임 참석자 불러오기
@@ -6765,6 +6783,105 @@ async function setAttendanceMembers(memberIds: string[]) {
                 }}
               >
                 모임 관리 열기
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {showPreviousMeetingPicker && selectedMeeting && (
+        <div
+          className="meetingModalBackdrop"
+          role="presentation"
+          onClick={() => {
+            if (!saving) setShowPreviousMeetingPicker(false);
+          }}
+        >
+          <section
+            className="meetingModal previousMeetingPicker"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="previousMeetingPickerTitle"
+            onClick={(event) => event.stopPropagation()}
+            onKeyDown={(event) => {
+              if (event.key === "Escape" && !saving) {
+                setShowPreviousMeetingPicker(false);
+              }
+            }}
+          >
+            <div className="meetingModalHeader">
+              <div>
+                <span>ATTENDANCE IMPORT</span>
+                <h2 id="previousMeetingPickerTitle">이전 모임 선택</h2>
+              </div>
+              <button
+                type="button"
+                className="modalCloseButton"
+                aria-label="닫기"
+                disabled={saving}
+                onClick={() => setShowPreviousMeetingPicker(false)}
+              >
+                ×
+              </button>
+            </div>
+
+            <p className="previousMeetingPickerHint">
+              선택한 모임의 회원 참석자를 현재 모임 참석자 목록으로 불러옵니다. 기존 참석자 중 빠지는 회원이 있으면 변경 전에 확인을 요청합니다.
+            </p>
+
+            <label className="previousMeetingSelectLabel" htmlFor="previous-meeting-source">
+              참석자를 가져올 모임
+            </label>
+            <select
+              id="previous-meeting-source"
+              value={previousMeetingSourceId}
+              onChange={(event) => setPreviousMeetingSourceId(event.target.value)}
+              disabled={saving}
+            >
+              {previousAttendanceMeetings.map((meeting) => {
+                const activeCount = meeting.attendeeIds.filter((id) =>
+                  activeMembers.some((member) => member.id === id)
+                ).length;
+                return (
+                  <option key={meeting.id} value={meeting.id}>
+                    {meeting.date} · {meeting.title} · 회원 {activeCount}명
+                  </option>
+                );
+              })}
+            </select>
+
+            {(() => {
+              const source = previousAttendanceMeetings.find(
+                (meeting) => meeting.id === previousMeetingSourceId
+              );
+              if (!source) return null;
+              const activeCount = source.attendeeIds.filter((id) =>
+                activeMembers.some((member) => member.id === id)
+              ).length;
+              return (
+                <div className="previousMeetingSelectionSummary" aria-live="polite">
+                  <strong>{source.date} · {source.title}</strong>
+                  <span>현재 회원 상태 기준 {activeCount}명의 참석자를 가져옵니다.</span>
+                </div>
+              );
+            })()}
+
+            <div className="meetingModalFooter">
+              <button
+                type="button"
+                className="tinyButton ghost"
+                onClick={() => setShowPreviousMeetingPicker(false)}
+                disabled={saving}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                className="smallButton"
+                onClick={() => void loadPreviousMeetingAttendees()}
+                disabled={saving || !previousMeetingSourceId}
+              >
+                {saving ? "불러오는 중…" : "선택한 모임 참석자 불러오기"}
               </button>
             </div>
           </section>
