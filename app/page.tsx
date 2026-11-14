@@ -102,6 +102,7 @@ type Meeting = MeetingRow & {
 };
 
 type MainTab = "dashboard" | "meetings" | "members" | "monthly" | "history" | "help";
+const MAIN_TAB_VALUES: MainTab[] = ["dashboard", "meetings", "members", "monthly", "history", "help"];
 type MemberFilter = "all" | "active" | "warning" | "withdrawn";
 type MemberSort = "nickname_asc" | "nickname_desc" | "join_desc" | "join_asc" | "last_desc" | "last_asc" | "points_desc" | "chat_desc" | "chat_asc";
 type MonthlySortKey = "member" | "status" | "join" | "attendance" | "last" | "burden" | "warning";
@@ -203,6 +204,7 @@ export default function Home() {
   const currentMonth = today.slice(0, 7);
 
   const [mainTab, setMainTab] = useState<MainTab>("dashboard");
+  const [mainTabUrlReady, setMainTabUrlReady] = useState(false);
   const [showDashboardCosts, setShowDashboardCosts] = useState(false);
   const [meetingCalendarMonth, setMeetingCalendarMonth] = useState(currentMonth);
   const [selectedCalendarDate, setSelectedCalendarDate] = useState(today);
@@ -216,6 +218,25 @@ export default function Home() {
   const [showBotAdmin, setShowBotAdmin] = useState(false);
   // 카톡 대국신청 링크(?omok= / ?alkkagi= / ?catch=)로 들어온 경우
   const [gameInvite, setGameInvite] = useState<{ kind: GameKind; id: string } | null>(null);
+
+  useEffect(() => {
+    const syncMainTabFromUrl = () => {
+      const requestedTab = new URLSearchParams(window.location.search).get("tab");
+      setMainTab(MAIN_TAB_VALUES.includes(requestedTab as MainTab) ? requestedTab as MainTab : "dashboard");
+    };
+    syncMainTabFromUrl();
+    setMainTabUrlReady(true);
+    window.addEventListener("popstate", syncMainTabFromUrl);
+    return () => window.removeEventListener("popstate", syncMainTabFromUrl);
+  }, []);
+
+  useEffect(() => {
+    if (!mainTabUrlReady) return;
+    const url = new URL(window.location.href);
+    if (mainTab === "dashboard") url.searchParams.delete("tab");
+    else url.searchParams.set("tab", mainTab);
+    window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+  }, [mainTab, mainTabUrlReady]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -3553,10 +3574,12 @@ async function setAttendanceMembers(memberIds: string[]) {
           </div>
 
           {authMode === "login" ? (
-            <div className="authForm">
+            <form className="authForm" onSubmit={(event) => { event.preventDefault(); void login(); }}>
               <label>
                 <span>닉네임</span>
                 <input
+                  type="text"
+                  name="nickname"
                   value={loginNickname}
                   onChange={(event) => setLoginNickname(event.target.value)}
                   placeholder="가입한 닉네임"
@@ -3567,27 +3590,27 @@ async function setAttendanceMembers(memberIds: string[]) {
                 <span>비밀번호</span>
                 <input
                   type="password"
+                  name="password"
                   value={loginPassword}
                   onChange={(event) => setLoginPassword(event.target.value)}
                   placeholder="비밀번호"
                   autoComplete="current-password"
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") void login();
-                  }}
                 />
               </label>
-              <button className="authPrimaryButton" onClick={() => void login()}>
+              <button type="submit" className="authPrimaryButton">
                 로그인
               </button>
-            </div>
+            </form>
           ) : (
-            <div className="authForm">
+            <form className="authForm" onSubmit={(event) => { event.preventDefault(); void signup(); }}>
               <div className="signupGuide">
                 처음 방문한 회원은 본인의 닉네임과 비밀번호를 직접 정해 가입합니다.
               </div>
               <label>
                 <span>사용할 닉네임</span>
                 <input
+                  type="text"
+                  name="nickname"
                   value={signupNickname}
                   onChange={(event) => setSignupNickname(event.target.value)}
                   placeholder="모임에서 사용할 닉네임"
@@ -3598,6 +3621,7 @@ async function setAttendanceMembers(memberIds: string[]) {
                 <span>생일</span>
                 <input
                   type="date"
+                  name="birthday"
                   value={signupBirthday}
                   max={today}
                   onChange={(event) => setSignupBirthday(event.target.value)}
@@ -3608,6 +3632,7 @@ async function setAttendanceMembers(memberIds: string[]) {
                 <span>비밀번호</span>
                 <input
                   type="password"
+                  name="new-password"
                   value={signupPassword}
                   onChange={(event) => setSignupPassword(event.target.value)}
                   placeholder="6자 이상"
@@ -3618,22 +3643,20 @@ async function setAttendanceMembers(memberIds: string[]) {
                 <span>비밀번호 확인</span>
                 <input
                   type="password"
+                  name="confirm-password"
                   value={signupPasswordConfirm}
                   onChange={(event) => setSignupPasswordConfirm(event.target.value)}
                   placeholder="비밀번호 다시 입력"
                   autoComplete="new-password"
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") void signup();
-                  }}
                 />
               </label>
-              <button className="authPrimaryButton" onClick={() => void signup()}>
+              <button type="submit" className="authPrimaryButton">
                 가입하고 시작하기
               </button>
-            </div>
+            </form>
           )}
 
-          {loginNotice && <div className="authNotice">{loginNotice}</div>}
+          {loginNotice && <div className="authNotice" role="alert">{loginNotice}</div>}
 
           {ownerExists === false && (
             <>
@@ -3679,6 +3702,7 @@ async function setAttendanceMembers(memberIds: string[]) {
 
   return (
     <main className="pageShell">
+      <a className="skipLink" href="#main-content">본문으로 바로가기</a>
       <header className="topHeader">
         <div>
           <div className="kicker">MEETING MANAGER</div>
@@ -3733,7 +3757,7 @@ async function setAttendanceMembers(memberIds: string[]) {
         </div>
       </header>
 
-      <nav className="mainTabs desktopMainTabs">
+      <nav className="mainTabs desktopMainTabs" aria-label="주요 메뉴">
         {[
           ["dashboard", "대시보드"],
           ["meetings", "모임 관리"],
@@ -3745,6 +3769,7 @@ async function setAttendanceMembers(memberIds: string[]) {
           <button
             key={value}
             className={mainTab === value ? "tabButton active" : "tabButton"}
+            aria-pressed={mainTab === value}
             data-tab={value}
             onClick={() => setMainTab(value as MainTab)}
           >
@@ -3762,27 +3787,30 @@ async function setAttendanceMembers(memberIds: string[]) {
           <button
             key={value}
             className={mainTab === value ? "active" : ""}
+            aria-pressed={mainTab === value}
             onClick={() => {
               setMainTab(value as MainTab);
               setShowMobileMore(false);
             }}
           >
-            <span>{icon}</span>
+            <span aria-hidden="true">{icon}</span>
             <strong>{label}</strong>
           </button>
         ))}
         <button
           className={["monthly", "history", "help"].includes(mainTab) || showMobileMore ? "active" : ""}
+          aria-expanded={showMobileMore}
+          aria-controls="mobile-more-sheet"
           onClick={() => setShowMobileMore((current) => !current)}
         >
-          <span>•••</span>
+          <span aria-hidden="true">•••</span>
           <strong>더보기</strong>
         </button>
       </nav>
 
       {showMobileMore && (
         <div className="mobileMoreBackdrop" onClick={() => setShowMobileMore(false)}>
-          <section className="mobileMoreSheet" onClick={(event) => event.stopPropagation()}>
+          <section id="mobile-more-sheet" className="mobileMoreSheet" onClick={(event) => event.stopPropagation()}>
             <div className="mobileMoreHandle" />
             <div className="mobileMoreHead">
               <strong>더보기</strong>
@@ -3826,7 +3854,7 @@ async function setAttendanceMembers(memberIds: string[]) {
         </div>
       )}
 
-      <section className="myStatusStrip">
+      <section className="myStatusStrip" id="main-content" tabIndex={-1}>
         <button
           className="myIdentity myIdentityButton"
           onClick={() => setShowMyActivity(true)}
@@ -4178,12 +4206,19 @@ async function setAttendanceMembers(memberIds: string[]) {
                   <div
                     className={`calendarDay ${cell.inMonth ? "" : "outside"} ${cell.date === today ? "today" : ""} ${cell.date === selectedCalendarDate ? "selectedDate" : ""}`}
                     key={cell.date}
-                    onClick={() => setSelectedCalendarDate(cell.date)}
                   >
-                    <div className="calendarDayNumber">
-                      <span>{cell.day}</span>
-                      {dayMeetings.length > 0 && <em>{dayMeetings.length}</em>}
-                    </div>
+                    <button
+                      type="button"
+                      className="calendarDaySelect"
+                      aria-label={`${cell.date} 선택, ${dayMeetings.length ? `${dayMeetings.length}개 모임` : "모임 없음"}`}
+                      aria-pressed={cell.date === selectedCalendarDate}
+                      onClick={() => setSelectedCalendarDate(cell.date)}
+                    >
+                      <div className="calendarDayNumber">
+                        <span>{cell.day}</span>
+                        {dayMeetings.length > 0 && <em>{dayMeetings.length}</em>}
+                      </div>
+                    </button>
                     <div className="calendarEvents">
                       {(expanded ? dayMeetings : dayMeetings.slice(0, 3)).map((meeting) => (
                         <button
