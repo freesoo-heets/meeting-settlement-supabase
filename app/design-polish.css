@@ -1,0 +1,142 @@
+/*
+ * Shared UI polish — additive overrides, loaded after globals.css.
+ * Existing layouts, game canvases, and theme palettes are intentionally preserved.
+ * Review: mobile typography, touch targets, action spacing and keyboard navigation.
+ */
+:root {
+  --ui-space-1: 4px;
+  --ui-space-2: 8px;
+  --ui-space-3: 12px;
+  --ui-space-4: 16px;
+  --ui-space-6: 24px;
+  --ui-touch-min: 44px;
+  --ui-button-height: 48px;
+  --ui-radius-control: 10px;
+  --ui-radius-card: 16px;
+  --ui-motion-fast: 150ms;
+  --ui-motion-standard: 220ms;
+}
+
+.pageShell .memberMoreButton,
+.pageShell .mobileMoreHead button {
+  width: var(--ui-touch-min);
+  height: var(--ui-touch-min);
+  min-width: var(--ui-touch-min);
+  min-height: var(--ui-touch-min);
+}
+
+.pageShell .memberMoreMenu button {
+  min-height: var(--ui-touch-min);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.pageShell .meetingFlowStep strong { font-size: 12px; }
+.pageShell .meetingFlowStep small { font-size: 12px; line-height: 1.4; }
+.pageShell .emptyStateCard strong { font-size: 14px; }
+.pageShell .emptyStateCard span { font-size: 12px; line-height: 1.5; }
+
+.pageShell .mobileMoreItem {
+  min-height: 52px;
+  gap: var(--ui-space-3);
+}
+.pageShell .mobileMoreItem strong { font-size: 14px; line-height: 1.4; }
+.pageShell .mobileMoreItem span { font-size: 12px; line-height: 1.45; }
+
+.pageShell .extraFeaturesStatus {
+  font-size: 11px;
+  line-height: 1.35;
+  padding: 4px 8px;
+}
+
+.pageShell .themeToggle,
+.pageShell .logoutButton,
+.pageShell .tabButton,
+.pageShell .smallButton {
+  min-height: var(--ui-touch-min);
+}
+
+.pageShell .mainTabs .tabButton {
+  line-height: 1.3;
+}
+
+.pageShell :is(
+  .themeToggle, .logoutButton, .tabButton, .smallButton,
+  .tinyButton, .memberMoreButton, .memberMoreMenu button,
+  .mobileBottomNav button, .mobileMoreHead button, .mobileMoreItem,
+  .pointRankingFab, .extraFeaturesDialogLink
+):focus-visible {
+  outline: 3px solid #2563eb;
+  outline-offset: 3px;
+}
+
+@media (max-width: 760px) {
+  .pageShell .mobileBottomNav {
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  }
+  .pageShell .mobileBottomNav > button {
+    min-height: 54px;
+    gap: 4px;
+  }
+  .pageShell .mobileBottomNav > button > strong {
+    font-size: 12px;
+    line-height: 1.2;
+  }
+  .pageShell .mobileBottomNav > button > span {
+    font-size: 16px;
+  }
+
+  /* Match the fixed navigation's top edge; retain all three existing actions. */
+  .pageShell .floatingActions {
+    right: 12px;
+    left: 12px;
+    bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+    gap: 8px;
+    flex-wrap: nowrap;
+  }
+  .pageShell .floatingActions > .extraFeaturesFabGroup,
+  .pageShell .floatingActions > .pointRankingFab {
+    min-width: 0;
+  }
+  .pageShell .floatingActions .pointRankingFab {
+    min-height: var(--ui-touch-min);
+    padding: 9px clamp(6px, 2vw, 12px);
+    font-size: clamp(11px, 2.8vw, 13px);
+    gap: 4px;
+  }
+
+  .pageShell .mobileMoreSheet {
+    max-height: min(85dvh, 760px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .pageShell .meetingFlowStep small {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
+@media (max-width: 390px) {
+  .pageShell .floatingActions {
+    right: 8px;
+    left: 8px;
+    gap: 6px;
+  }
+  .pageShell .floatingActions .pointRankingFab {
+    padding-inline: 6px;
+    font-size: 11px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pageShell .pointRankingFab,
+  .pageShell .extraFeaturesDialogLink {
+    transition-duration: 0.01ms;
+    animation-duration: 0.01ms;
+  }
+  .pageShell .pointRankingFab:hover,
+  .pageShell .extraFeaturesDialogLink:hover {
+    transform: none;
+  }
+}
