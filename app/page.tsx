@@ -6292,6 +6292,11 @@ async function setAttendanceMembers(memberIds: string[]) {
                 <span><strong>타로뱅크</strong><small>3카드 · 6개월 운세 · 켈틱 크로스</small></span>
                 <span aria-hidden="true">›</span>
               </a>
+              <a href="/support" className="extraFeaturesDialogLink">
+                <span className="extraFeaturesDialogIcon" aria-hidden="true">💝</span>
+                <span><strong>후원리스트</strong><small>월별 후원 횟수 · 지급 포인트</small></span>
+                <span aria-hidden="true">›</span>
+              </a>
               <a href="/pet" className="extraFeaturesDialogLink">
                 <span className="extraFeaturesDialogIcon" aria-hidden="true">🐾</span>
                 <span><strong>찐친 PET</strong><small>PET 상태 · Coin · 돌보기 통합 준비</small></span>
