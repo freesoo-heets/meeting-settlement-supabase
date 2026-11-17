@@ -13,16 +13,17 @@ function Run-Npx([string[]]$NpxArgs) {
 }
 
 Write-Host '1/5 Impeccable'
-Run-Npx @('--yes','impeccable','install','--providers=codex','--scope=project')
+Run-Npx -NpxArgs @('--yes','impeccable','install','--providers=codex','--scope=project')
 Write-Host '2/5 Taste Skill'
-Run-Npx @('--yes','skills','add','Leonxlnx/taste-skill','--skill','design-taste-frontend','--agent','codex','-y')
+Run-Npx -NpxArgs @('--yes','skills','add','Leonxlnx/taste-skill','--skill','design-taste-frontend','--agent','codex','-y')
 Write-Host '3/5 unslop'
-Run-Npx @('--yes','skills','add','heydamir/unslop','--skill','unslop','--agent','codex','-y')
+Run-Npx -NpxArgs @('--yes','skills','add','heydamir/unslop','--skill','unslop','--agent','codex','-y')
 Write-Host '4/5 UI Skills registry'
-Run-Npx @('--yes','ui-skills','--help')
+Run-Npx -NpxArgs @('--yes','skills','add','ibelick/ui-skills','--skill','ui-skills','--agent','codex','-y')
+Run-Npx -NpxArgs @('--yes','ui-skills','--help')
 Write-Host '5/5 Interface Design'
-Run-Npx @('--yes','skills','add','dammyjay93/interface-design','--skill','interface-design','--agent','codex','-y')
+Run-Npx -NpxArgs @('--yes','skills','add','dammyjay93/interface-design','--skill','interface-design','--agent','codex','-y')
 
-Write-Host 'Done. UI Skills is a CLI registry: use npx ui-skills list / get <skill-name> as needed.'
+Write-Host 'Done. UI Skills skill and its registry CLI are installed/available. Use npx ui-skills list / get <skill-name> as needed.'
 Write-Host 'Restart Codex to discover project skills. For Impeccable, approve the hook in Codex /hooks.'
 Write-Host 'Taste Skill browser QA additionally needs Chrome/Chromium. No application dependencies or UI source files were changed.'
