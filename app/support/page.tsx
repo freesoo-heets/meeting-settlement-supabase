@@ -68,7 +68,7 @@ export default function SupportHistoryPage() {
       </section>
       <section style={{ marginTop: 20, background: "white", borderRadius: 18, border: "1px solid #e8eaf1", padding: 20 }}>
         <h2 style={{ fontSize: 19, margin: "0 0 12px" }}>후원 지급 기준</h2>
-        <p style={{ margin: 0, lineHeight: 1.8 }}>매월 1회 5,000P · 2회 7,500P · 3회 10,000P<br/>매월 한국시간 1일에 횟수가 초기화되며, 월 최대 3회까지 지급합니다. 기존 후원 메달도 함께 지급됩니다.</p>
+        <p style={{ margin: 0, lineHeight: 1.8 }}>매월 1회 5,000P · 2회 7,500P · 3회부터 매회 10,000P<br/>3회차부터는 매회 10,000P를 지급하며 횟수 제한은 없습니다. 매월 한국시간 1일에 횟수가 초기화되고 기존 후원 메달도 함께 지급됩니다.</p>
       </section>
     </div>
   </main>;
