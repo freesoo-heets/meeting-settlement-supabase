@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "./design-polish.css";
+import "./design-polish-phase2.css";
 
 export const metadata: Metadata = {
   title: "모임 참석 · 비용 정산",
