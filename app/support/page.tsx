@@ -127,7 +127,7 @@ export default function SupportHistoryPage() {
                     opacity: deletingUid ? 0.6 : 1 }}>
                   {deletingUid === member.kakao_uid ? "삭제 중…" : "삭제"}
                 </button>
-              </td>
+              </td>}
             </tr>)}</tbody></table></div>}
       </section>
       {adminRows && <p style={{ margin: "14px 4px", color: "#667085", fontSize: 13 }}>
