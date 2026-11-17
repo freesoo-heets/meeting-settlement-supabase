@@ -1,0 +1,223 @@
+/*
+ * Phase 2 — dashboard / meeting settlement / member overview.
+ * Presentation-only overrides. Keep business logic, element order, all theme colors
+ * and the phase-1 stylesheet intact.
+ */
+
+:root {
+  --ui-panel-gap: 12px;
+  --ui-panel-padding: 16px;
+  --ui-table-row-height: 44px;
+  --ui-table-border: #e7e4e0;
+  --ui-text-secondary: #625e5a;
+}
+
+/* Dashboard: a common reading rhythm across stats and supporting panels. */
+.pageShell .meetingDashboardHero,
+.pageShell .meetingMetricGrid,
+.pageShell .dashboardRankingGrid,
+.pageShell .dashboardActionGrid {
+  gap: var(--ui-panel-gap);
+}
+
+.pageShell .meetingDashboardTitle {
+  align-items: center;
+  gap: 12px 18px;
+}
+.pageShell .meetingDashboardTitle h2 {
+  font-size: clamp(20px, 2.2vw, 25px);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.pageShell .meetingDashboardTitle p,
+.pageShell .dashboardEyebrow,
+.pageShell .meetingMetricCard > span,
+.pageShell .meetingMetricCard > small,
+.pageShell .dashboardPanelBadge {
+  font-size: 12px;
+  line-height: 1.4;
+}
+.pageShell .dashboardManageButton {
+  min-height: var(--ui-touch-min);
+  font-size: 13px;
+  padding-inline: 14px;
+}
+.pageShell .meetingMetricCard {
+  min-height: 116px;
+  padding: var(--ui-panel-padding);
+  gap: 6px;
+  border-radius: var(--ui-radius-card);
+  box-shadow: 0 4px 14px rgba(35, 30, 25, .035);
+}
+.pageShell .meetingMetricCard > strong {
+  font-size: clamp(20px, 2.1vw, 26px);
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+.pageShell .meetingMetricCard > strong em { font-size: 12px; }
+.pageShell .dashboardRankingPanel,
+.pageShell .dashboardActionGrid > .panel {
+  min-width: 0;
+}
+.pageShell button.meetingMetricCard:focus-visible,
+.pageShell .dashboardManageButton:focus-visible {
+  outline: 3px solid #2563eb;
+  outline-offset: 3px;
+}
+
+/* Settlement: preserve all calculations and save flows; improve scanability. */
+.pageShell .step51CostEditor {
+  display: grid;
+  gap: 12px;
+  padding: var(--ui-panel-padding);
+  border-radius: var(--ui-radius-card);
+}
+.pageShell .step51CostHead {
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-bottom: 0;
+  line-height: 1.4;
+}
+.pageShell .step51CostHead strong { font-size: 15px; }
+.pageShell .step51CostHead span { font-size: 12px; }
+.pageShell .step51CostActions,
+.pageShell .payeeRow { gap: 8px; }
+.pageShell .step51CostAmount {
+  font-size: clamp(18px, 2vw, 22px);
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.pageShell .payeeEditor {
+  margin-top: 2px;
+  padding-top: 14px;
+}
+.pageShell .payeeEditor .step51CostHead { margin-bottom: 10px; }
+.pageShell .payeeRow select,
+.pageShell .payeeRow input,
+.pageShell .payeeRow button,
+.pageShell .step51CostActions input,
+.pageShell .step51CostActions button {
+  min-height: var(--ui-touch-min);
+}
+.pageShell .payeeAccount { overflow-wrap: anywhere; }
+.pageShell .payeeHint { font-size: 12px; line-height: 1.55; }
+
+.pageShell .allocationSummaryGrid { gap: 10px; margin-bottom: 12px; }
+.pageShell .allocationSummaryGrid .miniSummary {
+  min-width: 0;
+  padding: 13px 14px;
+  border: 1px solid var(--ui-table-border);
+  border-radius: 12px;
+  gap: 6px;
+}
+.pageShell .allocationSummaryGrid .miniSummary span { font-size: 12px; line-height: 1.4; }
+.pageShell .allocationSummaryGrid .miniSummary strong {
+  font-size: clamp(14px, 1.5vw, 18px);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+.pageShell .allocationScroll { gap: 8px; }
+.pageShell .allocationCompactRow {
+  gap: 8px;
+  padding: 12px;
+  border-color: var(--ui-table-border);
+  border-radius: 12px;
+}
+.pageShell .allocationIdentity { gap: 6px; }
+.pageShell .allocationField label,
+.pageShell .allocationAmount span { font-size: 12px; }
+.pageShell .allocationAmount strong { font-size: 14px; font-variant-numeric: tabular-nums; }
+.pageShell .allocationCompactRow input { min-height: var(--ui-touch-min); }
+.pageShell .allocationRowActions { gap: 8px; }
+
+/* Member overview: align search, status summary, cards, and values. */
+.pageShell .memberManagementHeader { gap: 16px; }
+.pageShell .memberManagementTitleRow h2 { font-size: 18px; line-height: 1.4; }
+.pageShell .memberManagementTitleRow p,
+.pageShell .memberStatusTitleLine small { font-size: 12px; line-height: 1.5; }
+.pageShell .memberSearchBar { gap: 12px; }
+.pageShell .memberSearchBar label { gap: 6px; }
+.pageShell .memberSearchBar label > span { font-size: 12px; line-height: 1.35; }
+.pageShell .memberSearchBar input,
+.pageShell .memberSearchBar select,
+.pageShell .memberAddDrawerForm input,
+.pageShell .memberAddDrawerForm .adminAddMemberButton {
+  min-height: var(--ui-touch-min);
+}
+.pageShell .memberStatusSummary { gap: 10px; }
+.pageShell .memberStatusCard {
+  min-height: 68px;
+  gap: 8px;
+  padding: 14px;
+  border-radius: var(--ui-radius-card);
+}
+.pageShell .memberStatusCard > span { font-size: 13px; line-height: 1.35; }
+.pageShell .memberStatusCard > strong { font-size: 21px; font-variant-numeric: tabular-nums; }
+.pageShell .memberStatusCard > strong em { font-size: 12px; }
+.pageShell .memberCards { gap: 12px; }
+.pageShell .memberCard {
+  min-width: 0;
+  padding: 16px;
+  border-radius: var(--ui-radius-card);
+  box-shadow: 0 4px 12px rgba(35, 30, 25, .028);
+}
+.pageShell .memberCard .metaLine { font-size: 12px; line-height: 1.45; gap: 6px 10px; }
+
+/* Monthly attendance: distinguish headings without touching existing sticky logic.
+ * Tables remain horizontally scrollable for wide data sets. */
+.pageShell .tableWrap { max-width: 100%; overscroll-behavior-x: contain; }
+.pageShell .monthlyTable { border-spacing: 0; }
+.pageShell .monthlyTable th,
+.pageShell .monthlyTable td {
+  min-height: var(--ui-table-row-height);
+  padding: 12px 10px;
+  border-bottom: 1px solid var(--ui-table-border);
+  font-size: 13px;
+  line-height: 1.45;
+  vertical-align: middle;
+  font-variant-numeric: tabular-nums;
+}
+.pageShell .monthlyTable thead th {
+  padding: 0;
+  font-size: 12px;
+  font-weight: 800;
+}
+.pageShell .monthlyTable .monthlySortButton {
+  min-height: var(--ui-touch-min);
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.35;
+}
+.pageShell .mobileTableHint { font-size: 12px; line-height: 1.55; }
+
+/* Preserve normal vs Christmas thematic color palettes. */
+html[data-theme="christmas"] .pageShell .meetingMetricCard,
+html[data-theme="christmas"] .pageShell .memberCard {
+  box-shadow: 0 4px 14px rgba(38, 73, 48, .045);
+}
+
+@media (max-width: 760px) {
+  .pageShell .meetingDashboardTitle { align-items: stretch; }
+  .pageShell .meetingMetricGrid { gap: 10px; }
+  .pageShell .meetingMetricCard { min-height: 110px; padding: 12px; }
+  .pageShell .allocationSummaryGrid.allocationSummaryFour {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .pageShell .allocationCompactRow { padding: 12px; }
+  .pageShell .memberManagementHeader { padding: 16px !important; }
+  .pageShell .memberStatusCard { padding: 12px; min-height: 64px; }
+  .pageShell .memberCard { padding: 14px; }
+  .pageShell .monthlyTable th,
+  .pageShell .monthlyTable td { padding: 11px 10px; }
+}
+
+@media (max-width: 390px) {
+  .pageShell .meetingMetricGrid,
+  .pageShell .memberStatusSummary { gap: 8px; }
+  .pageShell .meetingMetricCard > strong { font-size: 20px; }
+  .pageShell .memberStatusCard > strong { font-size: 19px; }
+  .pageShell .memberStatusCard { padding: 11px 10px; }
+  .pageShell .memberCard { padding: 12px; }
+}
