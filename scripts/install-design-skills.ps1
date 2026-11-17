@@ -19,7 +19,7 @@ Run-Npx -NpxArgs @('--yes','skills','add','Leonxlnx/taste-skill','--skill','desi
 Write-Host '3/5 unslop'
 Run-Npx -NpxArgs @('--yes','skills','add','heydamir/unslop','--skill','unslop','--agent','codex','-y')
 Write-Host '4/5 UI Skills registry'
-Run-Npx -NpxArgs @('--yes','skills','add','ibelick/ui-skills','--skill','ui-skills','--agent','codex','-y')
+Run-Npx -NpxArgs @('--yes','skills','add','ibelick/ui-skills','--skill','ui-skills-root','--agent','codex','-y')
 Run-Npx -NpxArgs @('--yes','ui-skills','--help')
 Write-Host '5/5 Interface Design'
 Run-Npx -NpxArgs @('--yes','skills','add','dammyjay93/interface-design','--skill','interface-design','--agent','codex','-y')
