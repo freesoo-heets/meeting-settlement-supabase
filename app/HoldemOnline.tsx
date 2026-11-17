@@ -35,6 +35,8 @@ type TableRow = {
   turn_deadline: string | null;
   next_hand_at: string | null;
   created_at: string;
+  version?: number; // 저장할 때마다 1씩 오른다 (오래된 응답 거르기)
+  updated_at?: string;
 };
 type SeatRow = {
   id: string;
@@ -62,7 +64,7 @@ type SeatRow = {
   pass_until?: string | null;
 };
 
-const TABLE_COLUMNS = "id,status,host_member,host_name,is_friendly,max_seats,view,hand_no,turn_deadline,next_hand_at,created_at";
+const TABLE_COLUMNS = "id,status,host_member,host_name,is_friendly,max_seats,view,hand_no,turn_deadline,next_hand_at,created_at,version,updated_at";
 const SEAT_BASE = "id,table_id,member_id,name,status,buy_in,is_friendly,escrow_state,escrow_note,cash_out,hands,settle_state,payout,fee,created_at,left_at";
 const SEAT_COLUMNS = `${SEAT_BASE},rebuy_state,rebuy_note,rebuy_want,rebuy_total,renew_state,seated_at,pass_until`;
 const SEAT_REBUY = `${SEAT_BASE},rebuy_state,rebuy_note,rebuy_want,rebuy_total`;
@@ -114,7 +116,7 @@ const fmt = (n: number) => n.toLocaleString("ko-KR");
 async function callHoldem(payload: Record<string, unknown>) {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
-  if (!token) return { ok: false, error: "로그인이 필요합니다." } as { ok: boolean; error?: string; id?: string; hole?: Card[]; handNo?: number };
+  if (!token) return { ok: false, error: "로그인이 필요합니다." } as { ok: boolean; error?: string; id?: string; hole?: Card[]; handNo?: number; changed?: boolean };
   const response = await fetch("/api/holdem", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -126,6 +128,7 @@ async function callHoldem(payload: Record<string, unknown>) {
     id?: string;
     hole?: Card[];
     handNo?: number;
+    changed?: boolean;
   };
 }
 
@@ -413,9 +416,16 @@ function HoldemRoom({
     setEmotes((list) => [...list.filter((x) => x.member !== e.member).slice(-7), { ...e, key }]);
     window.setTimeout(() => setEmotes((list) => list.filter((x) => x.key !== key)), EMOTE_SHOW_MS);
   }, []);
+  // ⚡ 누가 행동하면 그 화면이 같은 채널로 '바뀜' 신호를 보낸다 → 받은 화면은 바로 다시 읽는다
+  //   (DB 변경 알림(postgres_changes)은 권한 확인 때문에 늦게 오거나 빠질 때가 있어, 5초 확인까지 기다리며 렉처럼 보였다 · 2026-11-17)
+  const loadRef = useRef<() => void>(() => {});
+  const pingOthers = useCallback(() => {
+    void emoteChannel.current?.send({ type: "broadcast", event: "sync", payload: {} });
+  }, []);
   useEffect(() => {
     const channel = supabase
       .channel(`holdem-emote-${tableId}`, { config: { broadcast: { self: false }, presence: { key: viewerKey.current } } })
+      .on("broadcast", { event: "sync" }, () => loadRef.current())
       .on("broadcast", { event: "emote" }, ({ payload }) => {
         const data = payload as { kind?: unknown; member?: unknown; name?: unknown };
         if (!isEmoteKind(data.kind) || typeof data.member !== "string") return;
@@ -442,24 +452,60 @@ function HoldemRoom({
     };
   }, [tableId, showEmote, currentMemberId, myName]);
 
+  // 테이블은 version 이 오르기만 한다 → 더 오래된 응답이 새 화면을 덮지 않게 · 같으면 그대로 둬서 다시 그리지 않게
+  const applyRow = useCallback((next: TableRow) => {
+    setRow((prev) => {
+      if (!prev) return next;
+      if ((next.version ?? 0) < (prev.version ?? 0)) return prev;
+      if (next.version === prev.version && next.status === prev.status && next.updated_at === prev.updated_at) return prev;
+      return next;
+    });
+  }, []);
+  const seatsKey = useRef("");
+  const loading = useRef(false);
+  const again = useRef(false);
   const load = useCallback(async () => {
-    const [t, s] = await Promise.all([
-      supabase.from("holdem_tables").select(TABLE_COLUMNS).eq("id", tableId).maybeSingle(),
-      readSeats((c) => supabase.from("holdem_seats").select(c).eq("table_id", tableId).order("created_at", { ascending: false }).limit(60)),
-    ]);
-    if (t.data) {
-      setRow(t.data as TableRow);
-      void holdemTableNumbers(supabase, [t.data as TableRow]).then((nos) => setTableNo(nos[tableId] ?? null));
+    // 동시에 여러 번 불려도 한 번에 하나만 (도는 중에 또 불리면 끝나고 한 번 더)
+    if (loading.current) {
+      again.current = true;
+      return;
     }
-    setSeats(s);
-  }, [tableId]);
+    loading.current = true;
+    try {
+      do {
+        again.current = false;
+        const [t, s] = await Promise.all([
+          supabase.from("holdem_tables").select(TABLE_COLUMNS).eq("id", tableId).maybeSingle(),
+          readSeats((c) => supabase.from("holdem_seats").select(c).eq("table_id", tableId).order("created_at", { ascending: false }).limit(60)),
+        ]);
+        if (t.data) applyRow(t.data as TableRow);
+        const key = JSON.stringify(s);
+        if (key !== seatsKey.current) {
+          seatsKey.current = key;
+          setSeats(s);
+        }
+      } while (again.current);
+    } finally {
+      loading.current = false;
+    }
+  }, [tableId, applyRow]);
+  loadRef.current = () => void load();
+
+  useEffect(() => {
+    if (row && tableNo === null) void holdemTableNumbers(supabase, [row]).then((nos) => setTableNo(nos[tableId] ?? null));
+  }, [row, tableNo, tableId]);
 
   // 실시간 반영 (+ 끊겨도 5초마다)
   useEffect(() => {
     void load();
     const channel = supabase
       .channel(`holdem-${tableId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "holdem_tables", filter: `id=eq.${tableId}` }, () => void load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "holdem_tables", filter: `id=eq.${tableId}` }, (change) => {
+        // 알림에 새 테이블이 통째로 들어 있으면 다시 읽지 않고 바로 쓴다
+        const next = (change as { new?: Partial<TableRow> }).new;
+        if (next && next.id === tableId && next.view && typeof next.version === "number") applyRow(next as TableRow);
+        else void load();
+      })
       .on("postgres_changes", { event: "*", schema: "public", table: "holdem_seats", filter: `table_id=eq.${tableId}` }, () => void load())
       .subscribe();
     const timer = window.setInterval(() => void load(), 5000);
@@ -467,7 +513,7 @@ function HoldemRoom({
       window.clearInterval(timer);
       void supabase.removeChannel(channel);
     };
-  }, [load, tableId]);
+  }, [load, tableId, applyRow]);
 
   const view = row?.view;
   const meIndex = view?.players?.findIndex((p) => p.member === currentMemberId && !p.empty) ?? -1;
@@ -504,11 +550,16 @@ function HoldemRoom({
       const waitingStart = row.status === "waiting" && (row.view?.players ?? []).filter((p) => !p.empty && p.chips > 0).length >= 2;
       if ((now > deadline || now > nextHand || newcomer || waitingStart) && now - lastTick.current > 2500) {
         lastTick.current = now;
-        void callHoldem({ action: "tick", tableId });
+        void callHoldem({ action: "tick", tableId }).then((result) => {
+          if (result.ok && result.changed) {
+            void load();
+            pingOthers();
+          }
+        });
       }
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [row, seats, tableId]);
+  }, [row, seats, tableId, load, pingOthers]);
 
   async function run(payload: Record<string, unknown>, done?: () => void) {
     setBusy(true);
@@ -516,7 +567,10 @@ function HoldemRoom({
     const result = await callHoldem({ tableId, ...payload });
     setBusy(false);
     if (!result.ok) setMessage(result.error ?? "처리하지 못했습니다.");
-    else done?.();
+    else {
+      done?.();
+      pingOthers();
+    }
     void load();
   }
   const onAct = (action: Action) => void run({ action: "act", type: action.type, to: action.to ?? 0, handNo });

@@ -89,9 +89,7 @@ async function save(admin: Admin, row: TableRow, version: number, ctx: Ctx) {
     .select("table_id");
   if (error || (data ?? []).length !== 1) return false;
   const at = new Date().toISOString();
-  for (const [id, fields] of ctx.seatUpdates) {
-    await admin.from("holdem_seats").update({ ...fields, updated_at: at }).eq("id", id).eq("status", "seated");
-  }
+  // ★ 화면이 보는 테이블(view)을 먼저 저장하고, 자리 기록은 그 뒤에 한꺼번에 (예전: 자리 하나씩 차례로 저장한 뒤 테이블 → 화면이 늦게 바뀜, 2026-11-17)
   await admin
     .from("holdem_tables")
     .update({
@@ -106,6 +104,11 @@ async function save(admin: Admin, row: TableRow, version: number, ctx: Ctx) {
     })
     .eq("id", row.id)
     .lt("version", next);
+  await Promise.all(
+    [...ctx.seatUpdates].map(([id, fields]) =>
+      admin.from("holdem_seats").update({ ...fields, updated_at: at }).eq("id", id).eq("status", "seated"),
+    ),
+  );
   return true;
 }
 
@@ -114,7 +117,7 @@ async function mutate(
   admin: Admin,
   tableId: string,
   change: (ctx: Ctx, seats: SeatRow[], now: number) => string | null,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<{ ok: true; changed?: boolean } | { ok: false; error: string }> {
   for (let attempt = 0; attempt < 4; attempt += 1) {
     const loaded = await load(admin, tableId);
     if (!loaded) return { ok: false, error: "테이블을 찾지 못했습니다." };
@@ -129,8 +132,9 @@ async function mutate(
     const before = signature(ctx);
     const error = change(ctx, loaded.seats, Date.now());
     if (error) return { ok: false, error };
-    if (signature(ctx) === before) return { ok: true };
-    if (await save(admin, loaded.row, loaded.version, ctx)) return { ok: true };
+    // changed: 화면이 다른 사람들에게 '바뀜' 신호를 보낼지 (tick 은 대부분 바뀐 것이 없다)
+    if (signature(ctx) === before) return { ok: true, changed: false };
+    if (await save(admin, loaded.row, loaded.version, ctx)) return { ok: true, changed: true };
   }
   return { ok: false, error: "동시에 처리하는 중이었어요. 다시 눌러 주세요." };
 }
