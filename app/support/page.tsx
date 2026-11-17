@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { supabase } from "../../lib/supabase";
 
-type Summary = { nickname: string; support_count: number; points_total: number };
+type Summary = { nickname: string; support_count: number; points_total: number; kakao_uid?: string };
 
 function currentMonth() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit" })
@@ -16,10 +16,15 @@ export default function SupportHistoryPage() {
   const [rows, setRows] = useState<Summary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [adminRows, setAdminRows] = useState<Summary[] | null>(null);
+  const [deletingUid, setDeletingUid] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError("");
+    setAdminRows(null);
     supabase.rpc("get_monthly_support_summary", { p_month: month })
       .then(({ data, error }) => {
         if (cancelled) return;
@@ -27,10 +32,58 @@ export default function SupportHistoryPage() {
         setError(error?.message || "");
         setLoading(false);
       });
+
+    // 일반 회원에게 공개 집계만 반환하고, 운영진에게만 삭제 식별자를 제공합니다.
+    void (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token || cancelled) return;
+        const response = await fetch("/api/support?month=" + encodeURIComponent(month), {
+          headers: { Authorization: "Bearer " + session.access_token },
+          cache: "no-store",
+        });
+        if (!response.ok || cancelled) return;
+        const payload = await response.json();
+        if (!cancelled && payload.ok && Array.isArray(payload.rows)) {
+          setAdminRows(payload.rows as Summary[]);
+        }
+      } catch {
+        // 관리자 확인에 실패해도 공개 조회는 유지합니다.
+      }
+    })();
     return () => { cancelled = true; };
-  }, [month]);
-  const totalPoints = useMemo(() => rows.reduce((sum, row) => sum + Number(row.points_total), 0), [rows]);
-  const totalCount = useMemo(() => rows.reduce((sum, row) => sum + Number(row.support_count), 0), [rows]);
+  }, [month, reloadKey]);
+
+  const displayRows = adminRows ?? rows;
+  const totalPoints = useMemo(() => displayRows.reduce((sum, row) => sum + Number(row.points_total), 0), [displayRows]);
+  const totalCount = useMemo(() => displayRows.reduce((sum, row) => sum + Number(row.support_count), 0), [displayRows]);
+
+  async function removeMonthSupport(uid: string, nickname: string) {
+    const question = month + " · " + nickname + "님의 후원리스트 기록을 삭제하시겠습니까?\\n\\n"
+      + "해당 월 기록이 목록에서 제외되지만, 회원 계정과 이미 지급한 점수·메달은 차감되지 않습니다. "
+      + "보상 회차 원본은 중복 지급 방지를 위해 보존됩니다.";
+    if (!window.confirm(question)) return;
+    setDeletingUid(uid);
+    setActionMessage("");
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error("다시 로그인한 후 시도해주세요.");
+      const response = await fetch("/api/support", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token },
+        body: JSON.stringify({ month, uid, confirm: "DELETE_MONTH_SUPPORT" }),
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) throw new Error(payload.error || "삭제 처리에 실패했습니다.");
+      setActionMessage(nickname + "님의 " + month + " 후원리스트 기록 "
+        + payload.removed + "건을 삭제했습니다. 점수·메달은 변경되지 않았습니다.");
+      setReloadKey(value => value + 1);
+    } catch (error) {
+      setActionMessage(error instanceof Error ? error.message : "삭제 처리에 실패했습니다.");
+    } finally {
+      setDeletingUid(null);
+    }
+  }
 
   return <main style={{ minHeight: "100vh", background: "#f7f8fc", color: "#202638", padding: "24px 16px 60px" }}>
     <div style={{ maxWidth: 760, margin: "0 auto" }}>
