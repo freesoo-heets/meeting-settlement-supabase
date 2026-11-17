@@ -6289,7 +6289,7 @@ async function setAttendanceMembers(memberIds: string[]) {
             <div className="extraFeaturesDialogBody">
               <a href="https://tarot-bank.vercel.app/" className="extraFeaturesDialogLink">
                 <span className="extraFeaturesDialogIcon" aria-hidden="true">🔮</span>
-                <span><strong>타로뱅크</strong><small>3카드 · 6개월 운세 · 켈틱 크로스</small></span>
+                <span><span className="extraFeaturesName"><strong>타로뱅크</strong><span className="extraFeaturesStatus">통합 진행중</span></span><small>3카드 · 6개월 운세 · 켈틱 크로스</small></span>
                 <span aria-hidden="true">›</span>
               </a>
               <a href="/support" className="extraFeaturesDialogLink">
@@ -6299,7 +6299,7 @@ async function setAttendanceMembers(memberIds: string[]) {
               </a>
               <a href="/pet" className="extraFeaturesDialogLink">
                 <span className="extraFeaturesDialogIcon" aria-hidden="true">🐾</span>
-                <span><strong>찐친 PET</strong><small>PET 상태 · Coin · 돌보기 통합 준비</small></span>
+                <span><span className="extraFeaturesName"><strong>찐친 PET</strong><span className="extraFeaturesStatus">통합 진행중</span></span><small>PET 상태 · Coin · 돌보기 통합 준비</small></span>
                 <span aria-hidden="true">›</span>
               </a>
             </div>
