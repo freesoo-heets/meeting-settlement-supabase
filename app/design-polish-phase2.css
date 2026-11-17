@@ -191,9 +191,6 @@
   line-height: 1.35;
 }
 .pageShell .mobileTableHint { font-size: 12px; line-height: 1.55; }
-.pageShell .monthlyTable tbody tr:hover td {
-  background-color: rgba(91, 80, 73, .035);
-}
 
 /* Preserve normal vs Christmas thematic color palettes. */
 html[data-theme="christmas"] .pageShell .meetingMetricCard,
