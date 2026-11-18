@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { supabase } from "../lib/supabase";
-import { BUY_IN, type Action, type Card, type Table } from "../lib/holdem";
+import { BUY_IN, showdownOpen, type Action, type Card, type Table } from "../lib/holdem";
 import { copyInviteLink } from "./copyInvite";
 import { useGameViewport } from "./useGameViewport";
 import { HoldemTableView, type HoldemEmote } from "./HoldemGame";
@@ -116,7 +116,7 @@ const fmt = (n: number) => n.toLocaleString("ko-KR");
 async function callHoldem(payload: Record<string, unknown>) {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
-  if (!token) return { ok: false, error: "로그인이 필요합니다." } as { ok: boolean; error?: string; id?: string; hole?: Card[]; handNo?: number; changed?: boolean };
+  if (!token) return { ok: false, error: "로그인이 필요합니다." } as { ok: boolean; error?: string; id?: string; hole?: Card[]; handNo?: number; changed?: boolean; cards?: Record<string, Card[]> };
   const response = await fetch("/api/holdem", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -129,6 +129,7 @@ async function callHoldem(payload: Record<string, unknown>) {
     hole?: Card[];
     handNo?: number;
     changed?: boolean;
+    cards?: Record<string, Card[]>; // 👀 관전자용 손패 (watchCards)
   };
 }
 
@@ -535,6 +536,25 @@ function HoldemRoom({
     };
   }, [inHand, handNo, hole?.handNo, tableId]);
 
+  // 👀 관전 중이면: '관전자에게 보여주기' 를 켠 사람의 카드를 받아 온다 (판이 바뀌거나 켜고 끈 사람이 바뀌면)
+  //    앉아 있거나 자리를 신청한 사람은 받지 않는다 (서버도 막는다)
+  const [watchCards, setWatchCards] = useState<{ handNo: number; cards: Record<string, Card[]> } | null>(null);
+  const watching = meIndex < 0 && !mySeat && !!currentMemberId;
+  const showingKey = (view?.players ?? []).filter((p) => !p.empty && !p.out && p.showWatchers && p.hole.length > 0).map((p) => p.id).join(",");
+  useEffect(() => {
+    if (!watching || !showingKey || !handNo) {
+      setWatchCards(null);
+      return;
+    }
+    let cancelled = false;
+    void callHoldem({ action: "watchCards", tableId }).then((result) => {
+      if (!cancelled && result.ok && result.handNo === handNo) setWatchCards({ handNo, cards: result.cards ?? {} });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [watching, showingKey, handNo, tableId]);
+
   // 시간 초과 · 다음 판 · 새로 앉은 사람: 누구 화면이든 서버에 '진행' 요청 (봇도 따로 한다)
   const lastTick = useRef(0);
   useEffect(() => {
@@ -619,6 +639,10 @@ function HoldemRoom({
     </span>
   ) : null;
   const closed = row.status === "closed";
+  // 🃏 이번 판에 카드를 받았고, 판이 끝났는데 아직 공개되지 않았으면 공개할 수 있다
+  const hadCards = !!me && !me.out && me.hole.length > 0 && handNo > 0;
+  const autoOpen = !!me && showdownOpen(view) && !me.folded && !me.out; // 쇼다운에서 어차피 공개됨
+  const canShowNow = hadCards && view.stage === "showdown" && !me?.shown && !me?.showAfter && !autoOpen;
 
   const inviteButtons = (
     <span className="hdInvite">
@@ -645,6 +669,14 @@ function HoldemRoom({
           봇이 점수 · 티켓을 확인하는 중<i className="hdDots" aria-hidden="true" />
           <button className="smallButton ghost" disabled={busy} onClick={() => void run({ action: "leave" })}>취소</button>
         </span>
+      );
+    }
+    // 🃏 판이 끝나면 '내 카드 공개' (누르면 바로 모두에게 공개 · 쇼다운에서 이미 공개된 사람은 없음)
+    if (handOver && canShowNow) {
+      return (
+        <button className="next hdShowBtn" disabled={busy} onClick={() => void run({ action: "show", handNo })}>
+          🃏 내 카드 공개
+        </button>
       );
     }
     if (row.status === "waiting") {
@@ -688,6 +720,25 @@ function HoldemRoom({
             onClick={() => void run({ action: "reserve" }, () => setInfo(me.standAfter ? "⏳ 나가기 예약을 취소했어요." : "⏳ 나가기 예약 · 이번 판이 끝나면 일어나고 남은 칩을 점수로 돌려받아요."))}
           >
             {me.standAfter ? "⏳ 예약 취소" : "⏳ 나가기 예약"}
+          </button>
+          {/* 🃏 폴드한 뒤: 판이 끝나면 내 카드 공개 예약 (다시 누르면 취소) */}
+          {hadCards && me.folded && view.stage !== "showdown" && (
+            <button
+              className={`smallButton ${me.showAfter ? "" : "ghost"}`}
+              disabled={busy}
+              onClick={() => void run({ action: "show", handNo }, () => setInfo(me.showAfter ? "🃏 공개 예약을 취소했어요." : "🃏 이번 판이 끝나면 내 카드를 모두에게 공개해요."))}
+            >
+              {me.showAfter ? "🃏 공개 예약 취소" : "🃏 끝나면 공개"}
+            </button>
+          )}
+          {/* 👀 관전자에게 내 카드 보여주기 (다른 플레이어에게는 보이지 않음 · 앉아 있는 동안 유지) */}
+          <button
+            className={`smallButton ${me.showWatchers ? "watchOn" : "ghost"}`}
+            disabled={busy}
+            title="관전 중인 사람에게만 내 카드를 보여줍니다. 같은 테이블 플레이어에게는 보이지 않아요."
+            onClick={() => void run({ action: "watchShow" }, () => setInfo(me.showWatchers ? "👀 관전자에게 카드 보여주기를 껐어요." : "👀 관전자에게 내 카드를 보여줘요. (다른 플레이어에게는 안 보여요)"))}
+          >
+            {me.showWatchers ? "👀 관전 공개 중" : "👀 관전자에게 보여주기"}
           </button>
           <button
             className="smallButton ghost stand"
@@ -768,6 +819,7 @@ function HoldemRoom({
       emotes={emotes}
       onEmote={onEmote}
       emoteReadyIn={Math.max(0, emoteUntil - Date.now())}
+      watchHoles={watching && watchCards?.handNo === handNo ? watchCards.cards : null}
     />
     {showTicket && createPortal(
       <TicketBuy

@@ -1,5 +1,5 @@
 // 홀덤 온라인 테이블 진행 (서버 전용 · 순수 함수: DB 는 api/holdem 이 다룬다)
-import { act, BUY_IN, legal, showdownOpen, startHand, type Action, type Player, type Table } from "./holdem";
+import { act, BUY_IN, cardText, legal, showdownOpen, startHand, type Action, type Player, type Table } from "./holdem";
 
 export const TURN_SECONDS = 25;   // 한 사람 생각 시간
 export const DEAL_SECONDS = 6;    // 새 판: 카드 나눠 주는 연출 시간만큼 더
@@ -57,7 +57,13 @@ function afterChange(ctx: Ctx, before: ReturnType<typeof snap>, now: number) {
       const newCards = t.board.length - (before.hand === t.handNo ? before.board : 0);
       const shown = t.players.filter((p) => !p.out && !p.folded).length;
       // 화면이 카드를 한 장씩 까고, 한 명씩 공개한 뒤 결과를 보여 줄 시간
-      ctx.nextHandAt = now + (showdownOpen(t) ? 5000 + shown * 1000 + newCards * 1100 : 3500 + newCards * 1100);
+      // (모두 폴드한 판도 '🃏 카드 공개' 를 누를 틈이 있게 4.5초 · 2026-11-19)
+      ctx.nextHandAt = now + (showdownOpen(t) ? 5000 + shown * 1000 + newCards * 1100 : 4500 + newCards * 1100);
+      // 🃏 '끝나면 공개' 예약한 사람 (쇼다운에서 어차피 공개되는 사람은 빼고)
+      for (const p of t.players) {
+        if (p.empty || !p.showAfter || p.hole.length !== 2 || (showdownOpen(t) && !p.folded && !p.out)) continue;
+        t.log.push(`🃏 ${p.name} 카드 공개 ${p.hole.map(cardText).join(" ")}`);
+      }
     }
     return;
   }
@@ -85,6 +91,7 @@ function cashOut(ctx: Ctx, p: Player, now: number) {
     name: "", chips: 0, hole: [], out: true, folded: true, allIn: false, empty: true,
     seatId: undefined, member: undefined, leaving: false, strikes: 0, hands: 0,
     standAfter: false, rebuys: 0, pendingChips: 0, rebuyQueued: false, passStand: false, renewRetryAt: 0,
+    shown: false, showAfter: false, showWatchers: false,
   });
 }
 
@@ -105,6 +112,7 @@ export function step(ctx: Ctx, seats: SeatRow[], now: number) {
       folded: true, allIn: false, acted: false, out: true, empty: false,
       seatId: seat.id, member: seat.member_id, leaving: false, strikes: 0, hands: 0,
       standAfter: false, rebuys: seat.rebuy_count ?? 0, pendingChips: 0,
+      shown: false, showAfter: false, showWatchers: false,
     });
     ctx.t.log.push(`💺 ${seat.name} 착석 · 칩 ${fmt(seat.buy_in)}`);
     if (ctx.status === "closed") ctx.status = "waiting";

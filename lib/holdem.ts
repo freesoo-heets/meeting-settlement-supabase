@@ -96,6 +96,9 @@ export type Player = {
   passStand?: boolean;    // 이용 시간이 끝나 자동으로 나가기 예약됨 (연장되면 풀린다)
   renewRetryAt?: number;  // 티켓을 사서 연장을 다시 요청한 시각
   rebuyQueued?: boolean;  // 판 도중 누른 충전 예약 (판이 끝난 뒤 칩이 모자라면 그만큼만 봇에게 요청)
+  shown?: boolean;        // 🃏 판이 끝난 뒤 스스로 카드 공개 (이번 판만)
+  showAfter?: boolean;    // 🃏 판 도중 '끝나면 공개' 예약 (이번 판만)
+  showWatchers?: boolean; // 👀 관전자에게 내 카드 보여주기 (앉아 있는 동안 계속 · 다른 플레이어에게는 안 보임)
 };
 
 export type Stage = "preflop" | "flop" | "turn" | "river" | "showdown";
@@ -154,7 +157,7 @@ export function startHand(prev: Table): Table {
   const t: Table = structuredClone(prev);
   for (const p of t.players) {
     p.out = p.chips <= 0;
-    Object.assign(p, { hole: [], bet: 0, total: 0, folded: p.out, allIn: false, acted: false });
+    Object.assign(p, { hole: [], bet: 0, total: 0, folded: p.out, allIn: false, acted: false, shown: false, showAfter: false });
   }
   if (live(t).length < 2) return t;
   t.handNo += 1;
@@ -360,7 +363,12 @@ export function showdownOpen(t: Table) {
   return t.stage === "showdown" && t.handNo > 0 && t.players.filter((p) => !p.out && !p.folded).length > 1;
 }
 
-// 화면용: 덱을 빼고, 남의 손패는 뒷면(r: 0)으로. 쇼다운 공개분만 그대로
+// 🃏 판이 끝난 뒤 스스로 공개한 사람 (공개 버튼 · '끝나면 공개' 예약)
+export const selfShown = (t: Table, p: Player) =>
+  t.stage === "showdown" && t.handNo > 0 && p.hole.length > 0 && !p.empty && (!!p.shown || !!p.showAfter);
+
+// 화면용: 덱을 빼고, 남의 손패는 뒷면(r: 0)으로. 쇼다운 공개분 · 스스로 공개한 카드만 그대로
+// (👀 관전자용 카드는 여기 넣지 않는다 — 플레이어도 이 화면을 보므로. api/holdem 'watchCards' 가 관전자에게만 준다)
 const BACK: Card = { r: 0, s: "s" };
 export function publicView(t: Table): Table {
   const open = showdownOpen(t);
@@ -370,7 +378,7 @@ export function publicView(t: Table): Table {
     log: t.log.slice(-30),
     players: t.players.map((p) => ({
       ...p,
-      hole: open && !p.folded && !p.out ? p.hole : p.hole.map(() => BACK),
+      hole: (open && !p.folded && !p.out) || selfShown(t, p) ? p.hole : p.hole.map(() => BACK),
     })),
   };
 }

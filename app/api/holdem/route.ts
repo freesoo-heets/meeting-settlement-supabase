@@ -9,7 +9,7 @@ import {
   requireMemberId,
   type Admin,
 } from "../../../lib/gameServer";
-import { BUY_IN, emptyTable, legal, publicView, type Action, type Table } from "../../../lib/holdem";
+import { BUY_IN, cardText, emptyTable, legal, publicView, showdownOpen, type Action, type Card, type Table } from "../../../lib/holdem";
 import { IDLE_MINUTES, SEAT_ACTIVE, apply, step, type Ctx, type SeatRow, type TableStatus } from "../../../lib/holdemTable";
 
 /*
@@ -254,6 +254,57 @@ export async function POST(request: Request) {
     const state = secret?.state as Table | undefined;
     const me = state?.players.find((p) => p.member === memberId && !p.empty);
     return NextResponse.json({ ok: true, handNo: state?.handNo ?? 0, hole: me && !me.out ? me.hole : [] });
+  }
+
+  if (action === "watchCards") {
+    // 👀 관전자: '관전자에게 보여주기' 를 켠 사람의 이번 판 손패
+    //    이 테이블에 앉아 있거나 자리를 신청 중인 사람에게는 주지 않는다 (상대 카드를 보면 안 되므로)
+    const [{ data: secret }, { data: mine }] = await Promise.all([
+      admin.from("holdem_secrets").select("state").eq("table_id", tableId).maybeSingle(),
+      admin.from("holdem_seats").select("id").eq("table_id", tableId).eq("member_id", memberId).in("status", SEAT_ACTIVE).limit(1),
+    ]);
+    const state = secret?.state as Table | undefined;
+    const cards: Record<string, Card[]> = {};
+    const seated = (mine ?? []).length > 0 || !!state?.players.some((p) => p.member === memberId && !p.empty);
+    if (state && !seated) {
+      for (const p of state.players) if (!p.empty && !p.out && p.showWatchers && p.hole.length === 2) cards[String(p.id)] = p.hole;
+    }
+    return NextResponse.json({ ok: true, handNo: state?.handNo ?? 0, cards });
+  }
+
+  if (action === "watchShow") {
+    // 👀 관전자에게 내 카드 보여주기 켜기 · 끄기 (다른 플레이어에게는 보이지 않는다)
+    const result = await mutate(admin, tableId, (ctx) => {
+      const me = ctx.t.players.find((p) => p.member === memberId && !p.empty);
+      if (!me) return "자리에 앉아 있지 않습니다.";
+      me.showWatchers = !me.showWatchers;
+      ctx.t.log.push(me.showWatchers ? `👀 ${me.name} 관전자에게 카드 보여주기 켬` : `👀 ${me.name} 관전자에게 카드 보여주기 끔`);
+      return null;
+    });
+    return result.ok ? NextResponse.json(result) : fail(result.error);
+  }
+
+  if (action === "show") {
+    // 🃏 내 카드 공개: 판이 끝났으면 바로 공개, 판 도중이면 '끝나면 공개' 예약(다시 누르면 취소)
+    const handNo = Number(body.handNo ?? -1);
+    const result = await mutate(admin, tableId, (ctx, _seats, now) => {
+      const t = ctx.t;
+      const me = t.players.find((p) => p.member === memberId && !p.empty);
+      if (!me) return "자리에 앉아 있지 않습니다.";
+      if (t.handNo !== handNo || t.handNo === 0) return "이미 다음 판이 시작됐어요.";
+      if (me.out || me.hole.length !== 2) return "이번 판에 받은 카드가 없습니다.";
+      if (t.stage !== "showdown") {
+        me.showAfter = !me.showAfter;
+        return null;
+      }
+      if (me.shown || me.showAfter || (showdownOpen(t) && !me.folded)) return null; // 이미 공개됨
+      me.shown = true;
+      t.log.push(`🃏 ${me.name} 카드 공개 ${me.hole.map(cardText).join(" ")}`);
+      // 다른 사람 화면에 보일 틈: 다음 판까지 3초는 남긴다
+      if (ctx.nextHandAt !== null) ctx.nextHandAt = Math.max(ctx.nextHandAt, now + 3000);
+      return null;
+    });
+    return result.ok ? NextResponse.json(result) : fail(result.error);
   }
 
   if (action === "invite") {

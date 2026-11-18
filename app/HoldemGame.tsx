@@ -156,6 +156,7 @@ type ViewProps = {
   emotes?: HoldemEmote[];       // 떠 있는 감정표현 (오목과 같은 스티커)
   onEmote?: (kind: EmoteKind) => void;
   emoteReadyIn?: number;        // 다시 보낼 수 있을 때까지 남은 ms
+  watchHoles?: Record<string, Card[]> | null; // 👀 관전자에게만: '관전자에게 보여주기' 를 켠 사람의 손패 (자리 번호 → 카드)
 };
 
 export type HoldemEmote = { key: number; kind: EmoteKind; member: string; name: string };
@@ -172,7 +173,7 @@ function EmotePop({ emote, watcher }: { emote: HoldemEmote; watcher?: boolean })
 // 테이블 화면 (연습판 · 온라인 공용)
 export function HoldemTableView({
   table, meIndex, myHole, onAct, busy, deadline, title, subtitle, headerExtra, idleBar, notice, onReady, onClose, onBack,
-  emotes = [], onEmote, emoteReadyIn = 0,
+  emotes = [], onEmote, emoteReadyIn = 0, watchHoles = null,
 }: ViewProps) {
   // 감정표현: 앉은 사람은 그 자리 위에, 관전자는 테이블 가운데에
   const emoteAt = (member?: string) => (member ? emotes.filter((e) => e.member === member) : []);
@@ -295,7 +296,14 @@ export function HoldemTableView({
   const bbSeat = order[(order.indexOf(sbSeat) + 1) % Math.max(1, order.length)];
 
   // 쇼다운 때 각자 어떤 메이드인지 (공개된 사람만)
-  const cardsOf = (id: number) => (id === meIndex && myCards ? myCards : table.players[id].hole);
+  const watchOf = (id: number) => (!seated && watchHoles?.[String(id)]?.length === 2 ? watchHoles[String(id)] : null);
+  const cardsOf = (id: number) => (id === meIndex && myCards ? myCards : watchOf(id) ?? table.players[id].hole);
+  // 🃏 판이 끝난 뒤 스스로 공개한 카드 · 👀 관전자에게 보여주는 카드 → 앞면
+  const selfShown = (id: number) => {
+    const p = table.players[id];
+    return handOver && (!!p.shown || !!p.showAfter) && (p.hole[0]?.r ?? 0) > 0;
+  };
+  const faceUp = (id: number) => isRevealed(id) || selfShown(id) || !!watchOf(id);
   const madeOf = (id: number) => {
     const p = table.players[id];
     const cards = cardsOf(id);
@@ -453,10 +461,10 @@ export function HoldemTableView({
                     {win && <span className="hdWinTag">👑 WIN +{fmt(wonAmount(p.id))}</span>}
                     {made && <span className={`hdMade ${win ? "win" : ""}`}>{made}</span>}
                   </div>
-                  <div className={`hdSeatCards ${isRevealed(p.id) ? "open" : ""}`}>
-                    {p.hole.slice(0, handOver ? 2 : dealtTo(p.id)).map((c, k) => (
+                  <div className={`hdSeatCards ${faceUp(p.id) ? "open" : ""} ${selfShown(p.id) ? "shown" : ""}`}>
+                    {cardsOf(p.id).slice(0, handOver ? 2 : dealtTo(p.id)).map((c, k) => (
                       <span key={`${table.handNo}-${k}`} className="hdDealIn from-center">
-                        <CardView key={`${k}-${isRevealed(p.id)}`} card={c} hidden={!isRevealed(p.id) || c.r === 0} size="sm" lit={isRevealed(p.id) && inWin(c)} />
+                        <CardView key={`${k}-${faceUp(p.id)}`} card={c} hidden={!faceUp(p.id) || c.r === 0} size="sm" lit={(isRevealed(p.id) || selfShown(p.id)) && inWin(c)} />
                       </span>
                     ))}
                   </div>
@@ -469,6 +477,7 @@ export function HoldemTableView({
                     {role && <span className={`hdRole ${role.toLowerCase()}`}>{role}</span>}
                     {/* '대기' 는 다음 판을 기다리는 사람이라 이름 · 칩이 보이게 덮지 않고 작은 표만 붙인다 */}
                     {status && <span className={`hdStatus ${status === "올인" ? "allin" : status === "대기" ? "wait" : ""}`}>{status}</span>}
+                    {p.showWatchers && <span className="hdWatchMark" title="관전자에게 카드를 보여주는 중">👀</span>}
                     {turn && secondsLeft !== null && <span className={`hdClock ${secondsLeft <= 5 ? "hurry" : ""}`}>{secondsLeft}</span>}
                   </div>
                   {p.bet > 0 && (
@@ -504,7 +513,7 @@ export function HoldemTableView({
               </div>
               <div className="hdMyCards">
                 {bottomCards.slice(0, handOver ? 2 : dealtTo(base)).map((c, i) => {
-                  const known = c.r > 0 && (base === meIndex ? true : handOver && contested);
+                  const known = c.r > 0 && (base === meIndex ? true : (handOver && contested) || faceUp(base));
                   const open = known && (base !== meIndex || myPeek > i || handOver);
                   return (
                     <span key={`${table.handNo}-${i}`} className="hdDealIn mine">
@@ -531,6 +540,7 @@ export function HoldemTableView({
                 {(bottom.leaving || (bottom.out && bottom.chips > 0)) && (
                   <span className="hdStatus">{bottom.leaving ? "자리 비움" : "다음 판부터"}</span>
                 )}
+                {bottom.showWatchers && <span className="hdWatchMark" title="관전자에게 카드를 보여주는 중">👀</span>}
               </div>
             </div>
           )}
