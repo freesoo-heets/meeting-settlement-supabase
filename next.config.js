@@ -18,11 +18,11 @@ const validOrigin = (() => {
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   async rewrites() {
-    if (!validOrigin) return [];
-    return [
+    if (!validOrigin) return { beforeFiles: [], afterFiles: [], fallback: [] };
+    return { beforeFiles: [
       { source: "/tarot", destination: `${validOrigin}/tarot` },
       { source: "/tarot/:path*", destination: `${validOrigin}/tarot/:path*` },
-    ];
+    ], afterFiles: [], fallback: [] };
   },
 };
 module.exports = nextConfig;
