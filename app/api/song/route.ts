@@ -254,7 +254,6 @@ export async function POST(request: Request) {
   if (action === "join") {
     if (inRoom) return NextResponse.json({ ok: true });
     if (room.status !== "waiting" && room.status !== "playing" && room.status !== "escrow") return fail("끝난 방입니다.");
-    if (room.players.length >= room.max_players) return fail(`방이 가득 찼습니다. (최대 ${room.max_players}명)`);
     const player = await playerOf(admin, memberId);
     if ("error" in player) return fail(player.error, player.status);
     const others = (await myRooms(admin, memberId)).filter((item) => item.id !== room.id);
@@ -295,8 +294,7 @@ export async function POST(request: Request) {
 
   if (action === "recruit") {
     if (room.is_test) return fail("테스트 방은 모집 알림을 보내지 않습니다.");
-    if (room.status !== "waiting" && room.status !== "playing") return fail("끝난 방입니다.");
-    if (room.players.length >= room.max_players) return fail("방이 이미 가득 찼습니다.");
+    if (!["waiting", "escrow", "playing"].includes(room.status)) return fail("끝난 방입니다.");
     const last = room.recruit_at ? new Date(room.recruit_at).getTime() : 0;
     const wait = Math.ceil((last + RECRUIT_COOLDOWN_MS - Date.now()) / 1000);
     if (wait > 0) return fail(`방금 모집 알림을 보냈어요. ${wait}초 뒤에 다시 보낼 수 있습니다.`);

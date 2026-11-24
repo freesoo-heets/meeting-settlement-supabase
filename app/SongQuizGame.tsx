@@ -7,7 +7,6 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
 import {
   CLIP_OFFSET,
-  MAX_PLAYERS,
   REVEAL_SECONDS,
   SONG_COUNTS,
   STAGES,
@@ -168,7 +167,7 @@ export default function SongQuizGame({ onClose, onBack, initialRoomId, currentMe
       <section className="meetingModal catchModal gameModal" role="dialog" aria-modal="true">
         <div className="meetingModalHeader">
           <div>
-            <span>최대 {MAX_PLAYERS}명 · 곡당 티켓 {TICKETS_PER_SONG}장(방장) · 정답 최대 {stagePoints(0)}점</span>
+            <span>인원 제한 없음 · 곡당 티켓 {TICKETS_PER_SONG}장(방장) · 정답 최대 {stagePoints(0)}점</span>
             <h2>🎧 노래 맞추기</h2>
           </div>
           <div className="gameHeaderActions">
@@ -241,7 +240,7 @@ export default function SongQuizGame({ onClose, onBack, initialRoomId, currentMe
                     <strong>{item.host_name}님의 방 · {topicLabel(item.topic)}</strong>
                     <span>
                       {item.status === "waiting" ? "대기 중" : item.status === "escrow" ? "시작 준비 중" : `${Math.min(item.song_no + 1, item.song_total)}/${item.song_total}곡`} ·{" "}
-                      {item.players.length}/{item.max_players}명 · {item.players.map((player) => player.name).join(", ")}
+                      {item.players.length}명 · {item.players.map((player) => player.name).join(", ")}
                     </span>
                   </div>
                   <button className="smallButton" onClick={() => setRoomId(item.id)}>
@@ -540,8 +539,9 @@ function SongRoomView({
     return () => vv.removeEventListener("resize", onResize);
   }, []);
 
-  const seatsLeft = room.max_players - room.players.length;
-  const canRecruit = joined && !room.is_test && seatsLeft > 0 && (room.status === "waiting" || room.status === "playing");
+  // 인원 제한 없음 · 진행 중에도 카톡방 모집 · 링크 복사 가능 (테스트 방은 모집 알림 없음)
+  const open = ["waiting", "escrow", "playing"].includes(room.status);
+  const canRecruit = joined && !room.is_test && open;
   const statusLabel =
     room.status === "waiting"
       ? "대기 중"
@@ -732,12 +732,6 @@ function SongRoomView({
                 <b>{room.scores[player.id] ?? 0}</b>
               </li>
             ))}
-            {Array.from({ length: Math.max(0, Math.min(seatsLeft, 3)) }, (_, i) => (
-              <li key={`empty${i}`} className="empty">
-                <span className="cmAvatar" />
-                <span className="cmName">빈 자리</span>
-              </li>
-            ))}
           </ul>
 
           <div className="cmChat">
@@ -788,8 +782,8 @@ function SongRoomView({
         <button className="smallButton ghost" onClick={onBack}>← 방 목록</button>
         <div className="cmActionsMain">
           {!joined && ["waiting", "escrow", "playing"].includes(room.status) && (
-            <button className="primaryButton" disabled={busy || seatsLeft <= 0} onClick={onJoin}>
-              {seatsLeft <= 0 ? "방이 가득 찼어요" : room.play_no > 0 ? "🔁 다시하기 참가" : "참가하기"}
+            <button className="primaryButton" disabled={busy} onClick={onJoin}>
+              {room.play_no > 0 ? "🔁 다시하기 참가" : "참가하기"}
             </button>
           )}
           {canRecruit && (
@@ -797,7 +791,7 @@ function SongRoomView({
               📣 카톡방에 모집
             </button>
           )}
-          {room.status === "waiting" && (
+          {open && (
             <button className="smallButton ghost" onClick={onCopyLink}>
               🔗 링크 복사
             </button>

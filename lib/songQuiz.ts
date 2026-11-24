@@ -5,7 +5,7 @@
 export const TICKETS_PER_SONG = 2;
 export const BASE_POINTS = 30;
 export const HINT_DECAY = 0.8;
-export const MAX_PLAYERS = 8;
+export const MAX_PLAYERS = 0; // 인원 제한 없음 (2026-11-24 사용자 요청 · 0 = 무제한)
 export const SONG_COUNTS = [3, 5, 10];
 export const CLIP_OFFSET = 1.0; // 미리듣기 앞쪽 페이드인 건너뛰기 (초)
 

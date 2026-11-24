@@ -465,7 +465,7 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
               <span className="gameHubIcon" aria-hidden="true">🎧</span>
               <div>
                 <strong>노래 맞추기</strong>
-                <span>듣고 제목 맞히기 · 최대 8명 · 정답 최대 30점</span>
+                <span>듣고 제목 맞히기 · 인원 제한 없음 · 정답 최대 30점</span>
               </div>
               <button className="smallButton" onClick={() => setActive({ kind: "song", id: "" })}>방 만들기</button>
             </div>
@@ -473,14 +473,13 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
               {songRooms.length === 0 && <span className="muted">열린 방이 없습니다.</span>}
               {songRooms.map((row) => {
                 const mine = row.players.some((player) => player.id === currentMemberId);
-                const full = row.players.length >= row.max_players;
                 return (
-                  <button key={row.id} className={`gameHubRoom ${row.status === "waiting" && !full ? "hot" : ""}`} onClick={() => setActive({ kind: "song", id: row.id })}>
+                  <button key={row.id} className={`gameHubRoom ${row.status === "waiting" ? "hot" : ""}`} onClick={() => setActive({ kind: "song", id: row.id })}>
                     <span>
                       <b>{row.is_test ? "🧪 테스트 · " : ""}{row.host_name}님의 방 · {row.status === "playing" ? `진행 중 ${Math.min(row.song_no + 1, row.song_total)}/${row.song_total}곡` : "대기 중"}</b>
-                      <em>{topicLabel(row.topic)} · 👥 {row.players.length}/{row.max_players}</em>
+                      <em>{topicLabel(row.topic)} · 👥 {row.players.length}명</em>
                     </span>
-                    <i>{mine ? "내 방" : full ? "관전" : "참가"} →</i>
+                    <i>{mine ? "내 방" : "참가"} →</i>
                   </button>
                 );
               })}

@@ -47,7 +47,7 @@ async function describe(kind: Kind, id: string) {
       const count = Array.isArray(data.players) ? data.players.length : 0;
       return {
         title: `${LABEL.song} · ${data.host_name}님의 방`,
-        description: `노래 듣고 제목 맞히기 · ${data.song_total}곡 · ${count}/${data.max_players}명 · 눌러서 참가하세요`,
+        description: `노래 듣고 제목 맞히기 · ${data.song_total}곡 · ${count}명 참여 중 · 눌러서 참가하세요`,
       };
     }
     if (kind === "catch") {
