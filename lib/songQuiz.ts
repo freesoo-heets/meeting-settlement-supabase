@@ -20,6 +20,13 @@ export const STAGES: Array<{ clip: number; seconds: number; hint?: "artist" | "t
 export const INTRO_SECONDS = 4;
 export const REVEAL_SECONDS = 9;
 
+// 전주: 봇 폰이 원곡 앞부분을 잘라 올린다 · 하이라이트: 애플 미리듣기(후렴 근처)
+export type SongMode = "highlight" | "intro";
+export const MODES: Array<{ value: SongMode; label: string; desc: string }> = [
+  { value: "highlight", label: "🎤 하이라이트", desc: "후렴 근처" },
+  { value: "intro", label: "🎹 전주", desc: "곡 첫 부분" },
+];
+
 export const TOPIC_PRESETS = [
   { value: "", label: "🔥 K-POP 인기곡" },
   { value: "90년대", label: "📼 90년대" },

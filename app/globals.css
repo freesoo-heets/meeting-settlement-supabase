@@ -7532,3 +7532,18 @@ html[data-theme="christmas"] select:focus { border-color: #4d8b5e; }
   .cmRoom.typing .sqStage { min-height: 150px; }
   .cmRoom.typing .sqSteps, .cmRoom.typing .sqReveal .sqArt { display: none; }
 }
+/* 🎧 노래 맞추기 — 늘 열린 방 (11-24) */
+.sqCustomInput { width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 999px; font-size: 13px; }
+.sqChips button small { font-size: 11px; opacity: .75; margin-left: 2px; }
+.sqAsk { margin-top: 4px; padding: 12px; font-size: 16px; }
+.sqBoard { padding: 8px 10px; border-radius: 12px; background: #fdf2f8; border: 1px solid #fbcfe8; font-size: 13px; }
+.sqBoard > strong { display: block; margin-bottom: 4px; color: #9d174d; }
+.sqBoard ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.sqBoard li { display: grid; grid-template-columns: 24px 1fr auto; gap: 6px; align-items: center; }
+.sqBoard li.me b { color: #be185d; }
+.sqBoard em { font-style: normal; color: #64748b; font-size: 12px; font-variant-numeric: tabular-nums; }
+.sqPresent { font-size: 12px; color: #64748b; line-height: 1.5; }
+@media (max-width: 760px) {
+  .sqBoard ol li:nth-child(n+4) { display: none; }
+  .cmRoom.typing .sqBoard, .cmRoom.typing .sqPresent { display: none; }
+}

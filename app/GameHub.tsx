@@ -91,7 +91,7 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
   const [omok, setOmok] = useState<StakeRow[]>([]);
   const [alkkagi, setAlkkagi] = useState<StakeRow[]>([]);
   const [catchRooms, setCatchRooms] = useState<CatchRow[]>([]);
-  const [songRooms, setSongRooms] = useState<Array<{ id: string; status: string; host_name: string; topic: string; song_no: number; song_total: number; max_players: number; is_test: boolean; players: Array<{ id: string; name: string }> }>>([]);
+  const [songLobby, setSongLobby] = useState<{ status: string; phase: string | null; opener_name: string | null; topic: string } | null>(null);
   const [holdemTables, setHoldemTables] = useState<Array<{ id: string; status: string; host_name: string; is_friendly: boolean; max_seats: number; hand_no: number; created_at: string; view: { players?: Array<{ name: string; empty?: boolean }> } }>>([]);
   const [holdemNos, setHoldemNos] = useState<Record<string, number>>({});
   // quietMs: 마지막 입력(또는 시작) 뒤 지난 시간 — 읽은 시각 기준
@@ -155,9 +155,9 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
       supabase.from("catch_rooms").select("id,status,host_name,players,max_players,turn_no,turn_total,is_test").in("status", ["waiting", "playing"]).order("created_at", { ascending: false }).limit(20),
       supabase.from("holdem_tables").select("id,status,host_name,is_friendly,max_seats,hand_no,created_at,view").in("status", ["waiting", "playing"]).order("created_at", { ascending: false }).limit(20),
       supabase.from("word_games").select("id,name,status,tries,max_tries,member_id,updated_at").eq("status", "playing").order("created_at", { ascending: false }).limit(30),
-      supabase.from("song_rooms").select("id,status,host_name,topic,song_no,song_total,max_players,is_test,players").in("status", ["waiting", "escrow", "playing"]).order("created_at", { ascending: false }).limit(20),
+      supabase.from("song_rooms").select("status,phase,opener_name,topic").eq("is_lobby", true).maybeSingle(),
     ]);
-    setSongRooms(((s.data ?? []) as typeof songRooms).filter((row) => !row.is_test || row.players.some((player) => player.id === currentMemberId)));
+    setSongLobby((s.data as typeof songLobby) ?? null);
     const readAt = Date.now();
     setWordLive(
       ((w.data ?? []) as Array<Omit<(typeof wordLive)[number], "quietMs"> & { updated_at: string | null }>).map(({ updated_at, ...row }) => ({
@@ -284,9 +284,9 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
       <SongQuizGame
         onClose={onClose}
         onBack={back}
-        initialRoomId={active.id && active.id !== "start" ? active.id : undefined}
         currentMemberId={currentMemberId}
         myName={myName}
+        myTickets={myTickets}
         isAdmin={isAdmin}
       />
     );
@@ -465,24 +465,22 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
               <span className="gameHubIcon" aria-hidden="true">🎧</span>
               <div>
                 <strong>노래 맞추기</strong>
-                <span>듣고 제목 맞히기 · 인원 제한 없음 · 정답 최대 30점</span>
+                <span>늘 열린 방 · 누구나 출제(전주 · 하이라이트) · 1곡 티켓 2장 · 정답 최대 30점</span>
               </div>
-              <button className="smallButton" onClick={() => setActive({ kind: "song", id: "" })}>방 만들기</button>
+              <button className="smallButton" onClick={() => setActive({ kind: "song", id: "" })}>입장</button>
             </div>
             <div className="gameHubRooms">
-              {songRooms.length === 0 && <span className="muted">열린 방이 없습니다.</span>}
-              {songRooms.map((row) => {
-                const mine = row.players.some((player) => player.id === currentMemberId);
-                return (
-                  <button key={row.id} className={`gameHubRoom ${row.status === "waiting" ? "hot" : ""}`} onClick={() => setActive({ kind: "song", id: row.id })}>
-                    <span>
-                      <b>{row.is_test ? "🧪 테스트 · " : ""}{row.host_name}님의 방 · {row.status === "playing" ? `진행 중 ${Math.min(row.song_no + 1, row.song_total)}/${row.song_total}곡` : "대기 중"}</b>
-                      <em>{topicLabel(row.topic)} · 👥 {row.players.length}명</em>
-                    </span>
-                    <i>{mine ? "내 방" : "참가"} →</i>
-                  </button>
-                );
-              })}
+              <button className={`gameHubRoom ${songLobby?.status === "playing" ? "hot" : ""}`} onClick={() => setActive({ kind: "song", id: "" })}>
+                <span>
+                  <b>
+                    {songLobby?.status === "playing" || songLobby?.status === "escrow"
+                      ? `🎵 ${songLobby.opener_name ?? ""}님 문제 진행 중`
+                      : "출제 대기 중 · 아무나 낼 수 있어요"}
+                  </b>
+                  <em>{songLobby && songLobby.status !== "waiting" ? topicLabel(songLobby.topic) : "K-POP · 90년대 · 팝송 · 가수 이름"}</em>
+                </span>
+                <i>입장 →</i>
+              </button>
             </div>
           </article>
           <article className="gameHubCard holdem">

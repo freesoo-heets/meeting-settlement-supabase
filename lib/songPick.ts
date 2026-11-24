@@ -13,6 +13,7 @@ export type PickedSong = {
   preview: string;
   artwork: string | null;
   answers: string[];
+  durationMs: number | null;
 };
 
 type Raw = {
@@ -25,6 +26,7 @@ type Raw = {
   releaseDate?: string;
   previewUrl?: string;
   artworkUrl100?: string;
+  trackTimeMillis?: number;
 };
 
 const SEED_TERMS = [
@@ -118,7 +120,7 @@ async function search(term: string, limit = 50) {
   return tracks.map((s) => korean.get(String(s.trackId)) ?? s);
 }
 
-type DeezerTrack = { id: number; title?: string; title_short?: string; preview?: string; release_date?: string;
+type DeezerTrack = { id: number; duration?: number; title?: string; title_short?: string; preview?: string; release_date?: string;
   artist?: { name?: string }; album?: { title?: string; cover_medium?: string } };
 
 const fromDeezer = (t: DeezerTrack): Raw & { art?: string } => ({
@@ -130,6 +132,7 @@ const fromDeezer = (t: DeezerTrack): Raw & { art?: string } => ({
   primaryGenreName: "",
   releaseDate: String(t.release_date ?? ""),
   previewUrl: t.preview ?? "",
+  trackTimeMillis: t.duration ? t.duration * 1000 : undefined,
   art: t.album?.cover_medium,
 });
 
@@ -221,6 +224,7 @@ export async function pickSongs(topic: string, count: number, recentIds: Set<str
       preview: s.previewUrl,
       artwork: s.art ?? (s.artworkUrl100 ? s.artworkUrl100.replace("100x100", "300x300") : null),
       answers,
+      durationMs: s.trackTimeMillis ?? null,
     });
   }
   return picked;
