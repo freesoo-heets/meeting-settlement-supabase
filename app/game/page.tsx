@@ -5,16 +5,16 @@ import { holdemTableLabel, holdemTableNumbers } from "../../lib/holdemNo";
 // 게임 초대 링크 전용 주소 (/game?omok=… · /game?alkkagi=… · /game?catch=…)
 // 카톡 미리보기에 '모임 참석 · 비용 정산' 대신 게임 제목이 나오게 하고, 들어오면 메인 화면의 그 방으로 보낸다.
 
-type Kind = "omok" | "alkkagi" | "catch" | "holdem" | "word";
+type Kind = "omok" | "alkkagi" | "catch" | "holdem" | "word" | "song";
 type Search = Promise<Record<string, string | string[] | undefined>>;
 
-const LABEL: Record<Kind, string> = { omok: "🏁 오목", alkkagi: "🥏 알까기", catch: "🎨 캐치마인드", holdem: "🃏 홀덤", word: "📝 단어게임" };
+const LABEL: Record<Kind, string> = { omok: "🏁 오목", alkkagi: "🥏 알까기", catch: "🎨 캐치마인드", holdem: "🃏 홀덤", word: "📝 단어게임", song: "🎧 노래 맞추기" };
 
 function pick(params: Record<string, string | string[] | undefined>): { kind: Kind; id: string } | null {
-  for (const kind of ["omok", "alkkagi", "catch", "holdem", "word"] as Kind[]) {
+  for (const kind of ["omok", "alkkagi", "catch", "holdem", "word", "song"] as Kind[]) {
     const value = params[kind];
     const id = Array.isArray(value) ? value[0] : value;
-    if (id && (/^[0-9a-f-]{36}$/i.test(id) || (kind === "word" && id === "start"))) return { kind, id }; // word=start: 단어게임 첫 화면
+    if (id && (/^[0-9a-f-]{36}$/i.test(id) || ((kind === "word" || kind === "song") && id === "start"))) return { kind, id }; // word=start · song=start: 첫 화면
   }
   return null;
 }
@@ -38,6 +38,16 @@ async function describe(kind: Kind, id: string) {
       return {
         title: `🆘 ${data.name}님의 단어게임 도와주세요!`,
         description: `${data.tries}/${data.max_tries}번째 도전 중 · 눌러서 같이 보며 채팅하세요`,
+      };
+    }
+    if (kind === "song") {
+      if (id === "start") return { title: "🎧 노래 맞추기", description: "노래 듣고 제목 맞히기 · 눌러서 방을 만들거나 참가하세요" };
+      const { data } = await admin.from("song_rooms").select("host_name,players,max_players,song_total").eq("id", id).maybeSingle();
+      if (!data) return null;
+      const count = Array.isArray(data.players) ? data.players.length : 0;
+      return {
+        title: `${LABEL.song} · ${data.host_name}님의 방`,
+        description: `노래 듣고 제목 맞히기 · ${data.song_total}곡 · ${count}/${data.max_players}명 · 눌러서 참가하세요`,
       };
     }
     if (kind === "catch") {

@@ -244,7 +244,7 @@ export default function Home() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     let invite: { kind: GameKind; id: string } | null = null;
-    for (const kind of ["omok", "alkkagi", "catch", "holdem", "word"] as GameKind[]) {
+    for (const kind of ["omok", "alkkagi", "catch", "holdem", "word", "song"] as GameKind[]) {
       const id = params.get(kind);
       if (id) invite = { kind, id };
     }
@@ -3641,6 +3641,8 @@ async function setAttendanceMembers(memberIds: string[]) {
               <strong>
                 {gameInvite.kind === "holdem"
                   ? "🃏 홀덤 초대가 도착했어요!"
+                  : gameInvite.kind === "song"
+                  ? "🎧 노래 맞추기 초대가 도착했어요!"
                   : gameInvite.kind === "catch"
                   ? "🎨 캐치마인드 초대가 도착했어요!"
                   : gameInvite.kind === "alkkagi"

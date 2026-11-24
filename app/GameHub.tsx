@@ -6,6 +6,8 @@ import { supabase } from "../lib/supabase";
 import OmokGame, { type Opponent } from "./OmokGame";
 import AlkkagiGame from "./AlkkagiGame";
 import CatchMindGame from "./CatchMindGame";
+import SongQuizGame from "./SongQuizGame";
+import { topicLabel } from "../lib/songQuiz";
 import HoldemOnline, { sweepHoldem } from "./HoldemOnline";
 import RatingBoard from "./RatingBoard";
 import TicketBuy from "./TicketBuy";
@@ -14,8 +16,8 @@ import { holdemTableLabel, holdemTableNumbers } from "../lib/holdemNo";
 
 const WORD_IDLE_MS = 60 * 1000; // 목록: 이만큼 입력이 없으면 💤
 
-export type GameKind = "omok" | "alkkagi" | "catch" | "holdem" | "word";
-type RoomKind = Exclude<GameKind, "holdem" | "word">;
+export type GameKind = "omok" | "alkkagi" | "catch" | "holdem" | "word" | "song";
+type RoomKind = Exclude<GameKind, "holdem" | "word" | "song">;
 
 type StakeRow = {
   id: string;
@@ -89,6 +91,7 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
   const [omok, setOmok] = useState<StakeRow[]>([]);
   const [alkkagi, setAlkkagi] = useState<StakeRow[]>([]);
   const [catchRooms, setCatchRooms] = useState<CatchRow[]>([]);
+  const [songRooms, setSongRooms] = useState<Array<{ id: string; status: string; host_name: string; topic: string; song_no: number; song_total: number; max_players: number; is_test: boolean; players: Array<{ id: string; name: string }> }>>([]);
   const [holdemTables, setHoldemTables] = useState<Array<{ id: string; status: string; host_name: string; is_friendly: boolean; max_seats: number; hand_no: number; created_at: string; view: { players?: Array<{ name: string; empty?: boolean }> } }>>([]);
   const [holdemNos, setHoldemNos] = useState<Record<string, number>>({});
   // quietMs: 마지막 입력(또는 시작) 뒤 지난 시간 — 읽은 시각 기준
@@ -146,13 +149,15 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
   }, []);
 
   const load = useCallback(async () => {
-    const [o, a, c, h, w] = await Promise.all([
+    const [o, a, c, h, w, s] = await Promise.all([
       supabase.from("omok_games").select(STAKE_COLUMNS).in("status", ["open", "challenge", "escrow", "playing"]).order("created_at", { ascending: false }).limit(20),
       supabase.from("alkkagi_games").select(STAKE_COLUMNS).in("status", ["open", "challenge", "escrow", "playing"]).order("created_at", { ascending: false }).limit(20),
       supabase.from("catch_rooms").select("id,status,host_name,players,max_players,turn_no,turn_total,is_test").in("status", ["waiting", "playing"]).order("created_at", { ascending: false }).limit(20),
       supabase.from("holdem_tables").select("id,status,host_name,is_friendly,max_seats,hand_no,created_at,view").in("status", ["waiting", "playing"]).order("created_at", { ascending: false }).limit(20),
       supabase.from("word_games").select("id,name,status,tries,max_tries,member_id,updated_at").eq("status", "playing").order("created_at", { ascending: false }).limit(30),
+      supabase.from("song_rooms").select("id,status,host_name,topic,song_no,song_total,max_players,is_test,players").in("status", ["waiting", "escrow", "playing"]).order("created_at", { ascending: false }).limit(20),
     ]);
+    setSongRooms(((s.data ?? []) as typeof songRooms).filter((row) => !row.is_test || row.players.some((player) => player.id === currentMemberId)));
     const readAt = Date.now();
     setWordLive(
       ((w.data ?? []) as Array<Omit<(typeof wordLive)[number], "quietMs"> & { updated_at: string | null }>).map(({ updated_at, ...row }) => ({
@@ -270,6 +275,18 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
         myPoints={myPoints}
         myTickets={myTickets}
         opponents={opponents}
+        isAdmin={isAdmin}
+      />
+    );
+  }
+  if (active?.kind === "song") {
+    return (
+      <SongQuizGame
+        onClose={onClose}
+        onBack={back}
+        initialRoomId={active.id && active.id !== "start" ? active.id : undefined}
+        currentMemberId={currentMemberId}
+        myName={myName}
         isAdmin={isAdmin}
       />
     );
@@ -442,6 +459,32 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
                 })}
               </div>
             )}
+          </article>
+          <article className="gameHubCard song">
+            <div className="gameHubHead">
+              <span className="gameHubIcon" aria-hidden="true">🎧</span>
+              <div>
+                <strong>노래 맞추기</strong>
+                <span>듣고 제목 맞히기 · 최대 8명 · 정답 최대 30점</span>
+              </div>
+              <button className="smallButton" onClick={() => setActive({ kind: "song", id: "" })}>방 만들기</button>
+            </div>
+            <div className="gameHubRooms">
+              {songRooms.length === 0 && <span className="muted">열린 방이 없습니다.</span>}
+              {songRooms.map((row) => {
+                const mine = row.players.some((player) => player.id === currentMemberId);
+                const full = row.players.length >= row.max_players;
+                return (
+                  <button key={row.id} className={`gameHubRoom ${row.status === "waiting" && !full ? "hot" : ""}`} onClick={() => setActive({ kind: "song", id: row.id })}>
+                    <span>
+                      <b>{row.is_test ? "🧪 테스트 · " : ""}{row.host_name}님의 방 · {row.status === "playing" ? `진행 중 ${Math.min(row.song_no + 1, row.song_total)}/${row.song_total}곡` : "대기 중"}</b>
+                      <em>{topicLabel(row.topic)} · 👥 {row.players.length}/{row.max_players}</em>
+                    </span>
+                    <i>{mine ? "내 방" : full ? "관전" : "참가"} →</i>
+                  </button>
+                );
+              })}
+            </div>
           </article>
           <article className="gameHubCard holdem">
             <div className="gameHubHead">

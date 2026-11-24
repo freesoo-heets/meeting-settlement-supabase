@@ -7419,3 +7419,116 @@ html[data-theme="christmas"] select:focus { border-color: #4d8b5e; }
     color: #1f2937;
   }
 }
+
+/* 홀덤: 폴드(펼친 화면) · 가로로 넓고 낮은 화면 (2026-11-19)
+   - 테이블 크기를 '보이는 높이(--vvh)'에 맞춘다 (예전: 56vh 기준이라 낮은 화면에서 위아래가 잘리고 내 카드가 버튼을 덮음)
+   - 높이가 낮으면 족보표는 버튼으로 펼치고, 테이블은 조금 더 납작하게 · 아래 줄은 촘촘하게
+   - 위쪽 자리의 베팅 칩은 카드 오른쪽으로 (가운데 POT 와 겹치지 않게) */
+.hdSeat.top .hdBet { top: calc(100% + 14px); left: calc(50% + 34px); transform: none; }
+@media (min-width: 521px) {
+  /* 테이블은 초록 판 영역(.hdFelt)의 실제 높이에 맞춘다 (컨테이너 단위 cqh) */
+  .hdModal .hdFelt { container-type: size; }
+  .hdRail { width: max(300px, min(100cqw - 112px, (100cqh - 112px) * 1.6, 700px)); }
+}
+@media (min-width: 521px) and (max-height: 780px) and (min-aspect-ratio: 1/1) {
+  .hdModal { padding: 6px 12px 8px; }
+  .hdTop { padding-bottom: 2px; }
+  .hdRail { aspect-ratio: 2 / 1; border-radius: 50% / 50%; margin-top: 30px; width: max(300px, min(100cqw - 112px, (100cqh - 100px) * 2, 780px)); }
+  .hdSeat.left.high, .hdSeat.right.high { top: 18%; }
+  .hdSeat.left.low, .hdSeat.right.low { top: 70%; }
+  .hdCard.lg { width: 54px; height: 76px; border-radius: 8px; }
+  .hdCard.lg .hdCorner b { font-size: 20px; } .hdCard.lg .hdCorner i { font-size: 14px; }
+  .hdMyCards { width: 108px; height: 76px; }
+  .hdMe { margin-top: -44px; }
+  .hdBar { margin-top: 6px; height: 42px; min-height: 42px; }
+  .hdBar button { padding: 8px 2px; }
+  .hdNotice { margin-top: 4px; gap: 4px; }
+  .hdLastLine { margin-top: 4px; }
+  .hdEmoteBar { margin: 4px auto 0; gap: 8px; }
+  .hdEmoteBar .omokEmoteButton { width: 36px; height: 36px; padding: 4px; }
+}
+@media (min-width: 861px) and (max-height: 820px) {
+  .hdRanksBtn { display: inline-block; }
+  .hdRanksWrap { display: none; }
+  .hdRanksWrap.open { display: block; position: absolute; z-index: 20; top: 52px; right: 10px; width: 200px; animation: hdTagIn .2s ease-out both; }
+  .hdRanksWrap.open .hdRanks { background: rgba(8, 12, 28, .97); box-shadow: 0 16px 40px rgba(0, 0, 0, .6); }
+  .hdRanksWrap.open .hdIconBtn.sm { display: grid; place-items: center; }
+}
+/* 홀덤: 폴드 · 태블릿(손가락 화면)도 휴대폰처럼 화면 전체로 (예전: 761px 이상이면 높이 82% 창이라 펼친 폴드에서 테이블이 작고 잘림) */
+@media (pointer: coarse) and (min-width: 761px) and (max-width: 1180px), (min-width: 761px) and (max-height: 720px) {
+  .meetingModalBackdrop.gameBackdrop:has(.hdModal) { top: var(--vvtop, 0px); bottom: auto; height: var(--vvh, 100dvh); padding: 0; place-items: stretch; }
+  .meetingModal.hdModal { width: 100%; max-width: none; height: 100%; max-height: none; border: 0; border-radius: 0; }
+}
+/* 홀덤: 휴대폰처럼 화면 전체로 쓰는 521~760px(펼친 폴드 세로 등)은 높이도 끝까지 (예전: 760px 에서 멈춰 아래가 비었음) */
+@media (min-width: 521px) and (max-width: 760px) { .meetingModal.hdModal { height: 100%; } }
+
+/* ───────── 🎧 노래 맞추기 ───────── */
+.gameHubCard.song { border-left: 4px solid #ec4899; }
+.sqStage {
+  position: relative;
+  min-height: 330px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  border-radius: 14px;
+  background: linear-gradient(160deg, #1e1b4b 0%, #312e81 55%, #831843 130%);
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(30, 27, 75, .12);
+  overflow: hidden;
+}
+.sqStage.waiting { background: #fff; color: #0f172a; border: 1px solid #e2e8f0; box-shadow: none; align-items: stretch; }
+.sqCenter { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; max-width: 100%; }
+.sqCenter > strong { font-size: 19px; }
+.sqCenter > span { font-size: 13px; color: #c7d2fe; }
+.sqStage .cmRanking li { color: #0f172a; }
+.sqPlay {
+  width: 96px;
+  height: 96px;
+  border: 0;
+  border-radius: 50%;
+  background: #ec4899;
+  color: #fff;
+  font-size: 34px;
+  cursor: pointer;
+  box-shadow: 0 0 0 8px rgba(236, 72, 153, .22);
+  transition: transform .15s ease;
+}
+.sqPlay:active { transform: scale(.95); }
+.sqPlay.on { animation: sqPulse 1s ease-in-out infinite; }
+.sqPlay:disabled { opacity: .7; cursor: default; }
+@keyframes sqPulse { 50% { box-shadow: 0 0 0 16px rgba(236, 72, 153, .12); } }
+.sqBars { display: inline-flex; align-items: flex-end; gap: 4px; height: 34px; }
+.sqBars i { width: 6px; background: #fff; border-radius: 3px; animation: sqBar .8s ease-in-out infinite; }
+.sqBars i:nth-child(2) { animation-delay: .15s; }
+.sqBars i:nth-child(3) { animation-delay: .3s; }
+.sqBars i:nth-child(4) { animation-delay: .45s; }
+@keyframes sqBar { 0%, 100% { height: 8px; } 50% { height: 32px; } }
+.sqSteps { list-style: none; display: flex; gap: 6px; margin: 6px 0 0; padding: 0; flex-wrap: wrap; justify-content: center; }
+.sqSteps li { display: flex; flex-direction: column; align-items: center; min-width: 46px; padding: 4px 6px; border-radius: 10px; background: rgba(255, 255, 255, .08); font-size: 11px; color: #a5b4fc; }
+.sqSteps li em { font-style: normal; font-weight: 800; font-size: 13px; }
+.sqSteps li.done { opacity: .45; }
+.sqSteps li.now { background: #fde047; color: #1f1300; }
+.sqHints { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; font-size: 14px; }
+.sqHints b { color: #fde047; letter-spacing: .1em; }
+.sqError { color: #fca5a5 !important; }
+.sqReveal .sqArt { width: 132px; height: 132px; border-radius: 12px; object-fit: cover; box-shadow: 0 8px 24px rgba(0, 0, 0, .35); animation: gameResultFade .3s ease; }
+.sqReveal .sqAnswer { font-size: 16px !important; color: #fff !important; font-weight: 700; }
+.sqSetup { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+.sqSetup > strong { font-size: 13px; color: #475569; }
+.sqChips { display: flex; flex-wrap: wrap; gap: 6px; }
+.sqChips button { padding: 6px 12px; border-radius: 999px; border: 1px solid #e2e8f0; background: #f8fafc; color: #334155; font-size: 13px; cursor: pointer; }
+.sqChips button.active { background: #ec4899; border-color: #ec4899; color: #fff; font-weight: 700; }
+.sqChips button:disabled:not(.active) { cursor: default; opacity: .75; }
+.sqCustom { display: flex; gap: 6px; }
+.sqCustom input { flex: 1; min-width: 0; padding: 7px 12px; border: 1px solid #e2e8f0; border-radius: 999px; font-size: 13px; }
+.sqRule { margin: 4px 0 0; font-size: 12px; line-height: 1.6; color: #64748b; }
+.sqReject { padding: 8px 10px; border-radius: 10px; background: #fef2f2; color: #b91c1c; font-size: 13px; }
+.catchChatLine.wrong { color: #94a3b8; }
+.catchChatLine.wrong b { color: #94a3b8; }
+@media (max-width: 760px) {
+  .sqStage { min-height: 250px; padding: 14px; }
+  .sqPlay { width: 80px; height: 80px; font-size: 28px; }
+  .cmRoom.typing .sqStage { min-height: 150px; }
+  .cmRoom.typing .sqSteps, .cmRoom.typing .sqReveal .sqArt { display: none; }
+}
