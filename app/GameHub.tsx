@@ -465,7 +465,7 @@ export default function GameHub({ onClose, initial, currentMemberId, myName, myP
               <span className="gameHubIcon" aria-hidden="true">🎧</span>
               <div>
                 <strong>노래 맞추기</strong>
-                <span>늘 열린 방 · 누구나 출제(전주 · 하이라이트) · 1곡 티켓 1장 · 정답 최대 30점</span>
+                <span>늘 열린 방 · 누구나 출제(전주 · 하이라이트) · 1곡 티켓 1장 · 정답 최대 50점</span>
               </div>
               <button className="smallButton" onClick={() => setActive({ kind: "song", id: "" })}>입장</button>
             </div>

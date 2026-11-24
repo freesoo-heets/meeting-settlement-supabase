@@ -3,7 +3,7 @@
 //  · 출제자가 곡당 티켓 1장 · 맞힌 사람은 카톡 점수판에 점수 (이용 시간 제한 없음)
 
 export const TICKETS_PER_SONG = 1; // ★ 11-24 사용자 요청 2장 → 1장 (봇 song_quiz_helper.COST_TICKET 과 같게)
-export const BASE_POINTS = 30;
+export const BASE_POINTS = 50; // ★ 11-24 사용자 요청 30 → 50 (단계마다 x0.8: 50 · 40 · 32 · 25 · 20)
 export const HINT_DECAY = 0.8;
 export const MAX_PLAYERS = 0; // 인원 제한 없음 (2026-11-24 사용자 요청 · 0 = 무제한)
 export const SONG_COUNTS = [3, 5, 10];
