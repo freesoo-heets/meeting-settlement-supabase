@@ -7547,3 +7547,8 @@ html[data-theme="christmas"] select:focus { border-color: #4d8b5e; }
   .sqBoard ol li:nth-child(n+4) { display: none; }
   .cmRoom.typing .sqBoard, .cmRoom.typing .sqPresent { display: none; }
 }
+.sqVolume { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #64748b; }
+.sqVolume input[type="range"] { flex: 1; min-width: 0; accent-color: #ec4899; }
+.sqVolume span { min-width: 34px; text-align: right; font-variant-numeric: tabular-nums; }
+.sqVolume .smallButton { padding: 4px 8px; }
+@media (max-width: 760px) { .cmRoom.typing .sqVolume { display: none; } }

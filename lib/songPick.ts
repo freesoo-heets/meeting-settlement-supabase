@@ -147,9 +147,104 @@ async function deezerArtistTop(name: string, limit = 30) {
   return (await deezer(`/artist/${artists[0].id}/top?limit=${limit}`)).filter((t) => t.preview).map(fromDeezer);
 }
 
+// ★ 시대별 히트곡 (가수, 제목, 연도) — 모두 아는 곡만. 시대 · 연도 주제는 여기서 고른다
+type Hit = [string, string, number];
+const HITS: Hit[] = [
+  // 1990년대
+  ["서태지와 아이들", "난 알아요", 1992], ["서태지와 아이들", "하여가", 1993], ["서태지와 아이들", "Come Back Home", 1995],
+  ["김건모", "핑계", 1993], ["김건모", "잘못된 만남", 1995], ["김건모", "스피드", 1996], ["신승훈", "보이지 않는 사랑", 1991],
+  ["015B", "아주 오래된 연인들", 1992], ["듀스", "나를 돌아봐", 1993], ["듀스", "여름 안에서", 1994], ["투투", "일과 이분의 일", 1994],
+  ["노이즈", "상상속의 너", 1994], ["김광석", "사랑했지만", 1991], ["김광석", "서른 즈음에", 1994], ["이승환", "천일동안", 1995],
+  ["룰라", "날개 잃은 천사", 1995], ["R.ef", "이별공식", 1995], ["김종서", "아름다운 구속", 1996], ["클론", "쿵따리 샤바라", 1996],
+  ["H.O.T.", "캔디", 1996], ["H.O.T.", "전사의 후예", 1996], ["H.O.T.", "행복", 1997], ["H.O.T.", "빛", 1998],
+  ["영턱스클럽", "정", 1996], ["자자", "버스 안에서", 1996], ["터보", "트위스트 킹", 1996], ["쿨", "애상", 1997], ["쿨", "해변의 여인", 1997],
+  ["쿨", "운명", 1998], ["젝스키스", "폼생폼사", 1997], ["젝스키스", "커플", 1998], ["S.E.S.", "I'm Your Girl", 1997],
+  ["S.E.S.", "Dreams Come True", 1998], ["DJ DOC", "DOC와 춤을", 1997], ["박진영", "그녀는 예뻤다", 1997], ["박진영", "허니", 1998],
+  ["유승준", "가위", 1997], ["유승준", "나나나", 1998], ["엄정화", "포이즌", 1998], ["엄정화", "페스티벌", 1999], ["김현정", "그녀와의 이별", 1998],
+  ["핑클", "내 남자친구에게", 1998], ["핑클", "영원한 사랑", 1999], ["조성모", "To Heaven", 1998], ["god", "어머님께", 1999],
+  ["god", "촛불하나", 1999], ["신화", "T.O.P", 1999], ["이정현", "와", 1999], ["클론", "초련", 1999],
+  // 2000년대
+  ["god", "거짓말", 2000], ["god", "길", 2001], ["조성모", "아시나요", 2000], ["소찬휘", "Tears", 2000], ["이정현", "바꿔", 2000],
+  ["DJ DOC", "Run To You", 2000], ["신승훈", "I Believe", 2001], ["보아", "No.1", 2002], ["보아", "아틀란티스 소녀", 2003],
+  ["비", "나쁜 남자", 2002], ["비", "태양을 피하는 방법", 2003], ["휘성", "안되나요", 2002], ["김범수", "보고싶다", 2002],
+  ["이효리", "10 Minutes", 2003], ["빅마마", "체념", 2003], ["거미", "친구라도 될 걸 그랬어", 2003], ["동방신기", "Hug", 2004],
+  ["SG워너비", "Timeless", 2004], ["김종국", "한 남자", 2004], ["박효신", "눈의 꽃", 2004], ["이승기", "내 여자라니까", 2004],
+  ["장윤정", "어머나", 2004], ["신화", "Brand New", 2004], ["버즈", "가시", 2005], ["버즈", "겁쟁이", 2005], ["김종국", "사랑스러워", 2005],
+  ["에픽하이", "Fly", 2005], ["동방신기", "풍선", 2006], ["성시경", "거리에서", 2006], ["원더걸스", "Tell Me", 2007],
+  ["빅뱅", "거짓말", 2007], ["빅뱅", "마지막 인사", 2007], ["소녀시대", "다시 만난 세계", 2007], ["SG워너비", "라라라", 2007],
+  ["SG워너비", "내 사람", 2007], ["빅뱅", "하루하루", 2008], ["원더걸스", "So Hot", 2008], ["원더걸스", "Nobody", 2008],
+  ["이효리", "U-Go-Girl", 2008], ["동방신기", "주문 - MIROTIC", 2008], ["손담비", "미쳤어", 2008], ["백지영", "총 맞은 것처럼", 2008],
+  ["에픽하이", "우산", 2008], ["카라", "Pretty Girl", 2008], ["샤이니", "누난 너무 예뻐 (Replay)", 2008], ["소녀시대", "Gee", 2009],
+  ["소녀시대", "소원을 말해봐", 2009], ["슈퍼주니어", "Sorry, Sorry", 2009], ["2NE1", "I Don't Care", 2009], ["2NE1", "Fire", 2009],
+  ["카라", "미스터", 2009], ["브라운아이드걸스", "Abracadabra", 2009], ["이승기", "결혼해줄래", 2009], ["2PM", "Again & Again", 2009],
+  ["티아라", "Bo Peep Bo Peep", 2009], ["샤이니", "Ring Ding Dong", 2009], ["다비치", "8282", 2009],
+  // 2010년대
+  ["아이유", "좋은 날", 2010], ["미쓰에이", "Bad Girl Good Girl", 2010], ["소녀시대", "Oh!", 2010], ["소녀시대", "훗", 2010],
+  ["샤이니", "Lucifer", 2010], ["아이유", "너랑 나", 2011], ["2NE1", "내가 제일 잘 나가", 2011], ["현아", "Bubble Pop!", 2011],
+  ["싸이", "강남스타일", 2012], ["빅뱅", "FANTASTIC BABY", 2012], ["버스커버스커", "벚꽃 엔딩", 2012], ["버스커버스커", "여수 밤바다", 2012],
+  ["씨스타", "나 혼자", 2012], ["소녀시대", "I GOT A BOY", 2013], ["엑소", "으르렁", 2013], ["에일리", "보여줄게", 2013],
+  ["에이핑크", "NoNoNo", 2013], ["씨스타", "Touch My Body", 2014], ["에이핑크", "Mr. Chu", 2014], ["걸스데이", "Something", 2014],
+  ["자이언티", "양화대교", 2014], ["박효신", "야생화", 2014], ["악동뮤지션", "200%", 2014], ["빅뱅", "BANG BANG BANG", 2015],
+  ["마마무", "음오아예", 2015], ["여자친구", "오늘부터 우리는", 2015], ["트와이스", "OOH-AHH하게", 2015], ["태연", "I", 2015],
+  ["임창정", "내가 저지른 사랑", 2015], ["샤이니", "View", 2015], ["트와이스", "CHEER UP", 2016], ["트와이스", "TT", 2016],
+  ["방탄소년단", "피 땀 눈물", 2016], ["블랙핑크", "휘파람", 2016], ["볼빨간사춘기", "우주를 줄게", 2016], ["여자친구", "시간을 달려서", 2016],
+  ["레드벨벳", "Russian Roulette", 2016], ["10CM", "봄이 좋냐??", 2016], ["방탄소년단", "봄날", 2017], ["방탄소년단", "DNA", 2017],
+  ["아이유", "밤편지", 2017], ["아이유", "팔레트", 2017], ["레드벨벳", "빨간 맛", 2017], ["워너원", "에너제틱", 2017], ["선미", "가시나", 2017],
+  ["위너", "REALLY REALLY", 2017], ["마마무", "별이 빛나는 밤", 2017], ["멜로망스", "선물", 2017], ["브레이브걸스", "롤린", 2017],
+  ["DAY6", "예뻤어", 2017], ["방탄소년단", "IDOL", 2018], ["블랙핑크", "뚜두뚜두", 2018], ["트와이스", "What is Love?", 2018],
+  ["아이콘", "사랑을 했다", 2018], ["폴킴", "모든 날, 모든 순간", 2018], ["볼빨간사춘기", "여행", 2018], ["엑소", "Love Shot", 2018],
+  ["방탄소년단", "작은 것들을 위한 시", 2019], ["블랙핑크", "Kill This Love", 2019], ["아이유", "Blueming", 2019], ["청하", "벌써 12시", 2019],
+  ["악동뮤지션", "어떻게 이별까지 사랑하겠어, 널 사랑하는 거지", 2019], ["잔나비", "주저하는 연인들을 위해", 2019],
+  ["장범준", "흔들리는 꽃들 속에서 네 샴푸향이 느껴진거야", 2019], ["DAY6", "한 페이지가 될 수 있게", 2019],
+  // 2020년대
+  ["지코", "아무노래", 2020], ["방탄소년단", "Dynamite", 2020], ["블랙핑크", "How You Like That", 2020], ["임영웅", "이제 나만 믿어요", 2020],
+  ["싹쓰리", "다시 여기 바닷가", 2020], ["환불원정대", "DON'T TOUCH ME", 2020], ["아이유", "라일락", 2021], ["아이유", "Celebrity", 2021],
+  ["아이유", "strawberry moon", 2021], ["방탄소년단", "Butter", 2021], ["에스파", "Next Level", 2021], ["아이브", "ELEVEN", 2021],
+  ["이무진", "신호등", 2021], ["임영웅", "사랑은 늘 도망가", 2021], ["아이브", "LOVE DIVE", 2022], ["아이브", "After LIKE", 2022],
+  ["뉴진스", "Attention", 2022], ["뉴진스", "Hype Boy", 2022], ["뉴진스", "Ditto", 2022], ["르세라핌", "ANTIFRAGILE", 2022],
+  ["르세라핌", "FEARLESS", 2022], ["(여자)아이들", "TOMBOY", 2022], ["블랙핑크", "Pink Venom", 2022], ["윤하", "사건의 지평선", 2022],
+  ["경서", "나의 X에게", 2022], ["태연", "INVU", 2022], ["멜로망스", "사랑인가 봐", 2022], ["뉴진스", "OMG", 2023], ["뉴진스", "Super Shy", 2023],
+  ["아이브", "I AM", 2023], ["(여자)아이들", "Queencard", 2023], ["에스파", "Spicy", 2023], ["세븐틴", "손오공", 2023], ["정국", "Seven", 2023],
+  ["비비", "밤양갱", 2024], ["에스파", "Supernova", 2024], ["에스파", "Whiplash", 2024], ["아일릿", "Magnetic", 2024], ["로제", "APT.", 2024],
+  ["QWER", "고민중독", 2024], ["아이유", "Love wins all", 2024], ["지민", "Who", 2024],
+];
+
+// 히트곡 하나를 애플에서 찾는다 (제목이 맞는 첫 곡 · 가수까지 맞으면 우선)
+async function findHit([artist, title]: Hit): Promise<(Raw & { art?: string }) | null> {
+  const want = norm(cleanTitle(title).replace(/\(.*?\)/g, ""));
+  const who = norm(artist);
+  let best: { s: Raw; score: number } | null = null;
+  for (const s of await search(`${artist} ${title}`, 15)) {
+    if (!s.previewUrl || !s.trackName || NOT_SONG.test(s.trackName) || /remix|ver\.|version|live|라이브|sped|acoustic/i.test(s.trackName)) continue;
+    const got = norm(cleanTitle(s.trackName).replace(/\(.*?\)/g, ""));
+    if (!got || !(got === want || got.includes(want) || want.includes(got))) continue;
+    const by = norm(s.artistName ?? "");
+    const score = (got === want ? 2 : 0) + (by.includes(who) || who.includes(by) ? 2 : 0);
+    if (!best || score > best.score) best = { s, score };
+    if (score >= 4) break;
+  }
+  return best?.s ?? null;
+}
+
+async function hitPool(start: number, end: number, want: number) {
+  // 한 해만 고르면 곡이 적으니, 3곡이 안 되면 앞뒤로 넓힌다
+  let range = HITS.filter(([, , y]) => y >= start && y <= end);
+  for (let pad = 1; range.length < 3 && pad <= 3; pad += 1) range = HITS.filter(([, , y]) => y >= start - pad && y <= end + pad);
+  const out: Array<Raw & { art?: string }> = [];
+  for (const hit of shuffle(range).slice(0, want + 3)) {
+    const found = await findHit(hit);
+    if (found) out.push(found);
+    if (out.length >= want + 2) break; // 최근에 낸 곡이 섞여도 고를 수 있게 조금 더
+  }
+  return out;
+}
+
 async function poolFor(topic: string, want: number): Promise<Array<Raw & { art?: string }>> {
   const era = topic ? parseEra(topic) : null;
   if (era) {
+    // ★ 11-24: 그 시대 가수의 아무 곡(수록곡 포함)이 나와 너무 어렵다 → 모두 아는 히트곡 목록에서만 낸다
+    const hits = await hitPool(era[0], era[1], want);
+    if (hits.length >= want) return hits;
     const [start, end] = era;
     const artists = shuffle([
       ...new Set(
@@ -183,7 +278,8 @@ async function poolFor(topic: string, want: number): Promise<Array<Raw & { art?:
     return pool;
   }
   if (topic) {
-    let pool: Array<Raw & { art?: string }> = await search(topic, 100);
+    // ★ 11-24: 가수 이름은 검색 결과 위쪽(인기 · 관련도 순) 곡만 — 아래쪽은 잘 모르는 수록곡이 많다
+    let pool: Array<Raw & { art?: string }> = (await search(topic, 50)).slice(0, 20);
     if (pool.length === 0) pool = await deezerArtistTop(topic, 50);
     if (pool.length === 0) pool = (await deezer(`/search?q=${encodeURIComponent(topic)}&limit=50`)).filter((t) => t.preview).map(fromDeezer);
     return pool;
@@ -203,11 +299,13 @@ export async function pickSongs(topic: string, count: number, recentIds: Set<str
   const perArtist = new Map<string, number>();
   const seen = new Set<string>();
   const picked: PickedSong[] = [];
-  for (const s of shuffle(pool)) {
+  // 최근에 낸 곡은 빼고 고르되, 모자라면(히트곡 목록이 짧은 시대 등) 최근 곡도 다시 낸다
+  const shuffled = shuffle(pool);
+  for (const s of [...shuffled.filter((x) => !recentIds.has(String(x.trackId ?? ""))), ...shuffled]) {
     if (picked.length >= count) break;
     if (s.wrapperType && s.wrapperType !== "track") continue;
     const trackId = String(s.trackId ?? "");
-    if (!s.previewUrl || !s.trackName || !trackId || recentIds.has(trackId) || NOT_SONG.test(s.trackName)) continue;
+    if (!s.previewUrl || !s.trackName || !trackId || picked.some((p) => p.trackId === trackId) || NOT_SONG.test(s.trackName)) continue;
     const artistKey = norm(s.artistName ?? "");
     if (!artistTopic && (perArtist.get(artistKey) ?? 0) >= 2) continue;
     const key = `${norm(cleanTitle(s.trackName))}|${norm(s.artistName ?? "")}`;

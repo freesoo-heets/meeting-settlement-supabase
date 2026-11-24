@@ -1,6 +1,6 @@
 // 🎧 노래 맞추기 — 카톡 봇 song_quiz_helper.py 와 같은 규칙 (화면 · 서버 공용)
 //  · 곡마다 2초 → 4초 → 6초 듣기 → 가수 힌트 → 제목 힌트, 단계가 지날수록 배점 x0.8 (30 · 24 · 19 · 15 · 12)
-//  · 방장이 곡당 티켓 2장 (운영진 무료) · 맞힌 사람은 카톡 점수판에 점수
+//  · 출제자가 곡당 티켓 2장 · 맞힌 사람은 카톡 점수판에 점수 (이용 시간 제한 없음)
 
 export const TICKETS_PER_SONG = 2;
 export const BASE_POINTS = 30;
@@ -85,9 +85,14 @@ export function buildAnswers(title: string) {
   let base = title.replace(/[([{].*?[)\]}]/g, "");
   base = base.split(/\s+-\s+|\s+feat\.?|\s+ft\.?/i)[0];
   answers.add(norm(base));
+  // '주문 - MIROTIC' 처럼 ' - ' 로 나뉜 제목은 뒤쪽만 써도 정답
+  for (const part of title.replace(/[([{].*?[)\]}]/g, "").split(/\s+-\s+/).slice(1)) {
+    const n = norm(part);
+    if (n.length >= 2) answers.add(n);
+  }
   for (const match of title.matchAll(/[([](.*?)[)\]]/g)) {
     const inner = match[1];
-    if (/feat|ft\.|with|remix|ver|inst/i.test(inner)) continue;
+    if (EXTRA_TAG.test(inner)) continue; // 리마스터 · 버전 · OST 같은 표기는 정답이 아니다
     const n = norm(inner);
     if (n.length >= 2) answers.add(n);
   }
@@ -101,8 +106,13 @@ export function hintTitle(title: string) {
 }
 
 // 표시용 제목 (피처링 등 제거)
+// 괄호 속 부가 표기 (피처링 · 리마스터 · 버전 · OST 등)
+const EXTRA_TAG = /\bfeat|\bft\.|\bwith\b|\bprod\b|remix|\bver\b|\bver\.|version|\binst|remaster|\bedit\b|\bmix\b|\blive\b|\bfrom\b|\bost\b|o\.s\.t|sped up|acoustic|\b\d{4}\b/i;
+
 export function cleanTitle(title: string) {
-  return String(title).replace(/\s*[([]\s*(feat|ft|with|prod)[^)\]]*[)\]]/gi, "").trim();
+  return String(title)
+    .replace(/\s*[([]([^)\]]*)[)\]]/g, (whole, inner: string) => (EXTRA_TAG.test(inner) ? "" : whole))
+    .trim();
 }
 
 // 시대 표현 → [시작연도, 끝연도, 표시이름]

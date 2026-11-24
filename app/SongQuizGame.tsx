@@ -227,6 +227,52 @@ export default function SongQuizGame({ onClose, onBack, currentMemberId, myName,
     [playNo],
   );
 
+  // 🔊 소리 크기 (기기마다 기억). 아이폰은 audio.volume 을 무시해서, 막대를 움직이면 Web Audio 로 줄인다
+  const [volume, setVolume] = useState(() => {
+    try {
+      const saved = Number(window.localStorage.getItem("songQuizVolume"));
+      return Number.isFinite(saved) && saved > 0 && saved <= 1 ? saved : 0.8;
+    } catch {
+      return 0.8;
+    }
+  });
+  const [muted, setMuted] = useState(false);
+  const gainRef = useRef<GainNode | null>(null);
+  const applyVolume = useCallback((value: number, fromGesture: boolean) => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.volume = value;
+    if (!gainRef.current && fromGesture && Math.abs(audio.volume - value) > 0.01) {
+      try {
+        const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        const ctx = new Ctx();
+        const gain = ctx.createGain();
+        ctx.createMediaElementSource(audio).connect(gain).connect(ctx.destination);
+        void ctx.resume();
+        gainRef.current = gain;
+      } catch {
+        // 못 쓰면 기기 음량으로
+      }
+    }
+    if (gainRef.current) {
+      void (gainRef.current.context as AudioContext).resume?.();
+      gainRef.current.gain.value = value;
+    }
+  }, []);
+  useEffect(() => {
+    applyVolume(muted ? 0 : volume, false);
+  }, [volume, muted, applyVolume]);
+  const changeVolume = (value: number) => {
+    setVolume(value);
+    setMuted(false);
+    applyVolume(value, true);
+    try {
+      window.localStorage.setItem("songQuizVolume", String(value));
+    } catch {
+      // 저장 못 해도 이번에는 적용
+    }
+  };
+
   const stopClip = useCallback(() => {
     window.clearTimeout(stopTimer.current);
     audioRef.current?.pause();
@@ -399,7 +445,7 @@ export default function SongQuizGame({ onClose, onBack, currentMemberId, myName,
         <div className="meetingModalHeader">
           <div>
             <span>
-              누구나 출제 · 1곡에 티켓 {TICKETS_PER_SONG}장 (운영진 무료) · 정답 최대 {stagePoints(0)}점
+              누구나 출제 · 1곡에 티켓 {TICKETS_PER_SONG}장 · 정답 최대 {stagePoints(0)}점
               {myTickets !== null && myTickets !== undefined ? ` · 내 티켓 🎫 ${myTickets}` : ""}
             </span>
             <h2>🎧 노래 맞추기</h2>
@@ -489,7 +535,7 @@ export default function SongQuizGame({ onClose, onBack, currentMemberId, myName,
                     </button>
                     <p className="sqRule">
                       2초 → 4초 → 6초 듣기 → 가수 힌트 → 제목 힌트 순서로 열려요. 빨리 맞힐수록 점수가 커요 ({STAGES.map((_, i) => stagePoints(i)).join(" · ")}점).
-                      출제한 사람도 맞힐 수 있어요. 이용 시간: 평일 9시 전 · 12~14시 · 18시 이후, 주말 종일 (운영진은 언제나 · 무료)
+                      출제한 사람도 맞힐 수 있어요.
                     </p>
                   </div>
                 )}
@@ -549,6 +595,28 @@ export default function SongQuizGame({ onClose, onBack, currentMemberId, myName,
             </div>
 
             <aside className="cmSide">
+              <div className="sqVolume">
+                <button
+                  className="smallButton ghost"
+                  aria-label={muted ? "소리 켜기" : "소리 끄기"}
+                  onClick={() => {
+                    setMuted((m) => !m);
+                    applyVolume(muted ? volume : 0, true);
+                  }}
+                >
+                  {muted || volume === 0 ? "🔇" : volume < 0.4 ? "🔈" : volume < 0.75 ? "🔉" : "🔊"}
+                </button>
+                <input
+                  type="range"
+                  min={0.05}
+                  max={1}
+                  step={0.05}
+                  value={muted ? 0 : volume}
+                  onChange={(event) => changeVolume(Number(event.target.value))}
+                  aria-label="소리 크기"
+                />
+                <span>{muted ? 0 : Math.round(volume * 100)}%</span>
+              </div>
               <div className="sqBoard">
                 <strong>🏆 오늘의 순위</strong>
                 {ranking.length === 0 ? (
