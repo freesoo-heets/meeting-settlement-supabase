@@ -1,8 +1,8 @@
 // 🎧 노래 맞추기 — 카톡 봇 song_quiz_helper.py 와 같은 규칙 (화면 · 서버 공용)
 //  · 곡마다 2초 → 4초 → 6초 듣기 → 가수 힌트 → 제목 힌트, 단계가 지날수록 배점 x0.8 (30 · 24 · 19 · 15 · 12)
-//  · 출제자가 곡당 티켓 2장 · 맞힌 사람은 카톡 점수판에 점수 (이용 시간 제한 없음)
+//  · 출제자가 곡당 티켓 1장 · 맞힌 사람은 카톡 점수판에 점수 (이용 시간 제한 없음)
 
-export const TICKETS_PER_SONG = 2;
+export const TICKETS_PER_SONG = 1; // ★ 11-24 사용자 요청 2장 → 1장 (봇 song_quiz_helper.COST_TICKET 과 같게)
 export const BASE_POINTS = 30;
 export const HINT_DECAY = 0.8;
 export const MAX_PLAYERS = 0; // 인원 제한 없음 (2026-11-24 사용자 요청 · 0 = 무제한)
