@@ -7,6 +7,8 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
 import {
   CLIP_OFFSET,
+  DAILY_POINT_CAP,
+  kstDayStartIso,
   MODES,
   REVEAL_SECONDS,
   STAGES,
@@ -82,10 +84,14 @@ async function callSong(payload: Record<string, unknown>) {
 }
 
 // 오늘 0시 (한국 시간)
-function todayStartIso() {
-  const kst = new Date(Date.now() + 9 * 3600 * 1000);
-  kst.setUTCHours(0, 0, 0, 0);
-  return new Date(kst.getTime() - 9 * 3600 * 1000).toISOString();
+const todayStartIso = () => kstDayStartIso();
+
+// 정답 공개 문구: 하루 상한에 걸려 배점보다 적게 받았으면 함께 알린다
+function winPointsText(room: { last_points: number | null; stage: number }) {
+  const got = room.last_points ?? 0;
+  const full = stagePoints(room.stage);
+  if (got >= full) return `+${got}점`;
+  return got > 0 ? `+${got}점 (하루 상한 ${DAILY_POINT_CAP}점)` : `+0점 (오늘 상한 ${DAILY_POINT_CAP}점 도달)`;
 }
 
 export default function SongQuizGame({ onClose, onBack, currentMemberId, myName, myTickets, isAdmin }: Props) {
@@ -339,7 +345,7 @@ export default function SongQuizGame({ onClose, onBack, currentMemberId, myName,
         name: "",
         kind: "system",
         text: room.last_winner
-          ? `🎉 ${room.last_winner}님 정답! +${room.last_points ?? 0}점 · 「${room.reveal_title}」 ${room.reveal_artist}`
+          ? `🎉 ${room.last_winner}님 정답! ${winPointsText(room)} · 「${room.reveal_title}」 ${room.reveal_artist}`
           : `⏰ 정답은 「${room.reveal_title}」 ${room.reveal_artist}`,
       });
       void loadAwards();
@@ -403,6 +409,11 @@ export default function SongQuizGame({ onClose, onBack, currentMemberId, myName,
     return [...total.entries()].map(([id, v]) => ({ id, ...v })).sort((a, b) => b.points - a.points);
   }, [awards]);
 
+  const myTodayPoints = useMemo(
+    () => awards.filter((a) => a.member_id === currentMemberId).reduce((sum, a) => sum + Number(a.points ?? 0), 0),
+    [awards, currentMemberId],
+  );
+
   const chatLogRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const log = chatLogRef.current;
@@ -445,8 +456,9 @@ export default function SongQuizGame({ onClose, onBack, currentMemberId, myName,
         <div className="meetingModalHeader">
           <div>
             <span>
-              누구나 출제 · 1곡에 티켓 {TICKETS_PER_SONG}장 · 정답 최대 {stagePoints(0)}점
+              누구나 출제 · 1곡에 티켓 {TICKETS_PER_SONG}장 · 정답 최대 {stagePoints(0)}점 · 하루 최대 {DAILY_POINT_CAP}점
               {myTickets !== null && myTickets !== undefined ? ` · 내 티켓 🎫 ${myTickets}` : ""}
+              {currentMemberId ? ` · 오늘 내 점수 ${myTodayPoints}/${DAILY_POINT_CAP}` : ""}
             </span>
             <h2>🎧 노래 맞추기</h2>
           </div>
@@ -586,7 +598,7 @@ export default function SongQuizGame({ onClose, onBack, currentMemberId, myName,
                 {revealing && room && (
                   <div className="sqCenter sqReveal">
                     {room.reveal_art ? <img src={room.reveal_art} alt="" className="sqArt" /> : <span className="cmOverlayIcon">💿</span>}
-                    <strong>{room.last_winner ? `🎉 ${room.last_winner}님 정답! +${room.last_points ?? 0}점` : "⏰ 정답 공개"}</strong>
+                    <strong>{room.last_winner ? `🎉 ${room.last_winner}님 정답! ${winPointsText(room)}` : "⏰ 정답 공개"}</strong>
                     <span className="sqAnswer">「{room.reveal_title}」 {room.reveal_artist}</span>
                     <button className="smallButton" onClick={() => void playFull()}>🔊 하이라이트 듣기</button>
                   </div>

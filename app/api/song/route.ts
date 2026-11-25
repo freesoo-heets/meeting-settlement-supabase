@@ -3,6 +3,8 @@ import { getServerAdmin } from "../../../lib/server-admin";
 import { fail, isAdminMember, loadMember, loadPlayer, requireMemberId, updateIfUnchanged, type Admin } from "../../../lib/gameServer";
 import { eraSupported, pickSongs } from "../../../lib/songPick";
 import {
+  DAILY_POINT_CAP,
+  kstDayStartIso,
   REVEAL_SECONDS,
   STAGES,
   TICKETS_PER_SONG,
@@ -262,7 +264,16 @@ export async function POST(request: Request) {
     if (!secret || !(secret.answers ?? []).includes(text)) return NextResponse.json({ ok: true, correct: false });
     const member = await loadMember(admin, memberId);
     if ("error" in member) return fail(member.error, member.status);
-    const points = stagePoints(room.stage);
+    // 하루 상한: 오늘 이미 받은(또는 지급 대기) 점수를 빼고 남은 만큼만
+    const { data: todayRows } = await admin
+      .from("song_awards")
+      .select("points")
+      .eq("member_id", memberId)
+      .in("state", ["pending", "paid"])
+      .gte("created_at", kstDayStartIso())
+      .limit(500);
+    const already = (todayRows ?? []).reduce((sum, row) => sum + Number(row.points ?? 0), 0);
+    const points = Math.max(0, Math.min(stagePoints(room.stage), DAILY_POINT_CAP - already));
     const ok = await reveal(admin, room, { last_winner: member.name, last_points: points });
     if (ok) {
       const point = await loadPlayer(admin, memberId);

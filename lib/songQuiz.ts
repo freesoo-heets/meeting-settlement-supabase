@@ -5,6 +5,15 @@
 export const TICKETS_PER_SONG = 1; // ★ 11-24 사용자 요청 2장 → 1장 (봇 song_quiz_helper.COST_TICKET 과 같게)
 export const BASE_POINTS = 50; // ★ 11-24 사용자 요청 30 → 50 (단계마다 x0.8: 50 · 40 · 32 · 25 · 20)
 export const HINT_DECAY = 0.8;
+// ★ 11-25 사용자 요청: 노래 맞추기로 받는 점수는 한 사람당 하루(한국 시간) 300점까지 (봇 song_bridge.DAILY_CAP 과 같게)
+export const DAILY_POINT_CAP = 300;
+
+// 한국 시간 오늘 0시 (UTC ISO 문자열)
+export function kstDayStartIso(now = Date.now()) {
+  const kst = new Date(now + 9 * 3600 * 1000);
+  kst.setUTCHours(0, 0, 0, 0);
+  return new Date(kst.getTime() - 9 * 3600 * 1000).toISOString();
+}
 export const MAX_PLAYERS = 0; // 인원 제한 없음 (2026-11-24 사용자 요청 · 0 = 무제한)
 export const SONG_COUNTS = [3, 5, 10];
 export const CLIP_OFFSET = 1.0; // 미리듣기 앞쪽 페이드인 건너뛰기 (초)
