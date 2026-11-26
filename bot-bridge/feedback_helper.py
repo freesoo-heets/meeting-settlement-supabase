@@ -16,7 +16,7 @@ import os
 import urllib.error
 import urllib.request
 
-COMMANDS = ("!소리", "!소리목록", "!소리도움", "!답변")
+COMMANDS = ("!소리", "!소리목록", "!소리도움", "!답변", "!검토", "!완료", "!소리내역")
 MAX_TEXT = 4000
 
 
@@ -56,7 +56,7 @@ def handle_message(room_id, sender_uid, message_id, text, send):
     command = text.strip()
     try:
         if command == "!소리도움":
-            output = "💌 찐친 소리함\n!소리 / !소리목록\n!소리 번호 (접수 상세)\n!답변 번호 내용 (비공개 즉시 저장)"
+            output = "💌 찐친 소리함\n!소리 / !소리목록\n!소리 번호 (접수 상세)\n!답변 번호 내용 (비공개 즉시 저장)\n!검토 번호 / !완료 번호\n!소리내역 번호"
         elif command == "!소리" or command == "!소리목록":
             result = _api("list", room_id, senderUid=str(sender_uid))
             rows = result.get("rows", [])
@@ -70,6 +70,19 @@ def handle_message(room_id, sender_uid, message_id, text, send):
             item = _api("detail", room_id, senderUid=str(sender_uid), receipt=receipt)["item"]
             output = ("💌 접수 #{receipt}\n작성자: {nickname}\n분류: {category}\n제목: {title}"
                       "\n내용:\n{content}\n상태: {status}").format(**item)
+        elif command.startswith("!소리내역 "):
+            receipt = int(command.split(None, 1)[1])
+            result = _api("history",room_id,senderUid=str(sender_uid),receipt=receipt)
+            history = result.get("history",[])
+            output = ("💌 #{0} 답변 이력\\n".format(receipt) + ("\\n".join(
+                "{0} · {1}\\n{2}".format(h["replied_at"],h["source"],h["content"]) for h in history
+            ) or "아직 답변이 없습니다."))
+        elif command.startswith("!검토 ") or command.startswith("!완료 "):
+            flag, number = command.split(None,1)
+            receipt = int(number)
+            status = "reviewing" if flag == "!검토" else "closed"
+            _api("status",room_id,senderUid=str(sender_uid),receipt=receipt,status=status)
+            output = "✅ #{0} 상태가 {1}(으)로 변경되었습니다.".format(receipt,"검토중" if status=="reviewing" else "종결")
         elif command.startswith("!답변 "):
             parts = command.split(None, 2)
             if len(parts) != 3 or not parts[1].isdigit() or not parts[2].strip():
