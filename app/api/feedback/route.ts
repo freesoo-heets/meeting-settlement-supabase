@@ -42,13 +42,13 @@ export async function GET(request: Request) {
     const ids = (owned || []).map(x => x.feedback_id);
     let myItems: Record<string, unknown>[] = [];
     if (ids.length) {
-      const { data, error } = await db.from("jjinchin_feedback").select("id,category,title,content,anonymous,status,created_at,updated_at,jjinchin_feedback_replies(content,replied_at)").in("id", ids).order("created_at", { ascending: false });
+      const { data, error } = await db.from("jjinchin_feedback").select("id,receipt_no,category,title,content,anonymous,status,created_at,updated_at,jjinchin_feedback_replies(content,replied_at),jjinchin_feedback_reply_history(content,replied_at,source)").in("id", ids).order("created_at", { ascending: false });
       if (error) throw error;
       myItems = data || [];
     }
     let inbox: Record<string, unknown>[] = [];
     if (isReviewer) {
-      const { data, error } = await db.from("jjinchin_feedback").select("id,category,title,content,anonymous,status,created_at,updated_at,jjinchin_feedback_replies(content,replied_at)").order("created_at", { ascending: false }).limit(200);
+      const { data, error } = await db.from("jjinchin_feedback").select("id,receipt_no,category,title,content,anonymous,status,created_at,updated_at,jjinchin_feedback_replies(content,replied_at),jjinchin_feedback_reply_history(content,replied_at,source)").order("created_at", { ascending: false }).limit(200);
       if (error) throw error;
       inbox = data || [];
       // 실명으로 접수한 글만 닉네임을 결합한다. 익명 글의 작성자 ID는 응답에 포함하지 않는다.
