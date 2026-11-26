@@ -109,6 +109,29 @@ export async function POST(request: Request) {
         title: f.title, content: f.content, status: f.status, createdAt: f.created_at
       } });
     }
+    if (action === "history") {
+      const receipt = numberOf(body.receipt);
+      if (!receipt) return fail("접수번호를 확인해주세요.", 400);
+      const { data: ticket, error: findError } = await db.from("jjinchin_feedback")
+        .select("id,receipt_no").eq("receipt_no", receipt).maybeSingle();
+      if (findError) throw findError;
+      if (!ticket) return fail("접수 내역이 없습니다.", 404);
+      const { data, error } = await db.from("jjinchin_feedback_reply_history")
+        .select("content,source,replied_at").eq("feedback_id",ticket.id)
+        .order("replied_at",{ascending:false}).limit(10);
+      if (error) throw error;
+      return reply({ok:true, receipt, history:data||[]});
+    }
+    if (action === "status") {
+      const receipt = numberOf(body.receipt), status = string(body.status);
+      if (!receipt || !["reviewing","closed"].includes(status)) return fail("접수번호 또는 처리 상태가 올바르지 않습니다.",400);
+      const {data,error} = await db.from("jjinchin_feedback").update({
+        status,updated_at:new Date().toISOString()
+      }).eq("receipt_no",receipt).select("receipt_no").maybeSingle();
+      if (error) throw error;
+      if (!data) return fail("접수 내역이 없습니다.",404);
+      return reply({ok:true,receipt,status,actor:actor.nickname});
+    }
     if (action === "reply") {
       const receipt = numberOf(body.receipt);
       const content = string(body.content), messageId = string(body.messageId);
