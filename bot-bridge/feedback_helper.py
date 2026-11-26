@@ -42,6 +42,8 @@ def _api(action, room_id, **kwargs):
         except (ValueError, UnicodeDecodeError):
             error = "처리 실패"
         raise RuntimeError(error) from None
+    except (urllib.error.URLError, TimeoutError):
+        raise RuntimeError("소리함 서버 연결에 실패했습니다.") from None
     if not payload.get("ok"):
         raise RuntimeError(payload.get("error", "처리 실패"))
     return payload
