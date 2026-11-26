@@ -23,7 +23,6 @@ const replyOf = (item: Feedback) => Array.isArray(item.jjinchin_feedback_replies
 export default function FeedbackPage() {
   const [payload, setPayload] = useState<Payload | null>(null);
   const [category, setCategory] = useState<Category>("suggestion");
-  const [anonymous, setAnonymous] = useState(true);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [activeTab, setActiveTab] = useState<"write" | "mine" | "inbox">("write");
@@ -60,7 +59,7 @@ export default function FeedbackPage() {
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true); setNotice("");
     try {
-      await callApi("POST", { category, anonymous, title: title.trim(), content: content.trim() });
+      await callApi("POST", { category, title: title.trim(), content: content.trim() });
       setTitle(""); setContent(""); setNotice("의견이 접수되었습니다. 비공개 답변은 '내 접수내역'에서 확인할 수 있습니다.");
       setActiveTab("mine"); await reload();
     } catch (e) { setNotice(e instanceof Error ? e.message : "제출에 실패했습니다."); }
@@ -90,7 +89,7 @@ export default function FeedbackPage() {
       <header style={{ marginBottom: 22 }}>
         <div style={{ fontSize: 12, letterSpacing: 2, color: "#667085" }}>JJINCHIN · PRIVATE FEEDBACK</div>
         <h1 style={{ fontSize: "clamp(26px,5vw,36px)", margin: "8px 0" }}>💌 찐친 소리함</h1>
-        <p style={{ color: "#667085", lineHeight: 1.7, margin: 0 }}>작은 불편, 운영 건의, 말하기 어려운 고민까지 편하게 남겨주세요. 작성자 닉네임은 현재 로그인 계정에서 자동으로 연결됩니다.</p>
+        <p style={{ color: "#667085", lineHeight: 1.7, margin: 0 }}>작은 불편, 운영 건의, 말하기 어려운 고민까지 편하게 남겨주세요. 작성자 닉네임은 현재 로그인 계정에서 자동으로 연결되며 익명 작성은 지원하지 않습니다.</p>
       </header>
       <nav aria-label="소리함 메뉴" style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 18 }}>
         {([["write", "의견 남기기"], ["mine", "내 접수내역"], ...(payload?.isReviewer ? [["inbox", "운영진 접수함"]] : [])] as [typeof activeTab, string][]).map(([key, label]) =>
@@ -115,12 +114,7 @@ export default function FeedbackPage() {
           <span style={{ fontWeight: 700 }}>{payload?.currentNickname || "로그인 정보 확인 중"}</span>
           <p style={{ color: "#667085", fontSize: 13, margin: "6px 0 0", lineHeight: 1.6 }}>모임페이지 로그인 계정의 닉네임으로 접수됩니다. 직접 수정하거나 다른 회원의 닉네임으로 제출할 수 없습니다.</p>
         </div>
-        <fieldset style={{ border: 0, margin: "0 0 17px", padding: 0 }}>
-          <legend style={{ fontWeight: 700, marginBottom: 8 }}>작성 방식</legend>
-          <label style={{ marginRight: 18, display: "inline-block", marginBottom: 8 }}><input type="radio" name="anonymous" checked={anonymous} onChange={() => setAnonymous(true)} /> 익명</label>
-          <label><input type="radio" name="anonymous" checked={!anonymous} onChange={() => setAnonymous(false)} /> 닉네임 공개</label>
-          <p style={{ color: "#667085", fontSize: 13, lineHeight: 1.6 }}>익명으로 작성해도 본인 계정과 닉네임은 내부에 연결되어 답변을 확인할 수 있습니다. 단, 익명 접수의 닉네임과 계정 정보는 운영진에게 표시되지 않습니다.</p>
-        </fieldset>
+        <p style={{ background: "#f0f3fa", borderRadius: 12, padding: 13, fontSize: 13, lineHeight: 1.7 }}>작성 시 로그인 계정의 닉네임이 자동으로 표시됩니다. 익명 작성은 지원하지 않으며, 의견과 답변은 작성자 본인과 방장·지정 운영진에게만 공개됩니다.</p>
         <label htmlFor="feedback-title" style={{ display: "block", fontWeight: 700, marginBottom: 7 }}>제목</label>
         <input id="feedback-title" required minLength={2} maxLength={120} value={title} onChange={e => setTitle(e.target.value)} placeholder="제목을 입력해주세요" style={{ ...fieldStyle, marginBottom: 17 }} />
         <label htmlFor="feedback-content" style={{ display: "block", fontWeight: 700, marginBottom: 7 }}>내용</label>
@@ -142,7 +136,7 @@ export default function FeedbackPage() {
         </article>)}
       </section>}
       {activeTab === "inbox" && payload?.isReviewer && <section aria-label="운영진 접수함">
-        <div style={{ ...boxStyle, fontSize: 13, color: "#667085" }}>익명 접수의 작성자 정보는 이 화면에서 조회할 수 없습니다. 모든 답변은 작성자 본인에게만 보입니다.</div>
+        <div style={{ ...boxStyle, fontSize: 13, color: "#667085" }}>모든 신규 의견은 작성자 닉네임과 함께 접수됩니다. 답변은 작성자 본인에게만 보입니다. 이전에 익명으로 접수된 내역이 있다면 기존 익명 설정은 유지합니다.</div>
         {payload.inbox.map(item => <article key={item.id} style={boxStyle}>
           <div style={{ fontSize: 12, color: "#667085" }}>{categoryLabels[item.category]} · {new Date(item.created_at).toLocaleString("ko-KR")} · {item.author || "익명"}</div>
           <h2 style={{ fontSize: 18, overflowWrap: "anywhere" }}>{item.title}</h2>
