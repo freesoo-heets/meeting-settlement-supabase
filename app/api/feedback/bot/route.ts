@@ -25,11 +25,13 @@ async function operator(db: Db, uid: string) {
   if (pErr) throw pErr;
   if (!profile) return null;
   if (profile.role === "owner") return profile;
-  if (profile.role !== "admin") return null;
-  const { data: assigned, error: aErr } = await db.from("jjinchin_feedback_reviewers")
-    .select("user_id").eq("user_id", profile.id).maybeSingle();
-  if (aErr) throw aErr;
-  return assigned ? profile : null;
+  const [{ data: assigned, error: aErr }, { data: verified, error: vErr }] = await Promise.all([
+    db.from("jjinchin_feedback_reviewers").select("user_id").eq("user_id", profile.id).maybeSingle(),
+    db.from("jjinchin_feedback_verified_bot_admins").select("profile_id").eq("profile_id", profile.id)
+      .eq("kakao_uid", uid).gte("verified_at", new Date(Date.now()-7*86400000).toISOString()).maybeSingle()
+  ]);
+  if (aErr || vErr) throw aErr || vErr;
+  return assigned && verified ? profile : null;
 }
 const numberOf = (n: unknown) => typeof n === "number" && Number.isSafeInteger(n) && n > 0 ? n : null;
 const string = (s: unknown) => typeof s === "string" ? s.trim() : "";

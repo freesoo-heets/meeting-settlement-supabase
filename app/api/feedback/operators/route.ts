@@ -23,13 +23,24 @@ export async function GET(request: Request) {
     const auth = await requireOwner(request);
     if (auth.response) return auth.response;
     const db = auth.db!;
-    const [{ data: operators, error: opError }, { data: profiles, error: pError }] = await Promise.all([
+    const [{ data: operators, error: opError }, { data: profiles, error: pError },
+      { data: verified, error: verifiedError }] = await Promise.all([
       db.from("jjinchin_feedback_bot_operators").select("kakao_uid,profile_id"),
-      db.from("profiles").select("id,nickname,role").in("role", ["owner", "admin"])
+      db.from("profiles").select("id,nickname,role").in("role", ["owner", "admin"]),
+      db.from("jjinchin_feedback_verified_bot_admins").select("profile_id")
+        .gte("verified_at", new Date(Date.now() - 7 * 86400000).toISOString())
     ]);
-    if (opError || pError) throw opError || pError;
+    if (opError || pError || verifiedError) throw opError || pError || verifiedError;
+    const listed = new Map((profiles || []).map(x => [x.id, x]));
+    const extraIds = (verified || []).map(x => x.profile_id).filter(id => !listed.has(id));
+    if (extraIds.length) {
+      const { data: extra, error: extraError } = await db.from("profiles")
+        .select("id,nickname,role").in("id", extraIds);
+      if (extraError) throw extraError;
+      (extra || []).forEach(x => listed.set(x.id, x));
+    }
     const byProfile = new Map((operators || []).map(x => [x.profile_id,x.kakao_uid]));
-    return respond({ ok: true, rows: (profiles || []).map(x => ({
+    return respond({ ok: true, rows: [...listed.values()].map(x => ({
       profileId: x.id, nickname: x.nickname, role: x.role, kakaoUid: byProfile.get(x.id) || ""
     })) });
   } catch { return fail("운영진 연결 정보를 읽지 못했습니다.", 500); }
@@ -46,8 +57,13 @@ export async function PUT(request: Request) {
       return fail("회원 또는 카카오 사용자 ID가 올바르지 않습니다.", 400);
     const { data: target, error: tErr } = await db!.from("profiles")
       .select("id,role").eq("id", profileId).maybeSingle();
-    if (tErr || !target || !["owner", "admin"].includes(target.role))
-      return fail("방장·운영진 계정만 연결할 수 있습니다.", 400);
+    if (tErr || !target) return fail("등록된 회원 계정이 아닙니다.", 400);
+    if (!["owner", "admin"].includes(target.role)) {
+      const { data: verified, error: vErr } = await db!.from("jjinchin_feedback_verified_bot_admins")
+        .select("profile_id").eq("profile_id", profileId)
+        .gte("verified_at", new Date(Date.now() - 7 * 86400000).toISOString()).maybeSingle();
+      if (vErr || !verified) return fail("admin_helper.py에서 최근 인증된 관리자만 연결할 수 있습니다.", 403);
+    }
     // An admin may be mapped but cannot use the bot unless currently assigned.
     if (kakaoUid) {
       const { error: saveError } = await db!.from("jjinchin_feedback_bot_operators").upsert({

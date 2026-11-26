@@ -19,12 +19,20 @@ async function authenticate(request: Request): Promise<Authorized | Response> {
   if (profileError || !profile) return err("회원 프로필이 없습니다.", 403);
   return { db, profile: profile as Profile };
 }
-async function reviewer(db: Db, profile: Profile) {
-  if (profile.role === "owner") return true;
-  if (profile.role !== "admin") return false;
-  const { data, error } = await db.from("jjinchin_feedback_reviewers").select("user_id").eq("user_id", profile.id).maybeSingle();
+const VERIFIED_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+const verifiedSince = () => new Date(Date.now() - VERIFIED_WINDOW_MS).toISOString();
+async function isVerifiedBotAdmin(db: Db, profileId: string) {
+  const { data, error } = await db.from("jjinchin_feedback_verified_bot_admins")
+    .select("profile_id").eq("profile_id", profileId).gte("verified_at", verifiedSince()).maybeSingle();
   if (error) throw error;
   return !!data;
+}
+async function reviewer(db: Db, profile: Profile) {
+  if (profile.role === "owner") return true;
+  const { data, error } = await db.from("jjinchin_feedback_reviewers")
+    .select("user_id").eq("user_id", profile.id).maybeSingle();
+  if (error) throw error;
+  return !!data && await isVerifiedBotAdmin(db, profile.id);
 }
 const categories = new Set(["suggestion", "complaint", "concern", "other"]);
 const statuses = new Set(["received", "reviewing", "answered", "closed"]);
@@ -60,15 +68,26 @@ export async function GET(request: Request) {
         inbox = inbox.map(x => ({ ...x, author: x.anonymous ? "익명" : map.get(x.id as string) || "회원" }));
       } else inbox = inbox.map(x => ({ ...x, author: "익명" }));
     }
-    let admins: { id: string; nickname: string; selected: boolean }[] = [];
+    let admins: { id: string; nickname: string; selected: boolean; verified: boolean }[] = [];
     if (profile.role === "owner") {
-      const [{ data: candidates, error: candidateError }, { data: assigned, error: assignedError }] = await Promise.all([
-        db.from("profiles").select("id,nickname").eq("role", "admin"),
+      const [{ data: verified, error: verifiedError }, { data: assigned, error: assignedError }] = await Promise.all([
+        db.from("jjinchin_feedback_verified_bot_admins").select("profile_id,nickname_at_verification,verified_at"),
         db.from("jjinchin_feedback_reviewers").select("user_id"),
       ]);
-      if (candidateError || assignedError) throw candidateError || assignedError;
+      if (verifiedError || assignedError) throw verifiedError || assignedError;
       const selected = new Set((assigned || []).map(x => x.user_id));
-      admins = (candidates || []).map(x => ({ id: x.id, nickname: x.nickname, selected: selected.has(x.id) }));
+      const validFrom = Date.now() - VERIFIED_WINDOW_MS;
+      const current = new Map((verified || []).map(x => [x.profile_id, x]));
+      const ids = [...new Set([...current.keys(), ...selected])].filter(id => id !== profile.id);
+      if (ids.length) {
+        const { data: accounts, error: accountsError } = await db.from("profiles")
+          .select("id,nickname").in("id", ids);
+        if (accountsError) throw accountsError;
+        admins = (accounts || []).map(x => ({
+          id: x.id, nickname: x.nickname, selected: selected.has(x.id),
+          verified: !!current.get(x.id) && new Date(current.get(x.id)!.verified_at).getTime() >= validFrom
+        })).sort((a, b) => Number(b.verified) - Number(a.verified) || a.nickname.localeCompare(b.nickname, "ko"));
+      }
     }
     return json({ ok: true, currentNickname: profile.nickname, mine: myItems, inbox, isReviewer, isOwner: profile.role === "owner", admins });
   } catch (e) {
@@ -146,8 +165,11 @@ export async function PUT(request: Request) {
     if (profile.role !== "owner") return err("방장만 담당 운영진을 지정할 수 있습니다.", 403);
     const body = await request.json().catch(() => ({}));
     if (!uuid(body.userId) || typeof body.enabled !== "boolean") return err("대상 정보가 올바르지 않습니다.", 400);
-    const { data: candidate, error: candidateError } = await db.from("profiles").select("id,role").eq("id", body.userId).maybeSingle();
-    if (candidateError || !candidate || candidate.role !== "admin") return err("관리자 권한을 가진 회원만 지정할 수 있습니다.", 400);
+    const { data: candidate, error: candidateError } = await db.from("profiles")
+      .select("id").eq("id", body.userId).maybeSingle();
+    if (candidateError || !candidate) return err("등록된 회원 계정이 없습니다.", 400);
+    if (body.enabled && !(await isVerifiedBotAdmin(db, body.userId)))
+      return err("admin_helper.py에서 최근 인증된 관리자만 지정할 수 있습니다. 운영진방에서 !소리인증을 실행해주세요.", 403);
     if (body.enabled) {
       const { error } = await db.from("jjinchin_feedback_reviewers").upsert({ user_id: body.userId, assigned_by: profile.id }, { onConflict: "user_id" });
       if (error) throw error;
