@@ -12,6 +12,44 @@ import {
 import { BUY_IN, cardText, emptyTable, legal, publicView, showdownOpen, type Action, type Card, type Table } from "../../../lib/holdem";
 import { IDLE_MINUTES, SEAT_ACTIVE, apply, step, type Ctx, type SeatRow, type TableStatus } from "../../../lib/holdemTable";
 
+// 🃏 족보 보너스: 판이 막 끝났으면(ctx.bonuses — holdemTable afterChange 가 계산) 기록해 두고,
+//   봇이 카톡 점수판에 지급한다 (holdem_bonuses). 같은 판 · 같은 사람은 표의 unique 로 한 번만.
+//   실패해도 판 진행은 막지 않는다. 친선 · 시험 테이블은 없음.
+async function recordHandBonuses(admin: Admin, row: TableRow, ctx: Ctx) {
+  const bonuses = ctx.bonuses ?? [];
+  if (!bonuses.length || row.is_friendly || row.is_test) return;
+  try {
+    const seatIds = bonuses.map((b) => b.seatId).filter((id): id is string => !!id);
+    const { data: seatRows } = await admin.from("holdem_seats").select("id,uid").in("id", seatIds);
+    const uidOf = new Map((seatRows ?? []).map((s) => [s.id as string, s.uid as string]));
+    const rows = bonuses
+      .map((b) => {
+        if (!b.member || !b.seatId) return null;
+        const uid = uidOf.get(b.seatId);
+        const usable = !!uid && uid !== "friendly";
+        return {
+          table_id: row.id,
+          hand_no: b.handNo,
+          seat_id: b.seatId,
+          member_id: b.member,
+          name: b.name,
+          uid: usable ? uid : null,
+          hand: b.hand,
+          cards: b.cards,
+          points: b.points,
+          state: usable ? "pending" : "skipped",
+          note: usable ? null : "카톡 점수판 정보 없음",
+        };
+      })
+      .filter((r): r is NonNullable<typeof r> => !!r);
+    if (!rows.length) return;
+    const { error } = await admin.from("holdem_bonuses").upsert(rows, { onConflict: "table_id,hand_no,member_id", ignoreDuplicates: true });
+    if (error) console.error("holdem_bonuses", error.message);
+  } catch (e) {
+    console.error("holdem_bonuses", e);
+  }
+}
+
 /*
  * 텍사스 홀덤 API (모든 쓰기는 여기서만 한다)
  *
@@ -29,6 +67,7 @@ type TableRow = {
   host_member: string;
   host_name: string;
   is_friendly: boolean;
+  is_test?: boolean;
   max_seats: number;
   version: number;
   turn_deadline: string | null;
@@ -59,7 +98,7 @@ const SEAT_BASE = "id,table_id,member_id,name,status,buy_in,escrow_state";
 async function load(admin: Admin, tableId: string) {
   const seatQuery = (columns: string) => admin.from("holdem_seats").select(columns).eq("table_id", tableId).in("status", SEAT_ACTIVE);
   const [table, secret, first] = await Promise.all([
-    admin.from("holdem_tables").select("id,status,host_member,host_name,is_friendly,max_seats,version,turn_deadline,next_hand_at,updated_at").eq("id", tableId).maybeSingle(),
+    admin.from("holdem_tables").select("id,status,host_member,host_name,is_friendly,is_test,max_seats,version,turn_deadline,next_hand_at,updated_at").eq("id", tableId).maybeSingle(),
     admin.from("holdem_secrets").select("state,version").eq("table_id", tableId).maybeSingle(),
     seatQuery(`${SEAT_BASE},rebuy_state,rebuy_count,last_rebuy,pass_until,renew_state`),
   ]);
@@ -134,7 +173,10 @@ async function mutate(
     if (error) return { ok: false, error };
     // changed: 화면이 다른 사람들에게 '바뀜' 신호를 보낼지 (tick 은 대부분 바뀐 것이 없다)
     if (signature(ctx) === before) return { ok: true, changed: false };
-    if (await save(admin, loaded.row, loaded.version, ctx)) return { ok: true, changed: true };
+    if (await save(admin, loaded.row, loaded.version, ctx)) {
+      await recordHandBonuses(admin, loaded.row, ctx);
+      return { ok: true, changed: true };
+    }
   }
   return { ok: false, error: "동시에 처리하는 중이었어요. 다시 눌러 주세요." };
 }

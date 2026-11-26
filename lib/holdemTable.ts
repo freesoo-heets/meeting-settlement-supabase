@@ -1,5 +1,6 @@
 // 홀덤 온라인 테이블 진행 (서버 전용 · 순수 함수: DB 는 api/holdem 이 다룬다)
 import { act, BUY_IN, cardText, legal, showdownOpen, startHand, type Action, type Player, type Table } from "./holdem";
+import { handBonuses, type HandBonus } from "./holdemBonus";
 
 export const TURN_SECONDS = 25;   // 한 사람 생각 시간
 export const DEAL_SECONDS = 6;    // 새 판: 카드 나눠 주는 연출 시간만큼 더
@@ -34,6 +35,7 @@ const rebuyPending = (seats: SeatRow[], p: Player) =>
 // 시간이 끝난 자리인데 봇이 연장을 처리 중 (방금 티켓을 샀다면 내보내지 않는다)
 const renewPending = (seats: SeatRow[], p: Player) =>
   !!p.passStand && seats.some((s) => s.id === p.seatId && (s.renew_state === "requested" || s.renew_state === "locking"));
+export type BonusHit = HandBonus & { handNo: number; name: string; seatId?: string; member?: string };
 export type Ctx = {
   t: Table;
   status: TableStatus;
@@ -41,6 +43,7 @@ export type Ctx = {
   nextHandAt: number | null;
   updatedAt: number;
   seatUpdates: Map<string, Record<string, unknown>>;
+  bonuses?: BonusHit[]; // 🃏 이번 처리에서 막 끝난 판의 족보 보너스 (저장 뒤 holdem_bonuses 에 적는다)
 };
 
 const iso = (ms: number) => new Date(ms).toISOString();
@@ -59,6 +62,12 @@ function afterChange(ctx: Ctx, before: ReturnType<typeof snap>, now: number) {
       // 화면이 카드를 한 장씩 까고, 한 명씩 공개한 뒤 결과를 보여 줄 시간
       // (모두 폴드한 판도 '🃏 카드 공개' 를 누를 틈이 있게 4.5초 · 2026-11-19)
       ctx.nextHandAt = now + (showdownOpen(t) ? 5000 + shown * 1000 + newCards * 1100 : 4500 + newCards * 1100);
+      // 🃏 족보 보너스는 판이 끝난 바로 이때 계산한다 (곧이어 일어나기 정리로 카드가 지워질 수 있다)
+      const hits = handBonuses(t).map((b) => {
+        const p = t.players[b.playerId];
+        return { ...b, handNo: t.handNo, name: p.name, seatId: p.seatId, member: p.member };
+      });
+      if (hits.length) ctx.bonuses = [...(ctx.bonuses ?? []), ...hits];
       // 🃏 '끝나면 공개' 예약한 사람 (쇼다운에서 어차피 공개되는 사람은 빼고)
       for (const p of t.players) {
         if (p.empty || !p.showAfter || p.hole.length !== 2 || (showdownOpen(t) && !p.folded && !p.out)) continue;
