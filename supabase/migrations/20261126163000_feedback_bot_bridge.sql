@@ -76,7 +76,8 @@ begin
  select f.id,'reminder', f.created_at + interval '24 hours'
  from public.jjinchin_feedback f
  join public.jjinchin_feedback_outbox n on n.feedback_id=f.id and n.kind='new' and n.state='sent'
- where f.status='received'
+ where f.status in ('received','reviewing')
+ and not exists(select 1 from public.jjinchin_feedback_replies rr where rr.feedback_id=f.id)
  and f.created_at < now()-interval '24 hours'
  on conflict(feedback_id,kind) do nothing;
 
@@ -143,9 +144,8 @@ begin
  on conflict(source_message_id) do nothing returning id into added;
  if added is null then return 'ALREADY_PROCESSED'; end if;
 
- -- Avoid duplicate web history trigger by writing latest reply directly inside this RPC.
- -- For bot replies, latest snapshot is updated WITHOUT a duplicate history event via
- -- separate trigger condition (web trigger skips rows with matching source history).
+ -- Explicit transaction-local source marker prevents duplicated audit history.
+ perform set_config('app.feedback_reply_source','kakao',true);
  insert into public.jjinchin_feedback_replies(feedback_id,content,replied_by,replied_at)
  values(fid,trim(p_content),actor,now())
  on conflict(feedback_id) do update set content=excluded.content,replied_by=excluded.replied_by,replied_at=excluded.replied_at;
@@ -154,15 +154,12 @@ begin
 end;
 $$;
 
--- Skip history logging if a matching bot event already exists in this transaction.
+-- Bot API already wrote its append-only history event.
 create or replace function public.jjinchin_feedback_log_web_reply()
 returns trigger language plpgsql security definer set search_path=public as $$
 begin
- if (tg_op='INSERT' or new.content is distinct from old.content) and not exists(
-   select 1 from public.jjinchin_feedback_reply_history h
-   where h.feedback_id=new.feedback_id and h.source='kakao' and h.content=new.content
-    and h.replied_by=new.replied_by and h.replied_at > now()-interval '10 seconds'
- ) then
+ if current_setting('app.feedback_reply_source',true)='kakao' then return new; end if;
+ if tg_op='INSERT' or new.content is distinct from old.content then
    insert into public.jjinchin_feedback_reply_history(feedback_id,content,replied_by,source,replied_at)
    values(new.feedback_id,new.content,new.replied_by,'web',new.replied_at);
  end if;
