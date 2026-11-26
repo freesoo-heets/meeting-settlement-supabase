@@ -7,9 +7,9 @@ import { supabase } from "../../lib/supabase";
 type Category = "suggestion" | "complaint" | "concern" | "other";
 type Status = "received" | "reviewing" | "answered" | "closed";
 type Feedback = {
-  id: string; category: Category; title: string; content: string;
+  id: string; receipt_no?: number; category: Category; title: string; content: string;
   anonymous: boolean; status: Status; created_at: string;
-  author?: string; jjinchin_feedback_replies?: { content: string; replied_at: string }[] | { content: string; replied_at: string } | null;
+  author?: string; jjinchin_feedback_reply_history?: { content: string; replied_at: string; source: string }[]; jjinchin_feedback_replies?: { content: string; replied_at: string }[] | { content: string; replied_at: string } | null;
 };
 type Admin = { id: string; nickname: string; selected: boolean };
 type Payload = { ok: boolean; currentNickname: string; mine: Feedback[]; inbox: Feedback[]; isReviewer: boolean; isOwner: boolean; admins: Admin[]; error?: string };
@@ -126,19 +126,25 @@ export default function FeedbackPage() {
       {activeTab === "mine" && <section aria-label="내 접수내역">
         {!payload?.mine.length && !loading && <div style={boxStyle}>아직 남긴 의견이 없습니다.</div>}
         {payload?.mine.map(item => <article key={item.id} style={boxStyle}>
-          <div style={{ fontSize: 12, color: "#667085" }}>{categoryLabels[item.category]} · {new Date(item.created_at).toLocaleString("ko-KR")} · {statusLabels[item.status]}</div>
+          <div style={{ fontSize: 12, color: "#667085" }}>#{item.receipt_no ?? "접수"} · {categoryLabels[item.category]} · {new Date(item.created_at).toLocaleString("ko-KR")} · {statusLabels[item.status]}</div>
           <h2 style={{ fontSize: 18, overflowWrap: "anywhere" }}>{item.title}</h2>
           <p style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere", lineHeight: 1.7 }}>{item.content}</p>
           <div style={{ background: "#f4f6fa", padding: 13, borderRadius: 12, marginTop: 12 }}>
             <strong>운영진 비공개 답변</strong>
             <p style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere", marginBottom: 0 }}>{replyOf(item)?.content || "아직 답변이 등록되지 않았습니다."}</p>
           </div>
+          {!!item.jjinchin_feedback_reply_history?.length && <details style={{marginTop:12}}>
+            <summary>답변 변경 이력 ({item.jjinchin_feedback_reply_history.length}건)</summary>
+            {item.jjinchin_feedback_reply_history.map((h,i)=><div key={i} style={{padding:10,whiteSpace:"pre-wrap",overflowWrap:"anywhere",borderTop:"1px solid #e4e7f0"}}>
+              <small>{new Date(h.replied_at).toLocaleString("ko-KR")} · {h.source==="kakao"?"운영진방":"웹"}</small><p>{h.content}</p>
+            </div>)}
+          </details>}
         </article>)}
       </section>}
       {activeTab === "inbox" && payload?.isReviewer && <section aria-label="운영진 접수함">
         <div style={{ ...boxStyle, fontSize: 13, color: "#667085" }}>모든 신규 의견은 작성자 닉네임과 함께 접수됩니다. 답변은 작성자 본인에게만 보입니다. 이전에 익명으로 접수된 내역이 있다면 기존 익명 설정은 유지합니다.</div>
         {payload.inbox.map(item => <article key={item.id} style={boxStyle}>
-          <div style={{ fontSize: 12, color: "#667085" }}>{categoryLabels[item.category]} · {new Date(item.created_at).toLocaleString("ko-KR")} · {item.author || "익명"}</div>
+          <div style={{ fontSize: 12, color: "#667085" }}>#{item.receipt_no ?? "접수"} · {categoryLabels[item.category]} · {new Date(item.created_at).toLocaleString("ko-KR")} · {item.author || "회원"}</div>
           <h2 style={{ fontSize: 18, overflowWrap: "anywhere" }}>{item.title}</h2>
           <p style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere", lineHeight: 1.7 }}>{item.content}</p>
           <label htmlFor={"status-" + item.id} style={{ display: "block", fontWeight: 700, marginBottom: 7 }}>처리 상태</label>
@@ -150,6 +156,7 @@ export default function FeedbackPage() {
           <button type="button" disabled={busy} onClick={() => void save(item)} style={{ ...buttonStyle, marginTop: 12 }}>저장</button>
         </article>)}
         {!payload.inbox.length && <div style={boxStyle}>접수된 의견이 없습니다.</div>}
+        {payload.isOwner && <p><Link href="/feedback/operators" style={{color:"#4059ac",fontWeight:700}}>🤖 봇 운영진 카카오 ID 연결 관리</Link></p>}
         {payload.isOwner && <section style={boxStyle}>
           <h2 style={{ fontSize: 19, marginTop: 0 }}>소리함 담당 운영진</h2>
           <p style={{ color: "#667085", fontSize: 13 }}>방장은 항상 열람할 수 있으며, 지정된 관리자만 추가로 확인할 수 있습니다.</p>
