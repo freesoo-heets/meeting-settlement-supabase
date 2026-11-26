@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 import requests
 import meeting_sync
 
-_CMDS = {"!소리", "!소리목록", "!소리도움", "!소리내역", "!답변", "!검토", "!완료"}
+_CMDS = {"!소리", "!소리목록", "!소리도움", "!소리내역", "!답변", "!검토", "!완료", "!소리연결"}
 _bot = None
 _room = None
 _started = False
@@ -121,15 +121,26 @@ def handle(chat, command, arg):
         # Registered admin_helper members may answer from the actual operator room,
         # even when they have not separately been assigned as web reviewers.
         # Web review permissions are never modified by this exception.
-        is_bot_admin = command == "!답변" and _is_registered_bot_admin(chat)
+        is_bot_admin = command in ("!답변", "!소리연결") and _is_registered_bot_admin(chat)
         if not is_bot_admin:
             actor = _operator(uid)
             if not actor:
                 chat.api.reply(room, "⛔ 지정된 소리함 운영진 또는 등록된 봇 관리자만 이용할 수 있습니다.")
                 return True
-        if command == "!소리도움":
+        if command == "!소리연결":
+            direct = _req("GET", "/jjinchin_feedback_bot_operators",
+                          params={"select": "profile_id", "kakao_uid": "eq." + uid, "limit": "1"}) or []
+            known = _req("GET", "/member_kakao_ids",
+                         params={"select": "member_id", "kakao_user_id": "eq." + uid, "limit": "1"}) or []
+            state = "등록됨" if direct or known else "미연결"
+            output = ("🔗 소리함 계정 연결 확인\n"
+                      "현재 발신 카카오 ID: {}\n"
+                      "연결 상태: {}\n"
+                      "방장은 소리함 > 봇 운영진 카카오 ID 연결 관리에서 "
+                      "실제 발신 ID를 해당 관리자에게 연결해주세요.").format(uid, state)
+        elif command == "!소리도움":
             output = ("💌 소리함 명령어\n!소리 / !소리목록\n!소리 번호\n"
-                      "!답변 번호 답변내용\n!검토 번호 / !완료 번호\n!소리내역 번호")
+                      "!답변 번호 답변내용\n!검토 번호 / !완료 번호\n!소리내역 번호\n!소리연결")
         elif command in ("!소리", "!소리목록") and not arg:
             rows = _req("GET", "/jjinchin_feedback", params={
                 "select": "receipt_no,title,status",
@@ -171,7 +182,7 @@ def handle(chat, command, arg):
                 elif status == "FORBIDDEN":
                     output = "⛔ 담당 운영진 권한이 없습니다."
                 elif status in ("ACCOUNT_NOT_LINKED", "ACCOUNT_AMBIGUOUS"):
-                    output = "⚠️ 카카오 ID에 연결된 모임페이지 계정을 확인해주세요."
+                    output = "⚠️ 실제 카카오 발신 ID가 모임페이지 계정에 연결되지 않았습니다. !소리연결로 실제 ID를 확인해주세요."
                 else:
                     output = "⚠️ 답변 저장 실패: {}".format(status)
         elif command in ("!검토", "!완료"):
