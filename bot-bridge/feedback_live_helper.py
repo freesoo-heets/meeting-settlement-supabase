@@ -105,10 +105,14 @@ def observe_admin(chat, force=False):
         return None
     registered = _is_registered_bot_admin(chat)
     if not registered:
-        # A removed admin who chats again loses eligibility immediately.
-        if uid in _admin_verified_cache:
+        # A removed admin who chats again loses eligibility immediately,
+        # including after a bot restart (a fresh process has an empty cache).
+        now = time.monotonic()
+        denied_key = "denied:" + uid
+        if force or now - _admin_verified_cache.get(denied_key, -1e9) >= _ADMIN_SYNC_SECONDS:
             _req("DELETE", "/jjinchin_feedback_verified_bot_admins", params={"kakao_uid": "eq." + uid})
-            _admin_verified_cache.pop(uid, None)
+            _admin_verified_cache[denied_key] = now
+        _admin_verified_cache.pop(uid, None)
         return None
     now = time.monotonic()
     if not force and now - _admin_verified_cache.get(uid, -1e9) < _ADMIN_SYNC_SECONDS:
