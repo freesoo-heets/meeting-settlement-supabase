@@ -76,6 +76,16 @@ def _operator(uid):
     return profile if assigned else None
 
 
+def _is_registered_bot_admin(chat):
+    """Use the exact admin_helper registry and live Kakao chat, never a typed nickname."""
+    try:
+        import admin_helper
+        return bool(admin_helper.is_admin(chat=chat))
+    except Exception:
+        # Fail closed if the administrator registry cannot be loaded.
+        return False
+
+
 def _one(receipt):
     rows = _req("GET", "/jjinchin_feedback", params={
         "select": "id,receipt_no,category,title,content,status,created_at",
@@ -108,10 +118,15 @@ def handle(chat, command, arg):
         return False
     uid = str(getattr(chat.sender, "id", "") or "")
     try:
-        actor = _operator(uid)
-        if not actor:
-            chat.api.reply(room, "⛔ 지정된 소리함 운영진만 이용할 수 있습니다.")
-            return True
+        # Registered admin_helper members may answer from the actual operator room,
+        # even when they have not separately been assigned as web reviewers.
+        # Web review permissions are never modified by this exception.
+        is_bot_admin = command == "!답변" and _is_registered_bot_admin(chat)
+        if not is_bot_admin:
+            actor = _operator(uid)
+            if not actor:
+                chat.api.reply(room, "⛔ 지정된 소리함 운영진 또는 등록된 봇 관리자만 이용할 수 있습니다.")
+                return True
         if command == "!소리도움":
             output = ("💌 소리함 명령어\n!소리 / !소리목록\n!소리 번호\n"
                       "!답변 번호 답변내용\n!검토 번호 / !완료 번호\n!소리내역 번호")
@@ -140,7 +155,9 @@ def handle(chat, command, arg):
                                  getattr(chat.message, "log_id", "") or "")
                 if not message_id:
                     raise ValueError("메시지 고유 ID를 읽지 못해 저장하지 않았습니다.")
-                status = _rpc("jjinchin_feedback_bot_reply", {
+                reply_rpc = ("jjinchin_feedback_bot_reply_registered_admin"
+                             if is_bot_admin else "jjinchin_feedback_bot_reply")
+                status = _rpc(reply_rpc, {
                     "p_kakao_uid": uid, "p_receipt": receipt,
                     "p_message_id": "{}:{}:{}".format(room,uid,message_id),
                     "p_content": parts[1].strip()
@@ -151,6 +168,8 @@ def handle(chat, command, arg):
                     output = "ℹ️ 이미 처리한 답변입니다."
                 elif status == "FORBIDDEN":
                     output = "⛔ 담당 운영진 권한이 없습니다."
+                elif status in ("ACCOUNT_NOT_LINKED", "ACCOUNT_AMBIGUOUS"):
+                    output = "⚠️ 카카오 ID에 연결된 모임페이지 계정을 확인해주세요."
                 else:
                     output = "⚠️ 답변 저장 실패: {}".format(status)
         elif command in ("!검토", "!완료"):
