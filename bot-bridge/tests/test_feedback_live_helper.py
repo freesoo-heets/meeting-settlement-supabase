@@ -30,6 +30,10 @@ with patch.dict(sys.modules, {
 
 class FeedbackAdminHelperTests(TestCase):
     def setUp(self):
+        # Import is intentionally lazy in the production helper.
+        # Preserve the test admin_helper stub for the entire handler call.
+        self.admin_modules = patch.dict(sys.modules, {"admin_helper": admin_stub})
+        self.admin_modules.start()
         self.sent = []
         self.chat = SimpleNamespace(
             room=SimpleNamespace(id="real-operator-room"),
@@ -39,6 +43,9 @@ class FeedbackAdminHelperTests(TestCase):
         )
         helper._room="real-operator-room"
         helper._bot=SimpleNamespace(api=self.chat.api)
+
+    def tearDown(self):
+        self.admin_modules.stop()
 
     def test_admin_helper_registered_can_reply_without_web_reviewer(self):
         admin_stub.is_admin=lambda chat=None: chat is self.chat
