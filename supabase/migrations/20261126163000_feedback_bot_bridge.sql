@@ -39,7 +39,7 @@ create index if not exists feedback_outbox_pending on public.jjinchin_feedback_o
 
 -- Queue only after BOTH content and real account identity have been written.
 create or replace function public.jjinchin_feedback_enqueue_new()
-returns trigger language plpgsql security definer set search_path = public as $$
+returns trigger language plpgsql security invoker set search_path = public as $$
 begin
  insert into public.jjinchin_feedback_outbox(feedback_id,kind)
  values (new.feedback_id,'new') on conflict(feedback_id,kind) do nothing;
@@ -53,7 +53,7 @@ for each row execute function public.jjinchin_feedback_enqueue_new();
 
 -- Trigger from previously registered replies (web API); no overwrite of history.
 create or replace function public.jjinchin_feedback_log_web_reply()
-returns trigger language plpgsql security definer set search_path = public as $$
+returns trigger language plpgsql security invoker set search_path = public as $$
 begin
  if (tg_op='INSERT' or new.content is distinct from old.content) then
    insert into public.jjinchin_feedback_reply_history(feedback_id,content,replied_by,source,replied_at)
@@ -69,7 +69,7 @@ for each row execute function public.jjinchin_feedback_log_web_reply();
 
 -- Service-role-only atomic claim to allow multiple bot workers safely.
 create or replace function public.jjinchin_feedback_claim_outbox()
-returns setof public.jjinchin_feedback_outbox language plpgsql security definer set search_path = public as $$
+returns setof public.jjinchin_feedback_outbox language plpgsql security invoker set search_path = public as $$
 begin
  -- Only one reminder per case; queue after 24h, but only after notification sent.
  insert into public.jjinchin_feedback_outbox(feedback_id,kind,due_at)
@@ -101,7 +101,7 @@ $$;
 
 create or replace function public.jjinchin_feedback_ack_outbox(
  p_id uuid, p_success boolean, p_error text default null
-) returns boolean language plpgsql security definer set search_path=public as $$
+) returns boolean language plpgsql security invoker set search_path=public as $$
 declare changed integer;
 begin
  update public.jjinchin_feedback_outbox set
@@ -120,7 +120,7 @@ $$;
 -- not a displayed Kakao nickname.
 create or replace function public.jjinchin_feedback_bot_reply(
  p_kakao_uid text,p_receipt bigint,p_message_id text,p_content text
-) returns text language plpgsql security definer set search_path=public as $$
+) returns text language plpgsql security invoker set search_path=public as $$
 declare actor uuid; fid uuid; added uuid;
 begin
  if length(trim(p_content)) not between 1 and 4000 then return 'INVALID_CONTENT'; end if;
@@ -156,7 +156,7 @@ $$;
 
 -- Bot API already wrote its append-only history event.
 create or replace function public.jjinchin_feedback_log_web_reply()
-returns trigger language plpgsql security definer set search_path=public as $$
+returns trigger language plpgsql security invoker set search_path=public as $$
 begin
  if current_setting('app.feedback_reply_source',true)='kakao' then return new; end if;
  if tg_op='INSERT' or new.content is distinct from old.content then
@@ -172,5 +172,6 @@ alter table public.jjinchin_feedback_reply_history enable row level security;
 alter table public.jjinchin_feedback_outbox enable row level security;
 revoke all on public.jjinchin_feedback_bot_operators,public.jjinchin_feedback_reply_history,public.jjinchin_feedback_outbox from anon,authenticated;
 grant all on public.jjinchin_feedback_bot_operators,public.jjinchin_feedback_reply_history,public.jjinchin_feedback_outbox to service_role;
+revoke all on function public.jjinchin_feedback_enqueue_new(),public.jjinchin_feedback_log_web_reply() from public,anon,authenticated;
 revoke all on function public.jjinchin_feedback_claim_outbox(),public.jjinchin_feedback_ack_outbox(uuid,boolean,text),public.jjinchin_feedback_bot_reply(text,bigint,text,text) from public,anon,authenticated;
 grant execute on function public.jjinchin_feedback_claim_outbox(),public.jjinchin_feedback_ack_outbox(uuid,boolean,text),public.jjinchin_feedback_bot_reply(text,bigint,text,text) to service_role;
