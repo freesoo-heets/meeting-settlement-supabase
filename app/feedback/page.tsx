@@ -11,7 +11,7 @@ type Feedback = {
   anonymous: boolean; status: Status; created_at: string;
   author?: string; jjinchin_feedback_reply_history?: { content: string; replied_at: string; source: string }[]; jjinchin_feedback_replies?: { content: string; replied_at: string }[] | { content: string; replied_at: string } | null;
 };
-type Admin = { id: string; nickname: string; selected: boolean };
+type Admin = { id: string; nickname: string; selected: boolean; verified: boolean };
 type Payload = { ok: boolean; currentNickname: string; mine: Feedback[]; inbox: Feedback[]; isReviewer: boolean; isOwner: boolean; admins: Admin[]; error?: string };
 const categoryLabels: Record<Category, string> = { suggestion: "건의사항", complaint: "불편·불만", concern: "고민·갈등", other: "기타 의견" };
 const statusLabels: Record<Status, string> = { received: "접수", reviewing: "검토중", answered: "답변완료", closed: "종결" };
@@ -161,19 +161,19 @@ export default function FeedbackPage() {
             <div style={{ minWidth: 0, flex: "1 1 200px" }}>
               <h2 id="feedback-reviewer-heading" style={{ fontSize: 19, margin: 0, letterSpacing: "-0.03em" }}>소리함 담당 운영진</h2>
               <p style={{ color: "#667085", fontSize: 13, lineHeight: 1.65, margin: "8px 0 0" }}>
-                방장은 항상 열람할 수 있습니다. 아래 관리자는 접수 내역을 확인하고 웹에서 처리할 수 있습니다.
+                방장은 항상 열람할 수 있습니다. admin_helper.py에서 인증된 관리자만 담당자로 지정할 수 있습니다. 운영진방에서 !소리인증으로 등록 상태를 갱신하세요.
               </p>
             </div>
             <span style={{ display: "inline-flex", alignItems: "center", whiteSpace: "nowrap", background: "#eef3ff", color: "#344d98", borderRadius: 999, padding: "7px 11px", fontSize: 12, fontWeight: 700 }}>
-              {payload.admins.filter(admin => admin.selected).length} / {payload.admins.length}명 지정
+              {payload.admins.filter(admin => admin.selected && admin.verified).length} / {payload.admins.filter(admin => admin.verified).length}명 지정
             </span>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 245px), 1fr))", gap: 10, marginTop: 18 }}>
             {payload.admins.map(admin => <label key={admin.id} style={{
               display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
               minWidth: 0, minHeight: 72, padding: "13px 15px", borderRadius: 14,
-              border: admin.selected ? "1px solid #a8b9e8" : "1px solid #e3e7f0",
-              background: admin.selected ? "#f4f7ff" : "#fff", cursor: busy ? "wait" : "pointer",
+              border: admin.selected && admin.verified ? "1px solid #a8b9e8" : "1px solid #e3e7f0",
+              background: admin.selected && admin.verified ? "#f4f7ff" : "#fff", cursor: busy || !admin.verified ? "not-allowed" : "pointer",
               boxSizing: "border-box", transition: "background 150ms ease, border-color 150ms ease"
             }}>
               <span style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0, flex: "1 1 auto" }}>
@@ -182,10 +182,10 @@ export default function FeedbackPage() {
                 </span>
                 <span style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 3 }}>
                   <strong style={{ fontSize: 15, color: "#202638", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={admin.nickname}>{admin.nickname}</strong>
-                  <span style={{ color: admin.selected ? "#4059ac" : "#737e91", fontSize: 12 }}>{admin.selected ? "접수함 열람 가능" : "열람 권한 없음"}</span>
+                  <span style={{ color: admin.selected ? "#4059ac" : "#737e91", fontSize: 12 }}>{!admin.verified ? "봇 관리자 인증 필요" : admin.selected ? "접수함 열람 가능" : "열람 권한 없음"}</span>
                 </span>
               </span>
-              <input type="checkbox" checked={admin.selected} disabled={busy} onChange={e => void assign(admin.id, e.target.checked)}
+              <input type="checkbox" checked={admin.selected} disabled={busy || (!admin.verified && !admin.selected)} onChange={e => void assign(admin.id, e.target.checked)}
                 aria-label={admin.nickname + " 소리함 담당 지정"} style={{
                   appearance: "auto", WebkitAppearance: "checkbox", flex: "0 0 20px",
                   width: 20, height: 20, minWidth: 20, minHeight: 20, maxWidth: 20, maxHeight: 20,
@@ -193,13 +193,13 @@ export default function FeedbackPage() {
                 }}/>
             </label>)}
           </div>
-          {!payload.admins.length && <p style={{ color: "#667085", fontSize: 14 }}>지정 가능한 관리자 계정이 없습니다.</p>}
+          {!payload.admins.length && <p style={{ color: "#667085", fontSize: 14 }}>인증된 관리자 계정이 없습니다. 운영진방에서 !소리인증을 실행하면 후보에 추가됩니다.</p>}
           <div style={{ marginTop: 18, paddingTop: 15, borderTop: "1px solid #edf0f5" }}>
             <Link href="/feedback/operators" style={{ color: "#4059ac", fontWeight: 700, fontSize: 14, textDecoration: "none", overflowWrap: "anywhere" }}>
               🤖 봇 운영진 카카오 ID 연결 관리 →
             </Link>
             <p style={{ margin: "7px 0 0", color: "#778196", fontSize: 12, lineHeight: 1.6 }}>
-              카카오톡 !답변 권한은 봇 관리자 명단과 연동되어 별도로 확인됩니다.
+              카카오톡 관리자 지정 명령어와 웹 지정은 동일한 담당자 DB를 사용합니다. 명령어: !소리관리자 목록 · !소리관리자 지정 닉네임 · !소리관리자 해제 닉네임
             </p>
           </div>
         </section>}
