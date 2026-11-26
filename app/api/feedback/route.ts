@@ -70,7 +70,7 @@ export async function GET(request: Request) {
       const selected = new Set((assigned || []).map(x => x.user_id));
       admins = (candidates || []).map(x => ({ id: x.id, nickname: x.nickname, selected: selected.has(x.id) }));
     }
-    return json({ ok: true, mine: myItems, inbox, isReviewer, isOwner: profile.role === "owner", admins });
+    return json({ ok: true, currentNickname: profile.nickname, mine: myItems, inbox, isReviewer, isOwner: profile.role === "owner", admins });
   } catch (e) {
     console.error("[FEEDBACK_GET]", e);
     return err("소리함을 불러오지 못했습니다. 데이터베이스 설정을 확인해주세요.", 500);
@@ -89,6 +89,8 @@ export async function POST(request: Request) {
       return err("분류·제목(2~120자)·내용(5~4000자)을 확인해주세요.", 400);
     }
     const { db, profile } = auth;
+    // 닉네임은 제출자가 입력하지 않고 로그인한 profiles.nickname을 기준으로 기록한다.
+    if (!profile.nickname?.trim()) return err("로그인 계정에 닉네임이 없습니다. 회원 정보를 확인해주세요.", 409);
     const { data: entry, error: insertError } = await db.from("jjinchin_feedback")
       .insert({ category, title, content, anonymous: body.anonymous }).select("id").single();
     if (insertError || !entry) throw insertError || Error("저장할 수 없습니다.");
