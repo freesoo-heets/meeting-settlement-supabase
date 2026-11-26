@@ -156,15 +156,52 @@ export default function FeedbackPage() {
           <button type="button" disabled={busy} onClick={() => void save(item)} style={{ ...buttonStyle, marginTop: 12 }}>저장</button>
         </article>)}
         {!payload.inbox.length && <div style={boxStyle}>접수된 의견이 없습니다.</div>}
-        {payload.isOwner && <p><Link href="/feedback/operators" style={{color:"#4059ac",fontWeight:700}}>🤖 봇 운영진 카카오 ID 연결 관리</Link></p>}
-        {payload.isOwner && <section style={boxStyle}>
-          <h2 style={{ fontSize: 19, marginTop: 0 }}>소리함 담당 운영진</h2>
-          <p style={{ color: "#667085", fontSize: 13 }}>방장은 항상 열람할 수 있으며, 지정된 관리자만 추가로 확인할 수 있습니다.</p>
-          {!payload.admins.length && <p>지정 가능한 관리자 계정이 없습니다.</p>}
-          {payload.admins.map(admin => <label key={admin.id} style={{ display: "flex", gap: 12, alignItems: "center", padding: "10px 0", borderTop: "1px solid #edf0f5" }}>
-            <input type="checkbox" checked={admin.selected} disabled={busy} onChange={e => void assign(admin.id, e.target.checked)} aria-label={admin.nickname + " 운영진 지정"} />
-            <span>{admin.nickname}</span>
-          </label>)}
+        {payload.isOwner && <section aria-labelledby="feedback-reviewer-heading" style={{ ...boxStyle, padding: "clamp(16px, 4vw, 24px)", overflow: "hidden" }}>
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 10 }}>
+            <div style={{ minWidth: 0, flex: "1 1 200px" }}>
+              <h2 id="feedback-reviewer-heading" style={{ fontSize: 19, margin: 0, letterSpacing: "-0.03em" }}>소리함 담당 운영진</h2>
+              <p style={{ color: "#667085", fontSize: 13, lineHeight: 1.65, margin: "8px 0 0" }}>
+                방장은 항상 열람할 수 있습니다. 아래 관리자는 접수 내역을 확인하고 웹에서 처리할 수 있습니다.
+              </p>
+            </div>
+            <span style={{ display: "inline-flex", alignItems: "center", whiteSpace: "nowrap", background: "#eef3ff", color: "#344d98", borderRadius: 999, padding: "7px 11px", fontSize: 12, fontWeight: 700 }}>
+              {payload.admins.filter(admin => admin.selected).length} / {payload.admins.length}명 지정
+            </span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 245px), 1fr))", gap: 10, marginTop: 18 }}>
+            {payload.admins.map(admin => <label key={admin.id} style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+              minWidth: 0, minHeight: 72, padding: "13px 15px", borderRadius: 14,
+              border: admin.selected ? "1px solid #a8b9e8" : "1px solid #e3e7f0",
+              background: admin.selected ? "#f4f7ff" : "#fff", cursor: busy ? "wait" : "pointer",
+              boxSizing: "border-box", transition: "background 150ms ease, border-color 150ms ease"
+            }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0, flex: "1 1 auto" }}>
+                <span aria-hidden="true" style={{ flexShrink: 0, width: 37, height: 37, borderRadius: 12, background: admin.selected ? "#dae5ff" : "#eff1f5", color: "#344d98", display: "grid", placeItems: "center", fontSize: 15, fontWeight: 800 }}>
+                  {admin.nickname.slice(0, 1)}
+                </span>
+                <span style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 3 }}>
+                  <strong style={{ fontSize: 15, color: "#202638", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={admin.nickname}>{admin.nickname}</strong>
+                  <span style={{ color: admin.selected ? "#4059ac" : "#737e91", fontSize: 12 }}>{admin.selected ? "접수함 열람 가능" : "열람 권한 없음"}</span>
+                </span>
+              </span>
+              <input type="checkbox" checked={admin.selected} disabled={busy} onChange={e => void assign(admin.id, e.target.checked)}
+                aria-label={admin.nickname + " 소리함 담당 지정"} style={{
+                  appearance: "auto", WebkitAppearance: "checkbox", flex: "0 0 20px",
+                  width: 20, height: 20, minWidth: 20, minHeight: 20, maxWidth: 20, maxHeight: 20,
+                  margin: 0, padding: 0, accentColor: "#4059ac", cursor: busy ? "wait" : "pointer"
+                }}/>
+            </label>)}
+          </div>
+          {!payload.admins.length && <p style={{ color: "#667085", fontSize: 14 }}>지정 가능한 관리자 계정이 없습니다.</p>}
+          <div style={{ marginTop: 18, paddingTop: 15, borderTop: "1px solid #edf0f5" }}>
+            <Link href="/feedback/operators" style={{ color: "#4059ac", fontWeight: 700, fontSize: 14, textDecoration: "none", overflowWrap: "anywhere" }}>
+              🤖 봇 운영진 카카오 ID 연결 관리 →
+            </Link>
+            <p style={{ margin: "7px 0 0", color: "#778196", fontSize: 12, lineHeight: 1.6 }}>
+              카카오톡 !답변 권한은 봇 관리자 명단과 연동되어 별도로 확인됩니다.
+            </p>
+          </div>
         </section>}
       </section>}
     </div>
