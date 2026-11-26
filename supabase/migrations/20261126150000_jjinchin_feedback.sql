@@ -4,7 +4,7 @@ create table if not exists public.jjinchin_feedback (
   category text not null check (category in ('suggestion','complaint','concern','other')),
   title text not null check (char_length(title) between 2 and 120),
   content text not null check (char_length(content) between 5 and 4000),
-  anonymous boolean not null default true,
+  anonymous boolean not null default false check (anonymous = false),
   status text not null default 'received' check (status in ('received','reviewing','answered','closed')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
