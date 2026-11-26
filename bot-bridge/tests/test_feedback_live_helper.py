@@ -35,6 +35,7 @@ class FeedbackAdminHelperTests(TestCase):
         self.admin_modules = patch.dict(sys.modules, {"admin_helper": admin_stub})
         self.admin_modules.start()
         self.sent = []
+        helper._admin_verified_cache.clear()
         self.chat = SimpleNamespace(
             room=SimpleNamespace(id="real-operator-room"),
             sender=SimpleNamespace(id="stable-kakao-uid",name="admin display name"),
