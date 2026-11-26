@@ -6764,6 +6764,11 @@ html[data-theme="christmas"] select:focus { border-color: #4d8b5e; }
 .hdBet.mine { left: 50%; bottom: 14%; transform: translateX(-50%); z-index: 2; }
 .hdBet .hdChips.bet { position: relative; width: 22px; height: 22px; }
 .hdBet .hdChips.bet .hdChipCol { left: 0; height: 22px; }
+/* ★ 베팅 금액 글자는 칩 · 카드보다 항상 위에 (칩이 금액을 가리던 문제, 2026-11-26)
+   칩은 한 줄로 촘촘히 놓고 그 너비만큼 자리를 차지한다 (HoldemGame.tsx ChipPile) */
+.hdBet { z-index: 3; }
+.hdBet > span { position: relative; z-index: 2; flex: none; white-space: nowrap; box-shadow: 0 1px 4px rgba(0, 0, 0, .45); }
+.hdBet .hdChips.bet { flex: none; z-index: 1; }
 
 /* 칩 */
 .hdChips { position: absolute; pointer-events: none; }

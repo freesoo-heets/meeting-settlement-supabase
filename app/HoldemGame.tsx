@@ -113,15 +113,28 @@ function chipColumns(amount: number, maxPerColumn = 8) {
 const SPOTS = [
   [0, 0], [-26, 6], [26, 4], [-50, -2], [50, 8], [-14, -18], [16, -16], [-38, -20], [40, -14],
 ];
+// ★ 베팅 칩(bet)은 흩지 않고 한 줄로 촘촘히 놓고 그 너비만큼 자리를 차지한다.
+//   예전: 팟처럼 ±50px 흩어 놓아 칩이 옆의 베팅 금액 글자를 덮었다 (2026-11-26 사용자 신고)
+const BET_STEP = 9;      // 베팅 칩 기둥 사이 간격 (기둥 폭 22px 보다 좁게 겹쳐 놓는다)
+const BET_MAX_COLS = 6;
 function ChipPile({ amount, className }: { amount: number; className: string }) {
-  const cols = chipColumns(amount);
+  const compact = className.split(" ").includes("bet");
+  const cols = compact ? chipColumns(amount).slice(0, BET_MAX_COLS) : chipColumns(amount);
   return (
-    <div className={`hdChips ${className}`} aria-hidden="true">
+    <div
+      className={`hdChips ${className}`}
+      aria-hidden="true"
+      style={compact ? { width: 22 + Math.max(0, cols.length - 1) * BET_STEP } : undefined}
+    >
       {cols.map((col, c) => (
         <span
           key={`${c}-${col.cls}`}
           className="hdChipCol"
-          style={{ transform: `translate(${SPOTS[c % SPOTS.length][0]}px, ${SPOTS[c % SPOTS.length][1]}px)` }}
+          style={{
+            transform: compact
+              ? `translateX(${c * BET_STEP}px)`
+              : `translate(${SPOTS[c % SPOTS.length][0]}px, ${SPOTS[c % SPOTS.length][1]}px)`,
+          }}
         >
           {Array.from({ length: col.n }, (_, k) => (
             <i key={k} className={`hdChip ${col.cls}`} style={{ bottom: k * 3.5, animationDelay: `${(k % 4) * 40}ms` }} />
