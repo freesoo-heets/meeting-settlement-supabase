@@ -74,8 +74,8 @@ def handle_message(room_id, sender_uid, message_id, text, send):
             receipt = int(command.split(None, 1)[1])
             result = _api("history",room_id,senderUid=str(sender_uid),receipt=receipt)
             history = result.get("history",[])
-            output = ("💌 #{0} 답변 이력\\n".format(receipt) + ("\\n".join(
-                "{0} · {1}\\n{2}".format(h["replied_at"],h["source"],h["content"]) for h in history
+            output = ("💌 #{0} 답변 이력\n".format(receipt) + ("\n".join(
+                "{0} · {1}\n{2}".format(h["replied_at"],h["source"],h["content"]) for h in history
             ) or "아직 답변이 없습니다."))
         elif command.startswith("!검토 ") or command.startswith("!완료 "):
             flag, number = command.split(None,1)
