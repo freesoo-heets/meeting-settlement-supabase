@@ -10,12 +10,15 @@ from datetime import datetime, timezone
 import requests
 import meeting_sync
 
-_CMDS = {"!소리", "!소리목록", "!소리도움", "!소리내역", "!답변", "!검토", "!완료", "!소리연결"}
+_CMDS = {"!소리", "!소리목록", "!소리도움", "!소리내역", "!답변", "!검토", "!완료", "!소리연결", "!소리인증", "!소리관리자"}
 _bot = None
 _room = None
 _started = False
 _last_error = 0
 _POLL_SECONDS = 30
+_ADMIN_SYNC_SECONDS = 600
+_ADMIN_FRESH_SECONDS = 7 * 24 * 60 * 60
+_admin_verified_cache = {}
 _CATEGORIES = {"suggestion": "건의사항", "complaint": "불편·불만", "concern": "고민·갈등", "other": "기타"}
 
 
@@ -55,25 +58,112 @@ def _send(room, message):
             time.sleep(0.5)
 
 
+def _linked_profile(uid):
+    """Resolve *one* site profile via both existing, owner-approved UID mappings."""
+    candidates = set()
+    mapped = _req("GET", "/jjinchin_feedback_bot_operators",
+                  params={"select": "profile_id", "kakao_uid": "eq." + uid, "limit": "2"}) or []
+    candidates.update(x["profile_id"] for x in mapped)
+    members = _req("GET", "/member_kakao_ids",
+                   params={"select": "member_id", "kakao_user_id": "eq." + uid, "limit": "2"}) or []
+    for member in members:
+        profiles = _req("GET", "/profiles", params={"select": "id", "member_id": "eq." + member["member_id"], "limit": "2"}) or []
+        candidates.update(x["id"] for x in profiles)
+    if len(candidates) != 1:
+        return None
+    rows = _req("GET", "/profiles", params={"select": "id,nickname,role", "id": "eq." + next(iter(candidates)), "limit": "1"}) or []
+    return rows[0] if len(rows) == 1 else None
+
+
 def _operator(uid):
-    rows = _req("GET", "/jjinchin_feedback_bot_operators",
-                params={"select": "profile_id", "kakao_uid": "eq." + uid, "limit": "1"}) or []
-    if not rows:
+    profile = _linked_profile(uid)
+    if not profile:
         return None
-    profile_id = rows[0]["profile_id"]
-    profiles = _req("GET", "/profiles", params={"select": "id,nickname,role",
-                  "id": "eq." + profile_id, "limit": "1"}) or []
-    if not profiles:
-        return None
-    profile = profiles[0]
     if profile["role"] == "owner":
         return profile
-    if profile["role"] != "admin":
+    registered = _req("GET", "/jjinchin_feedback_verified_bot_admins", params={
+        "select": "profile_id", "profile_id": "eq." + profile["id"],
+        "kakao_uid": "eq." + uid,
+        "verified_at": "gte." + datetime.fromtimestamp(time.time()-_ADMIN_FRESH_SECONDS, timezone.utc).isoformat(),
+        "limit": "1"}) or []
+    if not registered:
         return None
     assigned = _req("GET", "/jjinchin_feedback_reviewers",
-                    params={"select": "user_id", "user_id": "eq." + profile_id,
-                            "limit": "1"}) or []
+                    params={"select": "user_id", "user_id": "eq." + profile["id"], "limit": "1"}) or []
     return profile if assigned else None
+
+
+def observe_admin(chat, force=False):
+    """Sync actual admin_helper.is_admin(chat=chat) into a private service-role registry.
+    Called from existing message dispatcher, never trusting a typed nickname.
+    """
+    room = str(getattr(chat.room, "id", "") or "")
+    if room != str(_room) or not _room:
+        return None
+    uid = str(getattr(chat.sender, "id", "") or "").strip()
+    if not uid or len(uid) > 256:
+        return None
+    registered = _is_registered_bot_admin(chat)
+    if not registered:
+        # A removed admin who chats again loses eligibility immediately.
+        if uid in _admin_verified_cache:
+            _req("DELETE", "/jjinchin_feedback_verified_bot_admins", params={"kakao_uid": "eq." + uid})
+            _admin_verified_cache.pop(uid, None)
+        return None
+    now = time.monotonic()
+    if not force and now - _admin_verified_cache.get(uid, -1e9) < _ADMIN_SYNC_SECONDS:
+        return None
+    profile = _linked_profile(uid)
+    if not profile:
+        return None
+    # Set the Prefer header on REST upsert by avoiding a duplicate row: update
+    # existing verified profile first, otherwise insert; fail closed on conflict.
+    current = _req("GET", "/jjinchin_feedback_verified_bot_admins",
+                   params={"select": "profile_id", "profile_id": "eq." + profile["id"], "limit": "1"}) or []
+    record = {"kakao_uid": uid, "nickname_at_verification": profile["nickname"],
+              "verified_at": datetime.now(timezone.utc).isoformat()}
+    if current:
+        _req("PATCH", "/jjinchin_feedback_verified_bot_admins",
+             params={"profile_id": "eq." + profile["id"]}, data=record)
+    else:
+        _req("POST", "/jjinchin_feedback_verified_bot_admins",
+             data={"profile_id": profile["id"], **record})
+    _admin_verified_cache[uid] = now
+    return profile
+
+
+def _manage_reviewer(actor, arg):
+    """Owner-only; candidates must have a recent live admin_helper verification."""
+    parts = arg.strip().split(None, 1)
+    mode = parts[0] if parts else "목록"
+    if mode not in ("목록", "지정", "해제"):
+        return "사용법: !소리관리자 목록 / !소리관리자 지정 닉네임 / !소리관리자 해제 닉네임"
+    verified = _req("GET", "/jjinchin_feedback_verified_bot_admins",
+                    params={"select": "profile_id,nickname_at_verification,verified_at",
+                            "verified_at": "gte." + datetime.fromtimestamp(time.time()-_ADMIN_FRESH_SECONDS, timezone.utc).isoformat(),
+                            "order": "nickname_at_verification.asc", "limit": "100"}) or []
+    selected = _req("GET", "/jjinchin_feedback_reviewers",
+                    params={"select": "user_id", "limit": "200"}) or []
+    selected_ids = {x["user_id"] for x in selected}
+    if mode == "목록":
+        return "💌 소리함 관리자 (admin_helper 최근 인증)\\n" + ("\\n".join(
+            "{} · {}".format(x["nickname_at_verification"],
+                              "담당" if x["profile_id"] in selected_ids else "미지정")
+            for x in verified if x["profile_id"] != actor["id"]) or "인증된 관리자가 없습니다. 운영진방에서 !소리인증을 실행해주세요.")
+    if len(parts) < 2 or not parts[1].strip():
+        return "사용법: !소리관리자 {} 닉네임".format(mode)
+    nickname = parts[1].strip()
+    matches = [x for x in verified if x["nickname_at_verification"] == nickname and x["profile_id"] != actor["id"]]
+    if len(matches) != 1:
+        return "⛔ 최근 admin_helper에서 인증된 정확한 닉네임을 확인해주세요: {}".format(nickname)
+    target = matches[0]["profile_id"]
+    if mode == "지정":
+        if target not in selected_ids:
+            _req("POST", "/jjinchin_feedback_reviewers",
+                 data={"user_id": target, "assigned_by": actor["id"]})
+    elif target in selected_ids:
+        _req("DELETE", "/jjinchin_feedback_reviewers", params={"user_id": "eq." + target})
+    return "✅ {}님 소리함 담당 {} 완료 (웹페이지에도 즉시 반영)".format(nickname, mode)
 
 
 def _is_registered_bot_admin(chat):
@@ -118,6 +208,25 @@ def handle(chat, command, arg):
         return False
     uid = str(getattr(chat.sender, "id", "") or "")
     try:
+        if command == "!소리인증":
+            if not _is_registered_bot_admin(chat):
+                _send(room, "⛔ admin_helper.py에 등록된 관리자만 인증할 수 있습니다.")
+            else:
+                account = observe_admin(chat, force=True)
+                _send(room, "✅ admin_helper 관리자 인증 완료: {}".format(account["nickname"]) if account else
+                      "⚠️ 카카오 ID에 연결된 모임페이지 회원 계정이 없습니다. !소리연결로 확인해주세요.")
+            return True
+        if command == "!소리관리자":
+            if not _is_registered_bot_admin(chat):
+                _send(room, "⛔ 관리자 전용 명령어입니다.")
+                return True
+            account = observe_admin(chat)
+            account = account or _linked_profile(uid)
+            if not account or account["role"] != "owner":
+                _send(room, "⛔ 방장만 소리함 담당자를 지정할 수 있습니다.")
+                return True
+            _send(room, _manage_reviewer(account, arg))
+            return True
         # Registered admin_helper members may answer from the actual operator room,
         # even when they have not separately been assigned as web reviewers.
         # Web review permissions are never modified by this exception.
@@ -140,7 +249,7 @@ def handle(chat, command, arg):
                       "실제 발신 ID를 해당 관리자에게 연결해주세요.").format(uid, state)
         elif command == "!소리도움":
             output = ("💌 소리함 명령어\n!소리 / !소리목록\n!소리 번호\n"
-                      "!답변 번호 답변내용\n!검토 번호 / !완료 번호\n!소리내역 번호\n!소리연결")
+                      "!답변 번호 답변내용\n!검토 번호 / !완료 번호\n!소리내역 번호\n!소리연결\n!소리인증\n!소리관리자 목록/지정/해제")
         elif command in ("!소리", "!소리목록") and not arg:
             rows = _req("GET", "/jjinchin_feedback", params={
                 "select": "receipt_no,title,status",
