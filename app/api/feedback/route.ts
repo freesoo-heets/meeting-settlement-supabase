@@ -85,14 +85,15 @@ export async function POST(request: Request) {
     const category = string(body.category);
     const title = string(body.title);
     const content = string(body.content);
-    if (!categories.has(category) || title.length < 2 || title.length > 120 || content.length < 5 || content.length > 4000 || typeof body.anonymous !== "boolean") {
-      return err("분류·제목(2~120자)·내용(5~4000자)을 확인해주세요.", 400);
+    if (!categories.has(category) || title.length < 2 || title.length > 120 || content.length < 5 || content.length > 4000 || body.anonymous === true) {
+      return err("익명 제출은 불가합니다. 분류·제목(2~120자)·내용(5~4000자)을 확인해주세요.", 400);
     }
     const { db, profile } = auth;
+    // 익명 제출 요청은 API에서 거부한다. 작성자는 로그인 프로필에서만 결정한다.
     // 닉네임은 제출자가 입력하지 않고 로그인한 profiles.nickname을 기준으로 기록한다.
     if (!profile.nickname?.trim()) return err("로그인 계정에 닉네임이 없습니다. 회원 정보를 확인해주세요.", 409);
     const { data: entry, error: insertError } = await db.from("jjinchin_feedback")
-      .insert({ category, title, content, anonymous: body.anonymous }).select("id").single();
+      .insert({ category, title, content, anonymous: false }).select("id").single();
     if (insertError || !entry) throw insertError || Error("저장할 수 없습니다.");
     const { error: authorError } = await db.from("jjinchin_feedback_authors")
       .insert({ feedback_id: entry.id, user_id: profile.id, nickname_at_submission: profile.nickname });
