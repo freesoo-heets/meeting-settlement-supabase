@@ -55,7 +55,7 @@ export async function POST(request: Request) {
           .select("id,receipt_no,category,title,content,created_at,status")
           .eq("id", job.feedback_id).maybeSingle();
         if (fErr) throw fErr;
-        if (!feedback || (job.kind === "reminder" && feedback.status === "answered")) {
+        if (!feedback || (job.kind === "reminder" && !["received", "reviewing"].includes(feedback.status))) {
           await db.rpc("jjinchin_feedback_ack_outbox", { p_id: job.id, p_success: true });
           continue;
         }
