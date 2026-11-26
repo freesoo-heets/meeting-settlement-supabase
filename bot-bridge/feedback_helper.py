@@ -126,7 +126,11 @@ def pump(room_id, send):
             receipt=job["receipt"], nickname=job["nickname"], category=job["category"],
             title=job["title"], content=job["content"], id=marker)
         try:
-            send(room_id, text)
+            # Preserve full submission across conservative Kakao message-size limits.
+            chunk_size = 850
+            chunks = [text[i:i + chunk_size] for i in range(0, len(text), chunk_size)]
+            for index, chunk in enumerate(chunks, 1):
+                send(room_id, "[소리함 {0} {1}/{2}]\\n{3}".format(marker, index, len(chunks), chunk))
             _api("ack", room_id, id=marker, success=True)
             sent += 1
         except Exception:
