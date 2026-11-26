@@ -21,6 +21,6 @@ jobs:
         with:
           persist-credentials: false
       - name: Compile Python bridge
-        run: python3 -m py_compile bot-bridge/feedback_helper.py
+        run: python3 -m py_compile bot-bridge/feedback_helper.py bot-bridge/feedback_live_helper.py
       - name: Run bridge unit tests
         run: python3 -m unittest discover -s bot-bridge/tests -v
