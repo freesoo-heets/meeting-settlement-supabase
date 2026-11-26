@@ -79,6 +79,46 @@ class FeedbackAdminHelperTests(TestCase):
             self.assertTrue(helper.handle(self.chat,"!답변","4 답변"))
         self.assertIn("!소리연결",self.sent[0][1])
 
+    def test_admin_helper_verified_identity_synced_from_real_chat(self):
+        admin_stub.is_admin=lambda chat=None: chat is self.chat
+        account={"id":"profile-123","nickname":"숨차","role":"admin"}
+        with patch.object(helper,"_linked_profile",return_value=account),patch.object(helper,"_req",side_effect=[
+            [],None
+        ]) as req:
+            result=helper.observe_admin(self.chat,force=True)
+            self.assertEqual(result["id"],"profile-123")
+            self.assertEqual(req.call_args.args[:2],("POST","/jjinchin_feedback_verified_bot_admins"))
+            self.assertEqual(req.call_args.kwargs["data"]["kakao_uid"],"stable-kakao-uid")
+
+    def test_nonadmin_chat_never_attests_admin_status(self):
+        admin_stub.is_admin=lambda chat=None: False
+        with patch.object(helper,"_linked_profile") as identity,patch.object(helper,"_req") as requests:
+            self.assertIsNone(helper.observe_admin(self.chat,force=True))
+            identity.assert_not_called()
+            requests.assert_not_called()
+
+    def test_owner_bot_command_assigns_existing_verified_admin(self):
+        admin_stub.is_admin=lambda chat=None: True
+        owner={"id":"owner-1","nickname":"방장","role":"owner"}
+        recent="2099-01-01T00:00:00+00:00"
+        with patch.object(helper,"observe_admin",return_value=owner),patch.object(helper,"_req",side_effect=[
+            [{"profile_id":"target-2","nickname_at_verification":"카티","verified_at":recent}],
+            [],
+            None,
+        ]) as request:
+            self.assertTrue(helper.handle(self.chat,"!소리관리자","지정 카티"))
+            self.assertEqual(request.call_args.args[:2],("POST","/jjinchin_feedback_reviewers"))
+            self.assertEqual(request.call_args.kwargs["data"]["user_id"],"target-2")
+        self.assertIn("지정 완료",self.sent[0][1])
+
+    def test_nonowner_cannot_assign_bot_admins(self):
+        admin_stub.is_admin=lambda chat=None: True
+        admin={"id":"admin-3","nickname":"카티","role":"admin"}
+        with patch.object(helper,"observe_admin",return_value=admin),patch.object(helper,"_req") as requests:
+            self.assertTrue(helper.handle(self.chat,"!소리관리자","지정 누룽"))
+            requests.assert_not_called()
+        self.assertIn("방장만",self.sent[0][1])
+
     def test_not_registered_and_not_web_reviewer_is_denied(self):
         admin_stub.is_admin=lambda chat=None: False
         with patch.object(helper,"_operator",return_value=None),patch.object(helper,"_rpc") as rpc:
