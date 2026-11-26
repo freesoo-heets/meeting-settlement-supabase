@@ -6299,6 +6299,11 @@ async function setAttendanceMembers(memberIds: string[]) {
                 <span><strong>후원리스트</strong><small>월별 후원 횟수 · 지급 포인트</small></span>
                 <span aria-hidden="true">›</span>
               </a>
+              <a href="/feedback" className="extraFeaturesDialogLink">
+                <span className="extraFeaturesDialogIcon" aria-hidden="true">💌</span>
+                <span><strong>찐친 소리함</strong><small>익명 고민 · 불편사항 · 건의 · 비공개 답변</small></span>
+                <span aria-hidden="true">›</span>
+              </a>
               <a href="/pet" className="extraFeaturesDialogLink">
                 <span className="extraFeaturesDialogIcon" aria-hidden="true">🐾</span>
                 <span><span className="extraFeaturesName"><strong>찐친 PET</strong><span className="extraFeaturesStatus">통합 진행중</span></span><small>PET 상태 · Coin · 돌보기 통합 준비</small></span>
