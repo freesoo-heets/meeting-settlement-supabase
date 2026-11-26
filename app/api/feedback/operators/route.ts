@@ -49,14 +49,15 @@ export async function PUT(request: Request) {
     if (tErr || !target || !["owner", "admin"].includes(target.role))
       return fail("방장·운영진 계정만 연결할 수 있습니다.", 400);
     // An admin may be mapped but cannot use the bot unless currently assigned.
-    const { error: removeErr } = await db!.from("jjinchin_feedback_bot_operators")
-      .delete().eq("profile_id", profileId);
-    if (removeErr) throw removeErr;
     if (kakaoUid) {
-      const { error: insertErr } = await db!.from("jjinchin_feedback_bot_operators").insert({
+      const { error: saveError } = await db!.from("jjinchin_feedback_bot_operators").upsert({
         profile_id: profileId, kakao_uid: kakaoUid, assigned_by: profile!.id
-      });
-      if (insertErr) return fail("이미 사용 중인 카카오 사용자 ID이거나 저장에 실패했습니다.", 409);
+      }, { onConflict: "profile_id" });
+      if (saveError) return fail("이미 사용 중인 카카오 사용자 ID이거나 저장에 실패했습니다.", 409);
+    } else {
+      const { error: removeError } = await db!.from("jjinchin_feedback_bot_operators")
+        .delete().eq("profile_id",profileId);
+      if (removeError) throw removeError;
     }
     return respond({ ok: true });
   } catch { return fail("운영진 연결에 실패했습니다.", 500); }
