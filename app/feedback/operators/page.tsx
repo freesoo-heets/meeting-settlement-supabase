@@ -48,7 +48,7 @@ export default function FeedbackBotOperators() {
         <h1 style={{ fontSize: "clamp(24px, 5vw, 31px)", margin: "8px 0 10px", letterSpacing: "-0.035em" }}>🤖 운영진 카카오 ID 연결</h1>
         <p style={{ lineHeight: 1.7, color: "#667085", fontSize: 14, margin: 0 }}>
           실제 카카오톡 사용자 고유 ID를 회원 계정과 연결합니다. 닉네임으로 권한을 확인하지 않으며,
-          봇 관리자 명령어 권한과 웹 접수함 열람 권한은 별도로 관리됩니다.
+          admin_helper.py에서 확인된 관리자는 웹 관리자 역할이 없어도 표시됩니다. 봇 관리자 명령어 권한과 웹 접수함 열람 권한은 별도로 관리됩니다.
         </p>
       </header>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 14, padding: "14px 16px", background: "#edf2ff", borderRadius: 14 }}>
@@ -66,7 +66,7 @@ export default function FeedbackBotOperators() {
               <span aria-hidden="true" style={{ width: 41, height: 41, flexShrink: 0, borderRadius: 13, background: "#e9efff", color: "#4059ac", display: "grid", placeItems: "center", fontWeight: 800 }}>{row.nickname.slice(0, 1)}</span>
               <span style={{ flex: 1, minWidth: 0 }}>
                 <strong style={{ display: "block", fontSize: 16, whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>{row.nickname}</strong>
-                <span style={{ display: "block", fontSize: 12, marginTop: 3, color: "#768197" }}>{row.role === "owner" ? "방장" : "관리자"}</span>
+                <span style={{ display: "block", fontSize: 12, marginTop: 3, color: "#768197" }}>{row.role === "owner" ? "방장" : row.role === "admin" ? "웹 관리자" : "봇 인증 관리자"}</span>
               </span>
               <span style={{ borderRadius: 999, padding: "5px 9px", whiteSpace: "nowrap", fontSize: 12, fontWeight: 700, background: hasId ? "#ecf7f1" : "#f3f4f7", color: hasId ? "#207650" : "#7b8393" }}>{hasId ? "연결됨" : "미연결"}</span>
             </div>
