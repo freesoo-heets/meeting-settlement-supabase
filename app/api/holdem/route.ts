@@ -94,6 +94,25 @@ async function isBotKey(key: string) {
   }
 }
 
+// ⚡ 봇이 판을 진행시켰을 때(모두 카톡으로 나가 있는 등) 보고 있는 화면들에 '바뀜' 신호를 바로 보낸다.
+//   화면(HoldemOnline.tsx)은 holdem-emote-<테이블> 채널의 sync 신호를 받으면 곧바로 다시 읽는다.
+//   예전: 봇이 진행한 변화는 DB 변경 알림이 늦거나 빠지면 5초 확인 때까지 화면이 그대로였다 (2026-11-26)
+async function broadcastSync(tableId: string) {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return;
+  try {
+    await fetch(`${url}/realtime/v1/api/broadcast`, {
+      method: "POST",
+      headers: { apikey: key, "Content-Type": "application/json", ...(key.startsWith("eyJ") ? { Authorization: `Bearer ${key}` } : {}) },
+      body: JSON.stringify({ messages: [{ topic: `holdem-emote-${tableId}`, event: "sync", payload: {} }] }),
+      signal: AbortSignal.timeout(3000),
+    });
+  } catch {
+    // 신호를 못 보내도 화면은 5초마다 스스로 다시 읽는다
+  }
+}
+
 const SEAT_BASE = "id,table_id,member_id,name,status,buy_in,escrow_state";
 async function load(admin: Admin, tableId: string) {
   const seatQuery = (columns: string) => admin.from("holdem_seats").select(columns).eq("table_id", tableId).in("status", SEAT_ACTIVE);
@@ -236,6 +255,7 @@ export async function POST(request: Request) {
   // 봇: 시간 초과 · 다음 판 진행 (로그인 없이 서비스 키로)
   if (action === "tick" && (await isBotKey(request.headers.get("x-bot-key") ?? ""))) {
     const result = await mutate(admin, tableId, (ctx, seats, now) => (step(ctx, seats, now), null));
+    if (result.ok && result.changed) await broadcastSync(tableId);
     return NextResponse.json(result);
   }
 
