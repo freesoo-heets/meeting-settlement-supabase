@@ -3,9 +3,26 @@ import "./globals.css";
 import "./design-polish.css";
 import "./design-polish-phase2.css";
 
+const siteUrl = "https://gangseojjinc.vercel.app";
+
 export const metadata: Metadata = {
-  title: "모임 참석 · 비용 정산",
-  description: "모임 참석자와 비용 정산을 관리하는 사이트",
+  metadataBase: new URL(siteUrl),
+  title: "찐친만들기 모임페이지",
+  description: "강서구 찐친만들기 모임 일정과 참석, 비용 정산을 함께 관리하는 페이지입니다.",
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    locale: "ko_KR",
+    siteName: "강서구 찐친만들기",
+    url: "/",
+    title: "찐친만들기 모임페이지",
+    description: "강서구 찐친만들기 모임 일정과 참석, 비용 정산을 함께 관리하는 페이지입니다.",
+  },
+  twitter: {
+    card: "summary",
+    title: "찐친만들기 모임페이지",
+    description: "강서구 찐친만들기 모임 일정과 참석, 비용 정산을 함께 관리하는 페이지입니다.",
+  },
 };
 
 // 휴대폰 브라우저(삼성 인터넷 · 크롬)의 "강제 다크 모드"가 바둑돌·판 색을 바꿔 버려서 끈다.
