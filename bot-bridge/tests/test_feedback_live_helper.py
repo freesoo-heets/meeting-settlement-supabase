@@ -57,6 +57,28 @@ class FeedbackAdminHelperTests(TestCase):
             self.assertEqual(rpc.call_args.args[1]["p_message_id"],"real-operator-room:stable-kakao-uid:msg-123")
         self.assertIn("비공개 저장", self.sent[0][1])
 
+    def test_verified_admin_can_inspect_real_sender_uid(self):
+        admin_stub.is_admin=lambda chat=None: chat is self.chat
+        with patch.object(helper,"_req",return_value=[]) as req,patch.object(helper,"_operator") as operator:
+            self.assertTrue(helper.handle(self.chat,"!소리연결",""))
+            operator.assert_not_called()
+            self.assertEqual(req.call_count,2)
+        self.assertIn("stable-kakao-uid",self.sent[0][1])
+        self.assertIn("미연결",self.sent[0][1])
+
+    def test_unverified_sender_cannot_inspect_uid(self):
+        admin_stub.is_admin=lambda chat=None: False
+        with patch.object(helper,"_operator",return_value=None),patch.object(helper,"_req") as req:
+            self.assertTrue(helper.handle(self.chat,"!소리연결",""))
+            req.assert_not_called()
+        self.assertNotIn("stable-kakao-uid",self.sent[0][1])
+
+    def test_not_linked_reply_suggests_sender_check(self):
+        admin_stub.is_admin=lambda chat=None: True
+        with patch.object(helper,"_rpc",return_value="ACCOUNT_NOT_LINKED"):
+            self.assertTrue(helper.handle(self.chat,"!답변","4 답변"))
+        self.assertIn("!소리연결",self.sent[0][1])
+
     def test_not_registered_and_not_web_reviewer_is_denied(self):
         admin_stub.is_admin=lambda chat=None: False
         with patch.object(helper,"_operator",return_value=None),patch.object(helper,"_rpc") as rpc:
