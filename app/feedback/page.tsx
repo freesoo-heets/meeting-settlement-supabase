@@ -12,7 +12,7 @@ type Feedback = {
   author?: string; jjinchin_feedback_replies?: { content: string; replied_at: string }[] | { content: string; replied_at: string } | null;
 };
 type Admin = { id: string; nickname: string; selected: boolean };
-type Payload = { ok: boolean; mine: Feedback[]; inbox: Feedback[]; isReviewer: boolean; isOwner: boolean; admins: Admin[]; error?: string };
+type Payload = { ok: boolean; currentNickname: string; mine: Feedback[]; inbox: Feedback[]; isReviewer: boolean; isOwner: boolean; admins: Admin[]; error?: string };
 const categoryLabels: Record<Category, string> = { suggestion: "건의사항", complaint: "불편·불만", concern: "고민·갈등", other: "기타 의견" };
 const statusLabels: Record<Status, string> = { received: "접수", reviewing: "검토중", answered: "답변완료", closed: "종결" };
 const fieldStyle = { width: "100%", boxSizing: "border-box" as const, padding: 13, border: "1px solid #d8dce7", borderRadius: 12, fontSize: 16, color: "#202638", background: "#fff" };
@@ -90,7 +90,7 @@ export default function FeedbackPage() {
       <header style={{ marginBottom: 22 }}>
         <div style={{ fontSize: 12, letterSpacing: 2, color: "#667085" }}>JJINCHIN · PRIVATE FEEDBACK</div>
         <h1 style={{ fontSize: "clamp(26px,5vw,36px)", margin: "8px 0" }}>💌 찐친 소리함</h1>
-        <p style={{ color: "#667085", lineHeight: 1.7, margin: 0 }}>작은 불편, 운영 건의, 말하기 어려운 고민까지 편하게 남겨주세요. 접수 내용과 답변은 공개 게시판에 표시되지 않습니다.</p>
+        <p style={{ color: "#667085", lineHeight: 1.7, margin: 0 }}>작은 불편, 운영 건의, 말하기 어려운 고민까지 편하게 남겨주세요. 작성자 닉네임은 현재 로그인 계정에서 자동으로 연결됩니다.</p>
       </header>
       <nav aria-label="소리함 메뉴" style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 18 }}>
         {([["write", "의견 남기기"], ["mine", "내 접수내역"], ...(payload?.isReviewer ? [["inbox", "운영진 접수함"]] : [])] as [typeof activeTab, string][]).map(([key, label]) =>
@@ -110,11 +110,16 @@ export default function FeedbackPage() {
               </label>)}
           </div>
         </fieldset>
+        <div style={{ marginBottom: 17, padding: 14, borderRadius: 12, background: "#edf1ff" }}>
+          <strong style={{ display: "block", marginBottom: 5 }}>작성자 닉네임 (자동 연동)</strong>
+          <span style={{ fontWeight: 700 }}>{payload?.currentNickname || "로그인 정보 확인 중"}</span>
+          <p style={{ color: "#667085", fontSize: 13, margin: "6px 0 0", lineHeight: 1.6 }}>모임페이지 로그인 계정의 닉네임으로 접수됩니다. 직접 수정하거나 다른 회원의 닉네임으로 제출할 수 없습니다.</p>
+        </div>
         <fieldset style={{ border: 0, margin: "0 0 17px", padding: 0 }}>
           <legend style={{ fontWeight: 700, marginBottom: 8 }}>작성 방식</legend>
           <label style={{ marginRight: 18, display: "inline-block", marginBottom: 8 }}><input type="radio" name="anonymous" checked={anonymous} onChange={() => setAnonymous(true)} /> 익명</label>
           <label><input type="radio" name="anonymous" checked={!anonymous} onChange={() => setAnonymous(false)} /> 닉네임 공개</label>
-          <p style={{ color: "#667085", fontSize: 13, lineHeight: 1.6 }}>익명 접수는 운영진 조회 화면에 작성자 정보를 제공하지 않습니다. 서버에서는 본인 답변 확인을 위해 계정 연결을 별도로 보관합니다.</p>
+          <p style={{ color: "#667085", fontSize: 13, lineHeight: 1.6 }}>익명으로 작성해도 본인 계정과 닉네임은 내부에 연결되어 답변을 확인할 수 있습니다. 단, 익명 접수의 닉네임과 계정 정보는 운영진에게 표시되지 않습니다.</p>
         </fieldset>
         <label htmlFor="feedback-title" style={{ display: "block", fontWeight: 700, marginBottom: 7 }}>제목</label>
         <input id="feedback-title" required minLength={2} maxLength={120} value={title} onChange={e => setTitle(e.target.value)} placeholder="제목을 입력해주세요" style={{ ...fieldStyle, marginBottom: 17 }} />
