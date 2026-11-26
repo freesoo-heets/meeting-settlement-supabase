@@ -91,12 +91,13 @@ class FeedbackAdminHelperTests(TestCase):
             self.assertEqual(req.call_args.args[:2],("POST","/jjinchin_feedback_verified_bot_admins"))
             self.assertEqual(req.call_args.kwargs["data"]["kakao_uid"],"stable-kakao-uid")
 
-    def test_nonadmin_chat_never_attests_admin_status(self):
+    def test_nonadmin_chat_revokes_previous_admin_status(self):
         admin_stub.is_admin=lambda chat=None: False
         with patch.object(helper,"_linked_profile") as identity,patch.object(helper,"_req") as requests:
             self.assertIsNone(helper.observe_admin(self.chat,force=True))
             identity.assert_not_called()
-            requests.assert_not_called()
+            requests.assert_called_once_with("DELETE", "/jjinchin_feedback_verified_bot_admins",
+                                             params={"kakao_uid":"eq.stable-kakao-uid"})
 
     def test_owner_bot_command_assigns_existing_verified_admin(self):
         admin_stub.is_admin=lambda chat=None: True
