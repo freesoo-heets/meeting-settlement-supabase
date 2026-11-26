@@ -146,7 +146,7 @@ def _manage_reviewer(actor, arg):
                     params={"select": "user_id", "limit": "200"}) or []
     selected_ids = {x["user_id"] for x in selected}
     if mode == "목록":
-        return "💌 소리함 관리자 (admin_helper 최근 인증)\\n" + ("\\n".join(
+        return "💌 소리함 관리자 (admin_helper 최근 인증)\n" + ("\n".join(
             "{} · {}".format(x["nickname_at_verification"],
                               "담당" if x["profile_id"] in selected_ids else "미지정")
             for x in verified if x["profile_id"] != actor["id"]) or "인증된 관리자가 없습니다. 운영진방에서 !소리인증을 실행해주세요.")
