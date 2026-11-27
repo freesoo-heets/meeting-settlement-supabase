@@ -1,6 +1,14 @@
+import importlib.util
+from pathlib import Path
 import unittest
 
-from attendance_rank_rewards import OTHER_POINTS, TOP_10_POINTS, reward_for_rank
+module_path = Path(__file__).resolve().parents[1] / 'attendance_rank_rewards.py'
+spec = importlib.util.spec_from_file_location('attendance_rank_rewards_test', module_path)
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+OTHER_POINTS = module.OTHER_POINTS
+TOP_10_POINTS = module.TOP_10_POINTS
+reward_for_rank = module.reward_for_rank
 
 
 class TestAttendanceRankRewards(unittest.TestCase):
